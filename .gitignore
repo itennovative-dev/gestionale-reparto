@@ -1,0 +1,4 @@
+# Pubblica SOLO l'app: tutto il resto (dati, backup, regole con email) resta sul computer.
+*
+!.gitignore
+!index.html
