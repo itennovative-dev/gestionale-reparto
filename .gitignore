@@ -1,4 +1,8 @@
-# Pubblica SOLO l'app: tutto il resto (dati, backup, regole con email) resta sul computer.
+# Pubblica SOLO l'app e i documenti statici (manuali, modelli): tutto il resto (dati, backup, regole con email) resta sul computer.
 *
 !.gitignore
 !index.html
+!manuali/
+!manuali/**
+!modelli/
+!modelli/**

@@ -497,11 +497,7 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Modelli</h2>
-    <p class="note">Documenti e moduli operativi (checklist, etichette, schede qualità...). Come per i manuali, i file non sono incorporati nel software — tienili in una cartella chiamata <strong>modelli</strong>, nella stessa cartella dove hai salvato questo file HTML.</p>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="pickTemplatesFolder()">📁 Collega la cartella "modelli" (più affidabile dei link)</button>
-      <span class="note" id="templatesFolderStatus"></span>
-    </div>
+    <p class="note">Documenti e moduli operativi (checklist, etichette, schede qualità...). I file sono inclusi direttamente nel sito: basta cliccare per aprirli, da qualsiasi dispositivo.</p>
     <div id="templatesList"></div>
     <div class="roster-add-grid">
       <div><label>Titolo</label><input type="text" id="templateNewTitle" placeholder="Es. Checklist avvio produzione"></div>
@@ -526,11 +522,7 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Manuali e documentazione</h2>
-    <p class="note">I file PDF non sono incorporati nel software (sarebbero troppo pesanti) — tienili in una cartella chiamata <strong>manuali</strong>, nella stessa cartella dove hai salvato questo file HTML, e i collegamenti qui sotto si apriranno correttamente. I manuali che mi hai già dato sono precaricati nell'elenco.</p>
-    <div class="btn-row">
-      <button class="btn-ghost" onclick="pickManualsFolder()">📁 Collega la cartella "manuali" (più affidabile dei link)</button>
-      <span class="note" id="manualsFolderStatus"></span>
-    </div>
+    <p class="note">I file PDF sono inclusi direttamente nel sito: basta cliccare per aprirli o scaricarli, da qualsiasi dispositivo.</p>
     <div id="manualsList"></div>
     <div class="roster-add-grid">
       <div><label>Titolo</label><input type="text" id="manualNewTitle" placeholder="Es. Manuale tecnico TR415"></div>
@@ -2838,28 +2830,6 @@ function deleteManual(id){
   saveManuals();
   renderManualsList();
 }
-let manualsDirHandle = null;
-async function pickManualsFolder(){
-  if(!window.showDirectoryPicker){ toast('Il tuo browser non supporta questa funzione (serve Chrome o Edge da computer)'); return; }
-  try{
-    manualsDirHandle = await window.showDirectoryPicker();
-    document.getElementById('manualsFolderStatus').textContent = `Cartella collegata: "${manualsDirHandle.name}" — resta collegata finché tieni aperta questa pagina.`;
-    toast('Cartella collegata');
-    await renderManualsList();
-  }catch(e){ /* utente ha annullato la scelta */ }
-}
-async function openManualFile(filename){
-  if(!manualsDirHandle){ toast('Collega prima la cartella "manuali" con il pulsante qui sopra'); return; }
-  try{
-    const fileHandle = await manualsDirHandle.getFileHandle(filename);
-    const file = await fileHandle.getFile();
-    const url = URL.createObjectURL(file);
-    window.open(url, '_blank');
-    setTimeout(()=>URL.revokeObjectURL(url), 60000);
-  }catch(e){
-    toast(`File "${filename}" non trovato nella cartella collegata — controlla il nome esatto`);
-  }
-}
 async function renderManualsList(){
   const el = document.getElementById('manualsList');
   if(!el) return;
@@ -2867,10 +2837,7 @@ async function renderManualsList(){
   const sorted = MANUALS_LIST.slice().sort((a,b)=> (a.plant||'zzz').localeCompare(b.plant||'zzz'));
   el.innerHTML = sorted.map(m=>{
     const plantTag = m.plant ? (m.plant==='TA' ? 'Taglio anime' : `Impianto ${m.plant}`) : 'Generale';
-    const safeFilename = escJs(m.filename);
-    const link = manualsDirHandle
-      ? `<a href="#" onclick="openManualFile('${safeFilename}'); return false;">${m.title}</a>`
-      : `<a href="manuali/${encodeURIComponent(m.filename)}" target="_blank">${m.title}</a>`;
+    const link = `<a href="manuali/${encodeURIComponent(m.filename)}" target="_blank">${m.title}</a>`;
     return `<div class="roster-row">
       <div class="roster-main"><strong>${plantTag}</strong> — ${link}</div>
       <div class="roster-tags">${m.filename}</div>
@@ -2926,28 +2893,6 @@ function deleteTemplate(id){
   saveTemplates();
   renderTemplatesList();
 }
-let templatesDirHandle = null;
-async function pickTemplatesFolder(){
-  if(!window.showDirectoryPicker){ toast('Il tuo browser non supporta questa funzione (serve Chrome o Edge da computer)'); return; }
-  try{
-    templatesDirHandle = await window.showDirectoryPicker();
-    document.getElementById('templatesFolderStatus').textContent = `Cartella collegata: "${templatesDirHandle.name}" — resta collegata finché tieni aperta questa pagina.`;
-    toast('Cartella collegata');
-    await renderTemplatesList();
-  }catch(e){ /* utente ha annullato la scelta */ }
-}
-async function openTemplateFile(filename){
-  if(!templatesDirHandle){ toast('Collega prima la cartella "modelli" con il pulsante qui sopra'); return; }
-  try{
-    const fileHandle = await templatesDirHandle.getFileHandle(filename);
-    const file = await fileHandle.getFile();
-    const url = URL.createObjectURL(file);
-    window.open(url, '_blank');
-    setTimeout(()=>URL.revokeObjectURL(url), 60000);
-  }catch(e){
-    toast(`File "${filename}" non trovato nella cartella collegata — controlla il nome esatto`);
-  }
-}
 function renderTemplatesList(){
   const el = document.getElementById('templatesList');
   if(!el) return;
@@ -2956,10 +2901,7 @@ function renderTemplatesList(){
   el.innerHTML = categories.map(cat=>{
     const items = TEMPLATES_LIST.filter(t=>(t.category||'Altro')===cat);
     const rows = items.map(t=>{
-      const safeFilename = escJs(t.filename);
-      const link = templatesDirHandle
-        ? `<a href="#" onclick="openTemplateFile('${safeFilename}'); return false;">${t.title}</a>`
-        : `<a href="modelli/${encodeURIComponent(t.filename)}" target="_blank">${t.title}</a>`;
+      const link = `<a href="modelli/${encodeURIComponent(t.filename)}" target="_blank">${t.title}</a>`;
       return `<div class="roster-row">
         <div class="roster-main">${link}</div>
         <div class="roster-tags">${t.filename}</div>
