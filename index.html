@@ -587,10 +587,20 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Importa dati statistiche</h2>
-    <p class="note">Carica qui tutti i file Excel — sia quelli di produzione (mensili, per fase) sia quelli di turni/operatori/impianti — anche insieme, anche di anni diversi: il sistema riconosce da solo il tipo di ciascun file. Ricaricando un file già importato, i dati corrispondenti si aggiornano senza perdere gli altri anni già presenti.</p>
+
+    <h3 class="panel-subtitle">Statistiche produzione</h3>
+    <p class="note">Scegli il pulsante della fase giusta: il file caricato viene assegnato a quella fase a prescindere dal suo nome. Ricaricando un file già importato, i dati si aggiornano senza perdere gli anni già presenti.</p>
     <div class="btn-row">
-      <input type="file" id="importAnyFileInput" accept=".xlsx" multiple onchange="importAnyFiles(event)">
+      <label class="btn-primary" style="cursor:pointer;">📥 Importa dati fase 11000<input type="file" accept=".xlsx" multiple style="display:none;" onchange="importProductionFilesForced(event,'11000')"></label>
+      <label class="btn-primary" style="cursor:pointer;">📥 Importa dati TOTALE<input type="file" accept=".xlsx" multiple style="display:none;" onchange="importProductionFilesForced(event,'TOTALE')"></label>
     </div>
+
+    <h3 class="panel-subtitle" style="margin-top:24px;">Turni, operatori e impianti</h3>
+    <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" — anche insieme, anche di anni diversi.</p>
+    <div class="btn-row">
+      <input type="file" accept=".xlsx" multiple onchange="importOperatorFiles(event)">
+    </div>
+
     <div id="importResultsList" style="margin-top:14px;"></div>
 
     <h3 class="panel-subtitle" style="margin-top:26px;">Cosa è già caricato</h3>
@@ -2278,6 +2288,58 @@ async function importProductionFiles(event){
   toast(imported.length ? `Importati: ${imported.join(', ')}` : 'Nessun file importato');
   populateProductionSelectors();
   renderProductionPage();
+}
+// Import "a comando": la fase è quella scelta dal pulsante cliccato, non dedotta dal nome del file.
+// Se un file caricato qui risulta in realtà un file turni/operatori, viene comunque riconosciuto e smistato lì.
+async function importProductionFilesForced(event, forcedFase){
+  const files = Array.from(event.target.files || []);
+  if(files.length===0) return;
+  toast('Importazione in corso…');
+  const imported = [];
+  const rerouted = [];
+  const errors = [];
+  let touchedProd = false, touchedOp = false;
+  for(const file of files){
+    try{
+      const wb = await loadWorkbookFromFile(file);
+      const ws = wb.worksheets[0];
+      const type = detectImportFileType(ws);
+      if(type === 'operatori'){
+        const recs = parseOperatorWorksheet(ws, file.name);
+        mergeOperatorRecords(recs);
+        rerouted.push(`${file.name} → riconosciuto come turni/operatori`);
+        touchedOp = true;
+        continue;
+      }
+      const {year, data} = parseProductionWorksheet(ws, file.name);
+      PRODUCTION_STATS[forcedFase] = PRODUCTION_STATS[forcedFase] || {};
+      Object.entries(data).forEach(([voce, months])=>{
+        PRODUCTION_STATS[forcedFase][voce] = Object.assign(PRODUCTION_STATS[forcedFase][voce] || {}, months);
+      });
+      imported.push(`${file.name} → fase ${forcedFase}, anno ${year}`);
+      touchedProd = true;
+    }catch(e){
+      console.error(e);
+      errors.push(file.name);
+    }
+  }
+  if(touchedProd) await saveProductionStats();
+  if(touchedOp) await saveOperatorRecords();
+  event.target.value = '';
+  populateProductionSelectors();
+  renderProductionPage();
+  populateOperatorSelectors();
+  renderOperatorStatsPage();
+  renderImportSummary();
+  const lines = [...imported, ...rerouted];
+  const el = document.getElementById('importResultsList');
+  if(el){
+    let html = '';
+    if(lines.length) html += '<p class="note" style="color:var(--t2);">✓ ' + lines.join('<br>✓ ') + '</p>';
+    if(errors.length) html += '<p class="note" style="color:#b3541e;">⚠ Errore leggendo: ' + errors.join(', ') + '</p>';
+    el.innerHTML = html;
+  }
+  toast(lines.length ? `Importati ${lines.length} file su ${files.length}` : 'Nessun file importato');
 }
 function populateProductionSelectors(){
   const faseSel = document.getElementById('prodFaseSelect');
