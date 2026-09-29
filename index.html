@@ -2798,13 +2798,18 @@ let MANUALS_LIST = [];
 async function loadManuals(){
   try{
     const r = await storageGet('manuals-list');
-    if(r){ MANUALS_LIST = JSON.parse(r.value); }
-    else{
-      // primo avvio: precarica i manuali già forniti
-      MANUALS_LIST = DEFAULT_MANUALS.map(m=>({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...m}));
-      await saveManuals();
-    }
+    MANUALS_LIST = r ? JSON.parse(r.value) : [];
   }catch(e){ MANUALS_LIST = []; }
+  // aggiunge eventuali manuali di base mancanti dall'elenco salvato, senza toccare quelli già presenti
+  const existingFiles = new Set(MANUALS_LIST.map(m=>m.filename));
+  let changed = false;
+  DEFAULT_MANUALS.forEach(dm=>{
+    if(!existingFiles.has(dm.filename)){
+      MANUALS_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...dm});
+      changed = true;
+    }
+  });
+  if(changed) await saveManuals();
   const sel = document.getElementById('manualNewPlant');
   if(sel) renderPlantSelectOptions(sel, true, true);
   renderManualsList();
@@ -2864,12 +2869,18 @@ let TEMPLATES_LIST = [];
 async function loadTemplates(){
   try{
     const r = await storageGet('templates-list');
-    if(r){ TEMPLATES_LIST = JSON.parse(r.value); }
-    else{
-      TEMPLATES_LIST = DEFAULT_TEMPLATES.map(t=>({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...t}));
-      await saveTemplates();
-    }
+    TEMPLATES_LIST = r ? JSON.parse(r.value) : [];
   }catch(e){ TEMPLATES_LIST = []; }
+  // aggiunge eventuali modelli di base mancanti dall'elenco salvato, senza toccare quelli già presenti
+  const existingFiles = new Set(TEMPLATES_LIST.map(t=>t.filename));
+  let changed = false;
+  DEFAULT_TEMPLATES.forEach(dt=>{
+    if(!existingFiles.has(dt.filename)){
+      TEMPLATES_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...dt});
+      changed = true;
+    }
+  });
+  if(changed) await saveTemplates();
   renderTemplatesList();
 }
 async function saveTemplates(){
