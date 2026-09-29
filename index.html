@@ -1025,6 +1025,9 @@ function scheduleTurno(name, date){
     const wd = new Date(date+"T00:00:00").getDay();
     if(wd!==0 && wd!==6) return '1';
   }
+  // fallback 5: in mancanza di qualunque altra indicazione, sabato e domenica sono sempre riposo
+  const wdEnd = new Date(date+"T00:00:00").getDay();
+  if(wdEnd===0 || wdEnd===6) return 'R';
   return null;
 }
 // Confronto nomi "tollerante": ignora maiuscole/minuscole, spazi doppi e le diverse varianti di apostrofo
