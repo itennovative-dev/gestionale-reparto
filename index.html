@@ -1014,17 +1014,23 @@ function scheduleTurno(name, date){
   }
   // fallback 3: operatori senza squadra che si alternano a coppia, settimana per settimana,
   // tra 3x1°T+2x2°T e 3x2°T+2x1°T (es. Operatore Y. / Operatore X.)
-  const pair = PAIR_ROTATIONS.find(p=>p.members.includes(name));
+  const nName = normName(name);
+  const pair = PAIR_ROTATIONS.find(p=>p.members.some(m=>normName(m)===nName));
   if(pair){
-    const t = computePairRotationTurno(pair, name, date);
+    const t = computePairRotationTurno(pair, nName, date);
     if(t) return t;
   }
   // fallback 4: operatori senza squadra con turno fisso 1° dal lunedì al venerdì (es. Operatore Z. / D'Esempio Mas.)
-  if((emp && emp.onlyShift1) || FIXED_SHIFT1_NAMES.includes(name)){
+  if((emp && emp.onlyShift1) || FIXED_SHIFT1_NAMES.some(n=>normName(n)===nName)){
     const wd = new Date(date+"T00:00:00").getDay();
     if(wd!==0 && wd!==6) return '1';
   }
   return null;
+}
+// Confronto nomi "tollerante": ignora maiuscole/minuscole, spazi doppi e le diverse varianti di apostrofo
+// (dritto ' vs tipografico ’), per evitare i problemi di corrispondenza già visti con nomi come "D'Esempio".
+function normName(s){
+  return String(s||'').trim().toLowerCase().replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ');
 }
 // Nomi di operatori senza squadra con turno fisso 1° (lun-ven), a prescindere dal flag "solo 1°T" in anagrafica.
 const FIXED_SHIFT1_NAMES = ["Operatore Z.", "D'Esempio Mas."];
@@ -1034,7 +1040,7 @@ const FIXED_SHIFT1_NAMES = ["Operatore Z.", "D'Esempio Mas."];
 const PAIR_ROTATIONS = [
   { members:["Operatore X.", "Operatore Y."], anchorMonday:"2026-09-28" },
 ];
-function computePairRotationTurno(pair, name, dateStr){
+function computePairRotationTurno(pair, normalizedName, dateStr){
   const d = new Date(dateStr+"T00:00:00");
   const weekday = d.getDay();
   if(weekday===0 || weekday===6) return null;
@@ -1042,7 +1048,7 @@ function computePairRotationTurno(pair, name, dateStr){
   const anchorMonday = new Date(pair.anchorMonday+"T00:00:00");
   const weeksDiff = Math.round((monday - anchorMonday) / (7*86400000));
   const flip = ((weeksDiff % 2) + 2) % 2;
-  const idx = pair.members.indexOf(name);
+  const idx = pair.members.findIndex(m=>normName(m)===normalizedName);
   const doingFirstPattern = (idx===0) ? (flip===0) : (flip===1); // 3x1°T+2x2°T questa settimana?
   if(doingFirstPattern) return weekday<=3 ? '1' : '2';
   return weekday<=3 ? '2' : '1';
