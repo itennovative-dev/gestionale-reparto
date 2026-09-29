@@ -2197,6 +2197,10 @@ function detectFaseFromFilename(filename){
   // convenzione 2: "STAT_11000_21000_CAMPIONATURE_ANNO_2022.xlsx" -> "11000_21000_CAMPIONATURE"
   m = filename.match(/STAT_([A-Z0-9_]+?)_ANNO_\d{4}/i);
   if(m) return m[1].toUpperCase();
+  // convenzione 3: il nome del file contiene la parola "totale" -> fase aggregata di tutto il reparto
+  // (struttura del foglio identica alle altre fasi, cambia solo il nome file). L'underscore non è un
+  // confine di parola in JS, quindi si normalizza prima (es. "statistiche_totale_2022" -> "statistiche totale 2022").
+  if(/\btotale\b/i.test(filename.replace(/[^a-zA-Z]+/g, ' '))) return 'TOTALE';
   // riserva generica: tutto ciò che precede l'anno nel nome file
   m = filename.match(/^([A-Z0-9_]+?)[_\s]*\(?(?:ANNO[_\s]*)?20\d{2}/i);
   if(m && m[1].replace(/_/g,'').length>0) return m[1].replace(/^_+|_+$/g,'').toUpperCase();
