@@ -1,0 +1,54 @@
+name: Pubblica gestionale
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      carica_documenti:
+        description: "Carica anche manuali e modelli (cartelle manuali/ e modelli/) nel database"
+        type: boolean
+        default: false
+
+concurrency:
+  group: pubblica
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepara la cartella del sito (solo index.html, nessun documento)
+        run: |
+          mkdir -p public
+          cp index.html public/
+
+      - name: Credenziali Firebase
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SA" ]; then echo "::error::Manca il segreto FIREBASE_SERVICE_ACCOUNT nelle impostazioni del repository"; exit 1; fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+
+      - name: Pubblica sito e regole del database
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: npx --yes firebase-tools@14 deploy --only hosting,firestore:rules --project gestionale-giovanni --non-interactive
+
+      - name: Carica manuali e modelli nel database
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.carica_documenti }}
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+        run: |
+          npm install --prefix tools --no-save --no-audit --no-fund firebase-admin@12
+          node tools/carica-documenti.mjs
+
+      - name: Pulizia credenziali
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

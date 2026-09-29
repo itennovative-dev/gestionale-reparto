@@ -1,4 +1,5 @@
-# Pubblica SOLO l'app e i documenti statici (manuali, modelli): tutto il resto (dati, backup, regole con email) resta sul computer.
+# Nel repository vanno solo l'app, la configurazione di pubblicazione e i documenti sorgente.
+# I documenti (manuali/, modelli/) NON vengono pubblicati nel sito: sono caricati nel database protetto.
 *
 !.gitignore
 !index.html
@@ -6,3 +7,10 @@
 !manuali/**
 !modelli/
 !modelli/**
+!firebase.json
+!.firebaserc
+!firestore.rules
+!.github/
+!.github/**
+!tools/
+!tools/*.mjs

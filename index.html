@@ -194,6 +194,8 @@
   .checkbox-inline{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--steel); font-weight:normal;}
   .checkbox-inline input{width:auto;}
   .roster-row{display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px; flex-wrap:wrap;}
+  .doc-upload-btn{padding:5px 10px; font-size:11.5px; cursor:pointer; white-space:nowrap;}
+  .doc-status{font-size:11px;}
   .roster-row .roster-main{flex:1; min-width:160px;}
   .roster-row .roster-tags{color:var(--sub); font-size:11.5px;}
   .plant-checks{display:flex; gap:10px; flex-wrap:wrap;}
@@ -498,8 +500,9 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Modelli</h2>
-    <p class="note">Documenti e moduli operativi (checklist, etichette, schede qualità...). I file sono inclusi direttamente nel sito: basta cliccare per aprirli, da qualsiasi dispositivo.</p>
+    <p class="note">Documenti e moduli operativi (checklist, etichette, schede qualità...). I file sono salvati nel database protetto: si aprono solo dopo l'accesso, da qualsiasi dispositivo. Con "⬆ file" sostituisci un file con una versione aggiornata.</p>
     <div id="templatesList"></div>
+    <h3 class="panel-subtitle" style="margin-top:22px;">Aggiungi un modello</h3>
     <div class="roster-add-grid">
       <div><label>Titolo</label><input type="text" id="templateNewTitle" placeholder="Es. Checklist avvio produzione"></div>
       <div><label>Categoria</label>
@@ -508,10 +511,7 @@
           <option>Schede tecniche</option><option>Materiali</option><option>Monitoraggio</option><option>Formazione</option><option>Altro</option>
         </select>
       </div>
-      <div><label>Nome file (nella cartella "modelli")</label><input type="text" id="templateNewFilename" placeholder="Es. nome_file.docx"></div>
-    </div>
-    <div class="roster-add-grid">
-      <div><label>Oppure scegli il file (solo per compilare il nome file)</label><input type="file" onchange="document.getElementById('templateNewFilename').value=this.files[0]?this.files[0].name:''"></div>
+      <div><label>File</label><input type="file" id="templateNewFile"></div>
     </div>
     <div class="btn-row">
       <button class="btn-primary" onclick="addTemplate()">+ Aggiungi modello</button>
@@ -523,15 +523,13 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Manuali e documentazione</h2>
-    <p class="note">I file PDF sono inclusi direttamente nel sito: basta cliccare per aprirli o scaricarli, da qualsiasi dispositivo.</p>
+    <p class="note">I manuali sono salvati nel database protetto: si aprono solo dopo l'accesso, da qualsiasi dispositivo. I file grandi (es. Eutrolog, 79 MB) richiedono qualche secondo la prima volta. Con "⬆ file" sostituisci un file con una versione aggiornata.</p>
     <div id="manualsList"></div>
+    <h3 class="panel-subtitle" style="margin-top:22px;">Aggiungi un manuale</h3>
     <div class="roster-add-grid">
       <div><label>Titolo</label><input type="text" id="manualNewTitle" placeholder="Es. Manuale tecnico TR415"></div>
       <div><label>Impianto</label><select id="manualNewPlant"></select></div>
-      <div><label>Nome file (nella cartella "manuali")</label><input type="text" id="manualNewFilename" placeholder="Es. nome_file.pdf"></div>
-    </div>
-    <div class="roster-add-grid">
-      <div><label>Oppure scegli il PDF (solo per compilare il nome file)</label><input type="file" accept=".pdf" onchange="document.getElementById('manualNewFilename').value=this.files[0]?this.files[0].name:''"></div>
+      <div><label>File PDF</label><input type="file" id="manualNewFile" accept=".pdf"></div>
     </div>
     <div class="btn-row">
       <button class="btn-primary" onclick="addManual()">+ Aggiungi manuale</button>
@@ -1231,6 +1229,153 @@ async function uploadLocalDataToCloud(askFirst){
   toast('Dati caricati nel database, aggiorno…');
   setTimeout(()=>location.reload(), 1500);
   return true;
+}
+
+/* ============================= DOCUMENTI (manuali e modelli) NEL DATABASE =============================
+   I file non sono più pubblicati insieme al sito: stanno nel database, raccolta "documenti", leggibile
+   solo dopo l'accesso. Firestore accetta al massimo ~1 MB per documento, quindi ogni file è diviso in
+   parti da 700 KB (sottoraccolta "parti") e ricomposto al momento dell'apertura.
+   Lo stesso formato è usato da tools/carica-documenti.mjs per il caricamento iniziale. */
+const DOCS_COLLECTION = 'documenti';
+const DOC_CHUNK = 700*1024;
+const DOC_BATCH = 8;            // parti lette per volta (per mostrare l'avanzamento)
+const DOC_BLOB_CACHE = new Map(); // file già aperti in questa sessione
+const DOC_MIME = {
+  pdf:'application/pdf', doc:'application/msword', xls:'application/vnd.ms-excel',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+};
+function escHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function docMime(filename){ const ext = String(filename).split('.').pop().toLowerCase(); return DOC_MIME[ext] || 'application/octet-stream'; }
+function docRef(folder, filename){
+  return cloudDb.collection(DOCS_COLLECTION).doc(encodeURIComponent((folder+'/'+filename).normalize('NFC')));
+}
+function fmtMB(bytes){
+  if(bytes < 1048576) return Math.max(1, Math.round(bytes/1024))+' KB';
+  return (bytes/1048576).toLocaleString('it-IT',{maximumFractionDigits:1})+' MB';
+}
+
+async function docExists(folder, filename){
+  if(!CLOUD_ENABLED) return null;
+  try{ const s = await docRef(folder, filename).get(); return s.exists ? s.data() : false; }catch(e){ return null; }
+}
+async function loadDocumentBlob(folder, filename){
+  const cacheKey = folder+'/'+filename;
+  if(DOC_BLOB_CACHE.has(cacheKey)) return DOC_BLOB_CACHE.get(cacheKey);
+  const ref = docRef(folder, filename);
+  const meta = await ref.get();
+  if(!meta.exists) return null;
+  const {parts, size, mime} = meta.data();
+  const chunks = [];
+  for(let start=0; start<parts; start+=DOC_BATCH){
+    if(parts > DOC_BATCH) toast(`Apertura ${filename} — ${Math.round(start/parts*100)}% di ${fmtMB(size)}`);
+    const snap = await ref.collection('parti').orderBy('i').startAt(start).limit(DOC_BATCH).get();
+    snap.forEach(d=>chunks.push(d.data().d.toUint8Array()));
+  }
+  if(chunks.length !== parts) throw new Error('file incompleto nel database');
+  const blob = new Blob(chunks, {type: mime || docMime(filename)});
+  DOC_BLOB_CACHE.set(cacheKey, blob);
+  return blob;
+}
+async function openDocument(folder, filename){
+  if(!CLOUD_ENABLED){ window.open(folder+'/'+encodeURIComponent(filename), '_blank'); return; }
+  const isPdf = docMime(filename)==='application/pdf';
+  // La finestra va aperta subito al clic, altrimenti il browser la blocca come popup.
+  const win = isPdf ? window.open('', '_blank') : null;
+  if(win) win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">Apertura del documento in corso…</p>');
+  try{
+    const blob = await loadDocumentBlob(folder, filename);
+    if(!blob){
+      if(win) win.close();
+      toast('⚠ Questo file non è ancora stato caricato nel database');
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    if(win){ win.location.href = url; }
+    else{
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    toast(isPdf ? 'Documento aperto' : 'Documento scaricato');
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  }catch(e){
+    console.error(e);
+    if(win) win.close();
+    toast('⚠ Impossibile aprire il documento: '+(e.message||e));
+  }
+}
+/* Carica (o sostituisce) un file nel database con il nome indicato. */
+async function uploadDocument(folder, filename, file){
+  if(!CLOUD_ENABLED){ toast('Database online non configurato: impossibile caricare file'); return false; }
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const parts = Math.max(1, Math.ceil(buf.length/DOC_CHUNK));
+  const ref = docRef(folder, filename);
+  const user = firebase.auth().currentUser;
+  cloudPendingWrites++;
+  try{
+    const old = await ref.get();
+    const oldParts = old.exists ? (old.data().parts||0) : 0;
+    for(let i=0;i<parts;i++){
+      toast(`Caricamento ${filename} — ${Math.round(i/parts*100)}%`);
+      await ref.collection('parti').doc(String(i).padStart(4,'0')).set({
+        i, d: firebase.firestore.Blob.fromUint8Array(buf.subarray(i*DOC_CHUNK, (i+1)*DOC_CHUNK))
+      });
+    }
+    for(let i=parts;i<oldParts;i++) await ref.collection('parti').doc(String(i).padStart(4,'0')).delete();
+    await ref.set({
+      folder, name: filename, mime: docMime(filename), size: buf.length, parts,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: user ? user.email : ''
+    });
+    DOC_BLOB_CACHE.delete(folder+'/'+filename);
+    toast(`✓ ${filename} caricato (${fmtMB(buf.length)})`);
+    return true;
+  }catch(e){
+    console.error(e);
+    toast('⚠ Caricamento non riuscito: '+(e.message||e));
+    return false;
+  }finally{ cloudPendingWrites--; }
+}
+async function deleteDocumentFile(folder, filename){
+  if(!CLOUD_ENABLED) return;
+  try{
+    const ref = docRef(folder, filename);
+    const snap = await ref.collection('parti').get();
+    for(const d of snap.docs) await d.ref.delete();
+    await ref.delete();
+  }catch(e){ console.error(e); }
+}
+/* Riga di un elenco documenti: link che apre il file dal database, stato e pulsante per (ri)caricarlo. */
+function docRowHtml(folder, entry, labelHtml, deleteFn){
+  const fnJs = escHtml(escJs(entry.filename));
+  const statusId = 'docst-'+folder+'-'+encodeURIComponent(entry.filename).replace(/[^a-zA-Z0-9]/g,'_');
+  return `<div class="roster-row">
+    <div class="roster-main">${labelHtml ? labelHtml+' — ' : ''}<a href="#" onclick="openDocument('${folder}','${fnJs}'); return false;">${escHtml(entry.title)}</a></div>
+    <div class="roster-tags">${escHtml(entry.filename)} <span id="${statusId}" class="doc-status"></span></div>
+    <label class="btn-ghost doc-upload-btn" title="Carica o sostituisci il file nel database">⬆ file<input type="file" style="display:none;" onchange="uploadDocForEntry('${folder}','${fnJs}', this)"></label>
+    <button class="btn-danger" onclick="${deleteFn}('${escHtml(escJs(entry.id))}')">rimuovi</button>
+  </div>`;
+}
+async function refreshDocStatuses(folder, entries){
+  if(!CLOUD_ENABLED) return;
+  for(const e of entries){
+    const el = document.getElementById('docst-'+folder+'-'+encodeURIComponent(e.filename).replace(/[^a-zA-Z0-9]/g,'_'));
+    if(!el) continue;
+    const meta = await docExists(folder, e.filename);
+    if(meta===null) el.textContent = '';
+    else if(meta===false){ el.textContent = '· ⚠ file non caricato'; el.style.color = 'var(--danger)'; }
+    else{ el.textContent = '· '+fmtMB(meta.size); el.style.color = ''; }
+  }
+}
+async function uploadDocForEntry(folder, filename, input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  if(await uploadDocument(folder, filename, file)){
+    if(folder==='manuali') renderManualsList(); else renderTemplatesList();
+  }
 }
 
 /* ============================= STATO ============================= */
@@ -3151,26 +3296,33 @@ function getManualsList(){
 }
 async function saveManualsExtra(){ try{ await storageSet('manuals-extra', JSON.stringify(MANUALS_EXTRA)); }catch(e){} }
 async function saveManualsHidden(){ try{ await storageSet('manuals-hidden', JSON.stringify(MANUALS_HIDDEN)); }catch(e){} }
-function addManual(){
+async function addManual(){
   const title = document.getElementById('manualNewTitle').value.trim();
   const plant = document.getElementById('manualNewPlant').value;
-  const filename = document.getElementById('manualNewFilename').value.trim();
-  if(!title || !filename){ toast('Inserisci almeno titolo e nome file'); return; }
+  const input = document.getElementById('manualNewFile');
+  const file = input.files && input.files[0];
+  if(!title || !file){ toast('Inserisci il titolo e scegli il file'); return; }
+  const filename = file.name;
+  if(getManualsList().some(m=>m.filename===filename)){ toast('Esiste già un manuale con questo nome file: usa "⬆ file" su quella riga per sostituirlo'); return; }
+  if(!(await uploadDocument('manuali', filename, file))) return;
   MANUALS_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, plant, filename});
   document.getElementById('manualNewTitle').value = '';
-  document.getElementById('manualNewFilename').value = '';
+  input.value = '';
   saveManualsExtra();
   renderManualsList();
   toast('Manuale aggiunto');
 }
 function deleteManual(id){
-  if(!confirm("Rimuovere questo manuale dall'elenco? (il file PDF non viene toccato)")) return;
   if(id.indexOf('default:')===0){
+    if(!confirm("Rimuovere questo manuale dall'elenco? (il file resta nel database)")) return;
     const filename = id.slice('default:'.length);
     if(!MANUALS_HIDDEN.includes(filename)){ MANUALS_HIDDEN.push(filename); saveManualsHidden(); }
   }else{
-    MANUALS_EXTRA = MANUALS_EXTRA.filter(m=>m.id!==id);
+    const m = MANUALS_EXTRA.find(x=>x.id===id);
+    if(!confirm("Rimuovere questo manuale? Il file viene cancellato anche dal database.")) return;
+    MANUALS_EXTRA = MANUALS_EXTRA.filter(x=>x.id!==id);
     saveManualsExtra();
+    if(m) deleteDocumentFile('manuali', m.filename);
   }
   renderManualsList();
 }
@@ -3181,15 +3333,10 @@ async function renderManualsList(){
   if(list.length===0){ el.innerHTML = '<p class="empty">Nessun manuale in elenco.</p>'; return; }
   const sorted = list.slice().sort((a,b)=> (a.plant||'zzz').localeCompare(b.plant||'zzz'));
   el.innerHTML = sorted.map(m=>{
-    const plantTag = m.plant ? (m.plant==='TA' ? 'Taglio anime' : `Impianto ${m.plant}`) : 'Generale';
-    const link = `<a href="manuali/${encodeURIComponent(m.filename)}" target="_blank">${m.title}</a>`;
-    const safeId = escJs(m.id);
-    return `<div class="roster-row">
-      <div class="roster-main"><strong>${plantTag}</strong> — ${link}</div>
-      <div class="roster-tags">${m.filename}</div>
-      <button class="btn-danger" onclick="deleteManual('${safeId}')">rimuovi</button>
-    </div>`;
+    const plantTag = m.plant ? (m.plant==='TA' ? 'Taglio anime' : `Impianto ${escHtml(m.plant)}`) : 'Generale';
+    return docRowHtml('manuali', m, `<strong>${plantTag}</strong>`, 'deleteManual');
   }).join('');
+  refreshDocStatuses('manuali', sorted);
 }
 
 /* ============================= MODELLI (checklist, etichette, moduli qualità...) ============================= */
@@ -3225,26 +3372,33 @@ function getTemplatesList(){
 }
 async function saveTemplatesExtra(){ try{ await storageSet('templates-extra', JSON.stringify(TEMPLATES_EXTRA)); }catch(e){} }
 async function saveTemplatesHidden(){ try{ await storageSet('templates-hidden', JSON.stringify(TEMPLATES_HIDDEN)); }catch(e){} }
-function addTemplate(){
+async function addTemplate(){
   const title = document.getElementById('templateNewTitle').value.trim();
   const category = document.getElementById('templateNewCategory').value;
-  const filename = document.getElementById('templateNewFilename').value.trim();
-  if(!title || !filename){ toast('Inserisci almeno titolo e nome file'); return; }
+  const input = document.getElementById('templateNewFile');
+  const file = input.files && input.files[0];
+  if(!title || !file){ toast('Inserisci il titolo e scegli il file'); return; }
+  const filename = file.name;
+  if(getTemplatesList().some(t=>t.filename===filename)){ toast('Esiste già un modello con questo nome file: usa "⬆ file" su quella riga per sostituirlo'); return; }
+  if(!(await uploadDocument('modelli', filename, file))) return;
   TEMPLATES_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, category, filename});
   document.getElementById('templateNewTitle').value = '';
-  document.getElementById('templateNewFilename').value = '';
+  input.value = '';
   saveTemplatesExtra();
   renderTemplatesList();
   toast('Modello aggiunto');
 }
 function deleteTemplate(id){
-  if(!confirm("Rimuovere questo modello dall'elenco? (il file non viene toccato)")) return;
   if(id.indexOf('default:')===0){
+    if(!confirm("Rimuovere questo modello dall'elenco? (il file resta nel database)")) return;
     const filename = id.slice('default:'.length);
     if(!TEMPLATES_HIDDEN.includes(filename)){ TEMPLATES_HIDDEN.push(filename); saveTemplatesHidden(); }
   }else{
-    TEMPLATES_EXTRA = TEMPLATES_EXTRA.filter(t=>t.id!==id);
+    const t = TEMPLATES_EXTRA.find(x=>x.id===id);
+    if(!confirm("Rimuovere questo modello? Il file viene cancellato anche dal database.")) return;
+    TEMPLATES_EXTRA = TEMPLATES_EXTRA.filter(x=>x.id!==id);
     saveTemplatesExtra();
+    if(t) deleteDocumentFile('modelli', t.filename);
   }
   renderTemplatesList();
 }
@@ -3256,17 +3410,10 @@ function renderTemplatesList(){
   const categories = [...new Set(list.map(t=>t.category||'Altro'))].sort();
   el.innerHTML = categories.map(cat=>{
     const items = list.filter(t=>(t.category||'Altro')===cat);
-    const rows = items.map(t=>{
-      const link = `<a href="modelli/${encodeURIComponent(t.filename)}" target="_blank">${t.title}</a>`;
-      const safeId = escJs(t.id);
-      return `<div class="roster-row">
-        <div class="roster-main">${link}</div>
-        <div class="roster-tags">${t.filename}</div>
-        <button class="btn-danger" onclick="deleteTemplate('${safeId}')">rimuovi</button>
-      </div>`;
-    }).join('');
-    return `<h3 class="panel-subtitle" style="margin-top:16px;">${cat}</h3>${rows}`;
+    const rows = items.map(t=>docRowHtml('modelli', t, '', 'deleteTemplate')).join('');
+    return `<h3 class="panel-subtitle" style="margin-top:16px;">${escHtml(cat)}</h3>${rows}`;
   }).join('');
+  refreshDocStatuses('modelli', list);
 }
 
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */

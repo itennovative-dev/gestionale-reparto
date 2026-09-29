@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Accesso ai dati del gestionale: solo gli account elencati qui.
+// Per dare accesso a un'altra persona: aggiungi la sua email alla lista e fai il push.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function autorizzato() {
+      return request.auth != null
+        && request.auth.token.email.lower() in [
+          'vilardogiovanni@gmail.com'
+        ];
+    }
+
+    // Dati del gestionale (un documento per chiave)
+    match /dati/{id} {
+      allow read, write: if autorizzato();
+    }
+
+    // Manuali e modelli, divisi in parti
+    match /documenti/{id} {
+      allow read, write: if autorizzato();
+      match /parti/{parte} {
+        allow read, write: if autorizzato();
+      }
+    }
+
+    // Tutto il resto è chiuso
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
