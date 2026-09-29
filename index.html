@@ -2794,59 +2794,64 @@ const DEFAULT_MANUALS = [
   {title:"Manuale istruzioni TR415 - 1191 (rev. 2)", plant:"118", filename:"118-_Manuale_di_istruzioni_TR415_-_1191_IT_rev_2.pdf"},
   {title:"Manuale tecnico TR415", plant:"116", filename:"116-Manuale_Tecnico_TR_415_-_116.pdf"},
 ];
-let MANUALS_LIST = [];
+/* I manuali "di base" (DEFAULT_MANUALS, inclusi nel sito) sono sempre visibili, a meno che l'utente
+   non li rimuova esplicitamente (finiscono in MANUALS_HIDDEN). Quelli aggiunti dall'utente stanno
+   in MANUALS_EXTRA. Così un vecchio elenco salvato in precedenza (es. nel database cloud) non può
+   più "nascondere" per errore i manuali di base. */
+let MANUALS_EXTRA = [];
+let MANUALS_HIDDEN = [];
 async function loadManuals(){
-  try{
-    const r = await storageGet('manuals-list');
-    MANUALS_LIST = r ? JSON.parse(r.value) : [];
-  }catch(e){ MANUALS_LIST = []; }
-  // aggiunge eventuali manuali di base mancanti dall'elenco salvato, senza toccare quelli già presenti
-  const existingFiles = new Set(MANUALS_LIST.map(m=>m.filename));
-  let changed = false;
-  DEFAULT_MANUALS.forEach(dm=>{
-    if(!existingFiles.has(dm.filename)){
-      MANUALS_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...dm});
-      changed = true;
-    }
-  });
-  if(changed) await saveManuals();
+  try{ const r = await storageGet('manuals-extra'); MANUALS_EXTRA = r ? JSON.parse(r.value) : []; }catch(e){ MANUALS_EXTRA = []; }
+  try{ const r = await storageGet('manuals-hidden'); MANUALS_HIDDEN = r ? JSON.parse(r.value) : []; }catch(e){ MANUALS_HIDDEN = []; }
   const sel = document.getElementById('manualNewPlant');
   if(sel) renderPlantSelectOptions(sel, true, true);
   renderManualsList();
 }
-async function saveManuals(){
-  try{ await storageSet('manuals-list', JSON.stringify(MANUALS_LIST)); }catch(e){}
+function getManualsList(){
+  const base = DEFAULT_MANUALS
+    .filter(m=>!MANUALS_HIDDEN.includes(m.filename))
+    .map(m=>({id:'default:'+m.filename, isDefault:true, ...m}));
+  return [...base, ...MANUALS_EXTRA];
 }
+async function saveManualsExtra(){ try{ await storageSet('manuals-extra', JSON.stringify(MANUALS_EXTRA)); }catch(e){} }
+async function saveManualsHidden(){ try{ await storageSet('manuals-hidden', JSON.stringify(MANUALS_HIDDEN)); }catch(e){} }
 function addManual(){
   const title = document.getElementById('manualNewTitle').value.trim();
   const plant = document.getElementById('manualNewPlant').value;
   const filename = document.getElementById('manualNewFilename').value.trim();
   if(!title || !filename){ toast('Inserisci almeno titolo e nome file'); return; }
-  MANUALS_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, plant, filename});
+  MANUALS_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, plant, filename});
   document.getElementById('manualNewTitle').value = '';
   document.getElementById('manualNewFilename').value = '';
-  saveManuals();
+  saveManualsExtra();
   renderManualsList();
   toast('Manuale aggiunto');
 }
 function deleteManual(id){
-  if(!confirm("Rimuovere questo manuale dall'elenco? (il file PDF sul tuo computer non viene toccato)")) return;
-  MANUALS_LIST = MANUALS_LIST.filter(m=>m.id!==id);
-  saveManuals();
+  if(!confirm("Rimuovere questo manuale dall'elenco? (il file PDF non viene toccato)")) return;
+  if(id.indexOf('default:')===0){
+    const filename = id.slice('default:'.length);
+    if(!MANUALS_HIDDEN.includes(filename)){ MANUALS_HIDDEN.push(filename); saveManualsHidden(); }
+  }else{
+    MANUALS_EXTRA = MANUALS_EXTRA.filter(m=>m.id!==id);
+    saveManualsExtra();
+  }
   renderManualsList();
 }
 async function renderManualsList(){
   const el = document.getElementById('manualsList');
   if(!el) return;
-  if(MANUALS_LIST.length===0){ el.innerHTML = '<p class="empty">Nessun manuale in elenco.</p>'; return; }
-  const sorted = MANUALS_LIST.slice().sort((a,b)=> (a.plant||'zzz').localeCompare(b.plant||'zzz'));
+  const list = getManualsList();
+  if(list.length===0){ el.innerHTML = '<p class="empty">Nessun manuale in elenco.</p>'; return; }
+  const sorted = list.slice().sort((a,b)=> (a.plant||'zzz').localeCompare(b.plant||'zzz'));
   el.innerHTML = sorted.map(m=>{
     const plantTag = m.plant ? (m.plant==='TA' ? 'Taglio anime' : `Impianto ${m.plant}`) : 'Generale';
     const link = `<a href="manuali/${encodeURIComponent(m.filename)}" target="_blank">${m.title}</a>`;
+    const safeId = escJs(m.id);
     return `<div class="roster-row">
       <div class="roster-main"><strong>${plantTag}</strong> — ${link}</div>
       <div class="roster-tags">${m.filename}</div>
-      <button class="btn-danger" onclick="deleteManual('${m.id}')">rimuovi</button>
+      <button class="btn-danger" onclick="deleteManual('${safeId}')">rimuovi</button>
     </div>`;
   }).join('');
 }
@@ -2865,58 +2870,62 @@ const DEFAULT_TEMPLATES = [
   {title:"Materiale non conforme", category:"Qualità", filename:"MATERIALE_NON_CONFORME.DOC"},
   {title:"Etichette stampa 21 (etichette frecce)", category:"Etichette", filename:"etichette_stampa_21_etichette_frecce.doc"},
 ];
-let TEMPLATES_LIST = [];
+/* Stesso schema dei manuali: i modelli "di base" (DEFAULT_TEMPLATES, inclusi nel sito) sono sempre
+   visibili a meno che l'utente non li rimuova esplicitamente (TEMPLATES_HIDDEN); quelli aggiunti
+   dall'utente stanno in TEMPLATES_EXTRA. */
+let TEMPLATES_EXTRA = [];
+let TEMPLATES_HIDDEN = [];
 async function loadTemplates(){
-  try{
-    const r = await storageGet('templates-list');
-    TEMPLATES_LIST = r ? JSON.parse(r.value) : [];
-  }catch(e){ TEMPLATES_LIST = []; }
-  // aggiunge eventuali modelli di base mancanti dall'elenco salvato, senza toccare quelli già presenti
-  const existingFiles = new Set(TEMPLATES_LIST.map(t=>t.filename));
-  let changed = false;
-  DEFAULT_TEMPLATES.forEach(dt=>{
-    if(!existingFiles.has(dt.filename)){
-      TEMPLATES_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), ...dt});
-      changed = true;
-    }
-  });
-  if(changed) await saveTemplates();
+  try{ const r = await storageGet('templates-extra'); TEMPLATES_EXTRA = r ? JSON.parse(r.value) : []; }catch(e){ TEMPLATES_EXTRA = []; }
+  try{ const r = await storageGet('templates-hidden'); TEMPLATES_HIDDEN = r ? JSON.parse(r.value) : []; }catch(e){ TEMPLATES_HIDDEN = []; }
   renderTemplatesList();
 }
-async function saveTemplates(){
-  try{ await storageSet('templates-list', JSON.stringify(TEMPLATES_LIST)); }catch(e){}
+function getTemplatesList(){
+  const base = DEFAULT_TEMPLATES
+    .filter(t=>!TEMPLATES_HIDDEN.includes(t.filename))
+    .map(t=>({id:'default:'+t.filename, isDefault:true, ...t}));
+  return [...base, ...TEMPLATES_EXTRA];
 }
+async function saveTemplatesExtra(){ try{ await storageSet('templates-extra', JSON.stringify(TEMPLATES_EXTRA)); }catch(e){} }
+async function saveTemplatesHidden(){ try{ await storageSet('templates-hidden', JSON.stringify(TEMPLATES_HIDDEN)); }catch(e){} }
 function addTemplate(){
   const title = document.getElementById('templateNewTitle').value.trim();
   const category = document.getElementById('templateNewCategory').value;
   const filename = document.getElementById('templateNewFilename').value.trim();
   if(!title || !filename){ toast('Inserisci almeno titolo e nome file'); return; }
-  TEMPLATES_LIST.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, category, filename});
+  TEMPLATES_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, category, filename});
   document.getElementById('templateNewTitle').value = '';
   document.getElementById('templateNewFilename').value = '';
-  saveTemplates();
+  saveTemplatesExtra();
   renderTemplatesList();
   toast('Modello aggiunto');
 }
 function deleteTemplate(id){
-  if(!confirm("Rimuovere questo modello dall'elenco? (il file sul tuo computer non viene toccato)")) return;
-  TEMPLATES_LIST = TEMPLATES_LIST.filter(t=>t.id!==id);
-  saveTemplates();
+  if(!confirm("Rimuovere questo modello dall'elenco? (il file non viene toccato)")) return;
+  if(id.indexOf('default:')===0){
+    const filename = id.slice('default:'.length);
+    if(!TEMPLATES_HIDDEN.includes(filename)){ TEMPLATES_HIDDEN.push(filename); saveTemplatesHidden(); }
+  }else{
+    TEMPLATES_EXTRA = TEMPLATES_EXTRA.filter(t=>t.id!==id);
+    saveTemplatesExtra();
+  }
   renderTemplatesList();
 }
 function renderTemplatesList(){
   const el = document.getElementById('templatesList');
   if(!el) return;
-  if(TEMPLATES_LIST.length===0){ el.innerHTML = '<p class="empty">Nessun modello in elenco.</p>'; return; }
-  const categories = [...new Set(TEMPLATES_LIST.map(t=>t.category||'Altro'))].sort();
+  const list = getTemplatesList();
+  if(list.length===0){ el.innerHTML = '<p class="empty">Nessun modello in elenco.</p>'; return; }
+  const categories = [...new Set(list.map(t=>t.category||'Altro'))].sort();
   el.innerHTML = categories.map(cat=>{
-    const items = TEMPLATES_LIST.filter(t=>(t.category||'Altro')===cat);
+    const items = list.filter(t=>(t.category||'Altro')===cat);
     const rows = items.map(t=>{
       const link = `<a href="modelli/${encodeURIComponent(t.filename)}" target="_blank">${t.title}</a>`;
+      const safeId = escJs(t.id);
       return `<div class="roster-row">
         <div class="roster-main">${link}</div>
         <div class="roster-tags">${t.filename}</div>
-        <button class="btn-danger" onclick="deleteTemplate('${t.id}')">rimuovi</button>
+        <button class="btn-danger" onclick="deleteTemplate('${safeId}')">rimuovi</button>
       </div>`;
     }).join('');
     return `<h3 class="panel-subtitle" style="margin-top:16px;">${cat}</h3>${rows}`;
