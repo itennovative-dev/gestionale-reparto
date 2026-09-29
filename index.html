@@ -738,7 +738,8 @@
         <label class="checkbox-inline"><input type="checkbox" id="empNewViceResp"> vice responsabile di reparto</label>
       </div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="addEmployee()">+ Aggiungi operatore</button>
+        <button class="btn-primary" id="empSubmitBtn" onclick="addEmployee()">+ Aggiungi operatore</button>
+        <button class="btn-ghost" id="empCancelEditBtn" style="display:none;" onclick="cancelEditEmployee()">Annulla modifica</button>
       </div>
 
       <h3 class="panel-subtitle" style="margin-top:22px;">Operatori sostituti (pool)</h3>
@@ -754,9 +755,10 @@
       </div>
       <div><label class="note" style="display:block; margin:6px 0 4px;">Impianti abilitati</label><div id="subNewPlants" class="plant-checks"></div></div>
       <div class="btn-row">
-        <button class="btn-primary" onclick="addSubstitute()">+ Aggiungi sostituto</button>
+        <button class="btn-primary" id="subSubmitBtn" onclick="addSubstitute()">+ Aggiungi sostituto</button>
+        <button class="btn-ghost" id="subCancelEditBtn" style="display:none;" onclick="cancelEditSubstitute()">Annulla modifica</button>
       </div>
-    
+
   </div>
 </div>
 <div class="panel-section" id="panel-plants" style="display:none;">
@@ -1260,6 +1262,7 @@ function renderEmployeeList(){
     return `<div class="roster-row">
       <div class="roster-main"><strong>${e.name}</strong></div>
       <div class="roster-tags">${tags.join(' · ')||'—'}</div>
+      <button class="btn-ghost" onclick="editEmployee(${i})">modifica</button>
       <button class="btn-danger" onclick="deleteEmployee(${i})">elimina</button>
     </div>`;
   }).join('') || '<p class="empty">Nessun operatore.</p>';
@@ -1274,6 +1277,7 @@ function renderSubstituteList(){
     return `<div class="roster-row">
       <div class="roster-main"><strong>${s.name}</strong></div>
       <div class="roster-tags">${tags.join(' · ')}</div>
+      <button class="btn-ghost" onclick="editSubstitute(${i})">modifica</button>
       <button class="btn-danger" onclick="deleteSubstitute(${i})">elimina</button>
     </div>`;
   }).join('') || '<p class="empty">Nessun sostituto.</p>';
@@ -1300,10 +1304,40 @@ function renderRosterPanels(){
   renderPlantChecks();
 }
 
+let editingEmployeeIndex = null;
+function editEmployee(index){
+  const e = EMPLOYEES[index];
+  if(!e) return;
+  editingEmployeeIndex = index;
+  document.getElementById('empNewName').value = e.name;
+  document.getElementById('empNewPlant').value = e.plant || '';
+  document.getElementById('empNewTeam').value = e.team || '';
+  document.getElementById('empNewRole').value = e.role || '';
+  document.getElementById('empNewOnlyShift1').checked = !!e.onlyShift1;
+  document.getElementById('empNewNoNight').checked = !!e.noNight;
+  document.getElementById('empNewViceResp').checked = !!e.viceResponsabile;
+  document.getElementById('empSubmitBtn').textContent = '✓ Salva modifiche';
+  document.getElementById('empCancelEditBtn').style.display = '';
+  document.getElementById('empNewName').scrollIntoView({behavior:'smooth', block:'center'});
+}
+function cancelEditEmployee(){
+  editingEmployeeIndex = null;
+  document.getElementById('empNewName').value = '';
+  document.getElementById('empNewPlant').value = '';
+  document.getElementById('empNewTeam').value = '';
+  document.getElementById('empNewRole').value = '';
+  document.getElementById('empNewOnlyShift1').checked = false;
+  document.getElementById('empNewNoNight').checked = false;
+  document.getElementById('empNewViceResp').checked = false;
+  document.getElementById('empSubmitBtn').textContent = '+ Aggiungi operatore';
+  document.getElementById('empCancelEditBtn').style.display = 'none';
+}
 function addEmployee(){
   const name = document.getElementById('empNewName').value.trim().toUpperCase();
   if(!name){ toast('Inserisci un nome'); return; }
-  if(byName(name) || byNameSub(name)){ toast('Esiste già un operatore/sostituto con questo nome'); return; }
+  const isEditing = editingEmployeeIndex!=null;
+  const originalName = isEditing ? EMPLOYEES[editingEmployeeIndex].name : null;
+  if((byName(name) || byNameSub(name)) && name!==originalName){ toast('Esiste già un operatore/sostituto con questo nome'); return; }
   const plant = document.getElementById('empNewPlant').value || null;
   const team = document.getElementById('empNewTeam').value || null;
   const role = document.getElementById('empNewRole').value || undefined;
@@ -1315,20 +1349,18 @@ function addEmployee(){
   if(onlyShift1) emp.onlyShift1 = true;
   if(noNight) emp.noNight = true;
   if(viceResp){ EMPLOYEES.forEach(e=>{ delete e.viceResponsabile; }); emp.viceResponsabile = true; }
-  EMPLOYEES.push(emp);
-  document.getElementById('empNewName').value = '';
-  document.getElementById('empNewOnlyShift1').checked = false;
-  document.getElementById('empNewNoNight').checked = false;
-  document.getElementById('empNewViceResp').checked = false;
+  if(isEditing){ EMPLOYEES[editingEmployeeIndex] = emp; } else { EMPLOYEES.push(emp); }
+  cancelEditEmployee();
   renderRosterPanels();
   populateSelect();
   renderAbsences();
   saveRoster();
-  toast('Operatore aggiunto');
+  toast(isEditing ? 'Operatore modificato' : 'Operatore aggiunto');
 }
 function deleteEmployee(index){
   const e = EMPLOYEES[index];
   if(!confirm(`Eliminare l'operatore ${e.name}? Le assenze già inserite per questa persona non verranno rimosse automaticamente.`)) return;
+  if(editingEmployeeIndex!=null) cancelEditEmployee();
   EMPLOYEES.splice(index,1);
   renderRosterPanels();
   populateSelect();
@@ -1337,29 +1369,54 @@ function deleteEmployee(index){
   toast('Operatore eliminato');
 }
 
+let editingSubstituteIndex = null;
+function editSubstitute(index){
+  const s = SUBSTITUTES[index];
+  if(!s) return;
+  editingSubstituteIndex = index;
+  document.getElementById('subNewName').value = s.name;
+  document.getElementById('subNewTeamOnly').value = s.teamOnly || '';
+  document.getElementById('subNewConditional').value = s.conditional || '';
+  document.querySelectorAll('#subNewPlants input').forEach(el=>{ el.checked = s.plants.includes(el.value); });
+  document.getElementById('subSubmitBtn').textContent = '✓ Salva modifiche';
+  document.getElementById('subCancelEditBtn').style.display = '';
+  document.getElementById('subNewName').scrollIntoView({behavior:'smooth', block:'center'});
+}
+function cancelEditSubstitute(){
+  editingSubstituteIndex = null;
+  document.getElementById('subNewName').value = '';
+  document.getElementById('subNewTeamOnly').value = '';
+  document.getElementById('subNewConditional').value = '';
+  document.querySelectorAll('#subNewPlants input').forEach(el=>{ el.checked = false; });
+  document.getElementById('subSubmitBtn').textContent = '+ Aggiungi sostituto';
+  document.getElementById('subCancelEditBtn').style.display = 'none';
+}
 function addSubstitute(){
   const name = document.getElementById('subNewName').value.trim().toUpperCase();
   if(!name){ toast('Inserisci un nome'); return; }
-  if(byNameSub(name)){ toast('Esiste già un sostituto con questo nome'); return; }
+  const isEditing = editingSubstituteIndex!=null;
+  const originalName = isEditing ? SUBSTITUTES[editingSubstituteIndex].name : null;
+  if((byName(name) || byNameSub(name)) && name!==originalName){ toast('Esiste già un operatore/sostituto con questo nome'); return; }
   const plants = [...document.querySelectorAll('#subNewPlants input:checked')].map(el=>el.value);
   if(plants.length===0){ toast('Seleziona almeno un impianto'); return; }
   const teamOnly = document.getElementById('subNewTeamOnly').value || undefined;
   const conditional = document.getElementById('subNewConditional').value || undefined;
-  const sub = {name, plants, capacity:{}};
+  const sub = {name, plants, capacity: isEditing ? (SUBSTITUTES[editingSubstituteIndex].capacity||{}) : {}};
   if(teamOnly) sub.teamOnly = teamOnly;
   if(conditional) sub.conditional = conditional;
-  SUBSTITUTES.push(sub);
-  document.getElementById('subNewName').value = '';
+  if(isEditing){ SUBSTITUTES[editingSubstituteIndex] = sub; } else { SUBSTITUTES.push(sub); }
+  cancelEditSubstitute();
   renderRosterPanels();
   populateSelect();
   renderAbsences();
   renderCapacitySettings();
   saveRoster();
-  toast('Sostituto aggiunto');
+  toast(isEditing ? 'Sostituto modificato' : 'Sostituto aggiunto');
 }
 function deleteSubstitute(index){
   const s = SUBSTITUTES[index];
   if(!confirm(`Eliminare il sostituto ${s.name}?`)) return;
+  if(editingSubstituteIndex!=null) cancelEditSubstitute();
   SUBSTITUTES.splice(index,1);
   renderRosterPanels();
   populateSelect();
