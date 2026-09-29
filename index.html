@@ -2651,6 +2651,31 @@ async function importAnyFiles(event){
   if(!lines.length && !unknown.length && !errors.length) toast('Nessun file importato');
   else toast(`Importati ${prodImported.length + opImported.length} file su ${files.length}`);
 }
+function mergeProductionPhase(fase){
+  const sel = document.getElementById('faseAction-'+fase);
+  const target = sel ? sel.value : '';
+  if(!target){ toast('Scegli prima la fase di destinazione'); return; }
+  if(!confirm(`Unire tutti i dati della fase "${fase}" dentro la fase "${target}"? Dopo l'unione la fase "${fase}" resterà vuota (puoi poi eliminarla).`)) return;
+  PRODUCTION_STATS[target] = PRODUCTION_STATS[target] || {};
+  Object.entries(PRODUCTION_STATS[fase] || {}).forEach(([voce, months])=>{
+    PRODUCTION_STATS[target][voce] = Object.assign(PRODUCTION_STATS[target][voce] || {}, months);
+  });
+  delete PRODUCTION_STATS[fase];
+  saveProductionStats();
+  populateProductionSelectors();
+  renderProductionPage();
+  renderImportSummary();
+  toast(`Dati uniti nella fase "${target}"`);
+}
+function deleteProductionPhase(fase){
+  if(!confirm(`Eliminare definitivamente la fase "${fase}" e tutti i suoi dati? Operazione non reversibile.`)) return;
+  delete PRODUCTION_STATS[fase];
+  saveProductionStats();
+  populateProductionSelectors();
+  renderProductionPage();
+  renderImportSummary();
+  toast(`Fase "${fase}" eliminata`);
+}
 function renderImportSummary(){
   const elProd = document.getElementById('importSummaryProd');
   if(elProd){
@@ -2664,9 +2689,19 @@ function renderImportSummary(){
           Object.keys(months).forEach(k=>{ const m = k.match(/^(\d{4})/); if(m) years.add(m[1]); });
         });
         const yearList = [...years].sort().join(', ') || '—';
-        return `<div class="roster-row"><div class="roster-main"><strong>Fase ${fase.replace(/_/g,' + ')}</strong></div><div class="roster-tags">anni: ${yearList}</div></div>`;
+        const otherFasi = fasi.filter(f=>f!==fase);
+        const selId = 'faseAction-'+escJs(fase);
+        const opts = '<option value="">— unisci in… —</option>' + otherFasi.map(f=>`<option value="${f}">${f.replace(/_/g,' + ')}</option>`).join('');
+        return `<div class="roster-row">
+          <div class="roster-main"><strong>Fase ${fase.replace(/_/g,' + ')}</strong></div>
+          <div class="roster-tags">anni: ${yearList}</div>
+          <select id="${selId}">${opts}</select>
+          <button class="btn-ghost" onclick="mergeProductionPhase('${escJs(fase)}')">Unisci</button>
+          <button class="btn-danger" onclick="deleteProductionPhase('${escJs(fase)}')">elimina fase</button>
+        </div>`;
       }).join('');
-      elProd.innerHTML = '<h3 class="panel-subtitle">Statistiche produzione</h3>' + rows;
+      elProd.innerHTML = '<h3 class="panel-subtitle">Statistiche produzione</h3>' + rows
+        + '<p class="note" style="margin-top:6px;">Se un file è finito per errore in una fase sbagliata (es. "GENERALE"), usa "Unisci" per spostarne i dati dentro la fase corretta, poi la fase vuota resterà solo da eliminare.</p>';
     }
   }
   const elOp = document.getElementById('importSummaryOp');
