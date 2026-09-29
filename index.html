@@ -274,6 +274,7 @@
     <div class="menu-group">
       <h2>Archivio e strumenti</h2>
       <div class="menu-grid">
+        <button class="menu-tile" onclick="showPage('panel-import')"><span class="menu-glyph">📥</span><span>Importa dati statistiche</span></button>
         <button class="menu-tile" onclick="showPage('panel-stats')"><span class="menu-glyph">📊</span><span>Statistiche assenze</span></button>
         <button class="menu-tile" onclick="showPage('panel-production')"><span class="menu-glyph">📈</span><span>Statistiche produzione</span></button>
         <button class="menu-tile" onclick="showPage('panel-opstats')"><span class="menu-glyph">👷</span><span>Statistiche turni/operatori</span></button>
@@ -542,9 +543,9 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1300px;">
     <h2><span class="n">•</span>Statistiche turni, operatori e impianti</h2>
-    <p class="note">Importa qui i file "operatore × macchina" (a blocchi per impianto) e "turni operatori" (a blocchi per squadra) — anche insieme, anche di anni diversi. Ricaricando un file, i dati corrispondenti si aggiornano senza perdere gli altri anni già importati.</p>
+    <p class="note">Per caricare nuovi file "operatore × macchina" o "turni operatori", usa la pagina <strong>Importa dati statistiche</strong> — riconosce da sola il tipo di file, insieme a quelli di produzione.</p>
     <div class="btn-row">
-      <input type="file" id="opStatsFileInput" accept=".xlsx" multiple onchange="importOperatorFiles(event)">
+      <button class="btn-ghost" onclick="showPage('panel-import')">📥 Vai a Importa dati statistiche</button>
     </div>
 
     <div class="card" style="margin-top:20px;">
@@ -582,13 +583,29 @@
   </div>
 </div>
 
+<div class="panel-section" id="panel-import" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:900px;">
+    <h2><span class="n">•</span>Importa dati statistiche</h2>
+    <p class="note">Carica qui tutti i file Excel — sia quelli di produzione (mensili, per fase) sia quelli di turni/operatori/impianti — anche insieme, anche di anni diversi: il sistema riconosce da solo il tipo di ciascun file. Ricaricando un file già importato, i dati corrispondenti si aggiornano senza perdere gli altri anni già presenti.</p>
+    <div class="btn-row">
+      <input type="file" id="importAnyFileInput" accept=".xlsx" multiple onchange="importAnyFiles(event)">
+    </div>
+    <div id="importResultsList" style="margin-top:14px;"></div>
+
+    <h3 class="panel-subtitle" style="margin-top:26px;">Cosa è già caricato</h3>
+    <div id="importSummaryProd"></div>
+    <div id="importSummaryOp" style="margin-top:14px;"></div>
+  </div>
+</div>
+
 <div class="panel-section" id="panel-production" style="display:none;">
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Statistiche produzione</h2>
-    <p class="note">Importa qui i file Excel mensili (uno per anno; supporta anche fasi diverse in futuro). Ricaricando un file dello stesso anno/fase, i dati si aggiornano senza perdere gli anni già importati — così tieni sempre una serie storica continua.</p>
+    <p class="note">Per caricare nuovi file, usa la pagina <strong>Importa dati statistiche</strong> — riconosce da sola il tipo di file, insieme a quelli di turni/operatori.</p>
     <div class="btn-row">
-      <input type="file" id="prodFileInput" accept=".xlsx" multiple onchange="importProductionFiles(event)">
+      <button class="btn-ghost" onclick="showPage('panel-import')">📥 Vai a Importa dati statistiche</button>
     </div>
 
     <div class="btn-row" style="margin-top:20px;">
@@ -2185,11 +2202,13 @@ function detectFaseFromFilename(filename){
   if(m && m[1].replace(/_/g,'').length>0) return m[1].replace(/^_+|_+$/g,'').toUpperCase();
   return 'GENERALE';
 }
-async function parseProductionFile(file){
+async function loadWorkbookFromFile(file){
   const buffer = await file.arrayBuffer();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(buffer);
-  const ws = wb.worksheets[0];
+  return wb;
+}
+function parseProductionWorksheet(ws, filename){
   const headerRow = ws.getRow(2);
   const monthCols = [];
   let totalCol = null;
@@ -2198,9 +2217,9 @@ async function parseProductionFile(file){
     if(typeof v === 'number' && v>=1 && v<=12) monthCols.push({col:colNumber, month:v});
     else if(typeof v === 'string' && /totale/i.test(v)) totalCol = colNumber;
   });
-  const yearMatch = file.name.match(/(20\d{2})/);
+  const yearMatch = filename.match(/(20\d{2})/);
   const year = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
-  const fase = detectFaseFromFilename(file.name);
+  const fase = detectFaseFromFilename(filename);
 
   const data = {};
   ws.eachRow((row, rowNumber)=>{
@@ -2227,6 +2246,10 @@ async function parseProductionFile(file){
     }
   });
   return {fase, year, data};
+}
+async function parseProductionFile(file){
+  const wb = await loadWorkbookFromFile(file);
+  return parseProductionWorksheet(wb.worksheets[0], file.name);
 }
 async function importProductionFiles(event){
   const files = Array.from(event.target.files || []);
@@ -2469,12 +2492,8 @@ function mergeOperatorRecords(newRecords){
   newRecords.forEach(r=> map.set(`${r.dimension}|${r.groupKey}|${r.year}|${r.operatore}|${r.voce}`, r));
   OPERATOR_RECORDS = Array.from(map.values());
 }
-async function parseOperatorBreakdownFile(file){
-  const buffer = await file.arrayBuffer();
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load(buffer);
-  const ws = wb.worksheets[0];
-  const fileYearMatch = file.name.match(/(20\d{2})/);
+function parseOperatorWorksheet(ws, filename){
+  const fileYearMatch = filename.match(/(20\d{2})/);
   const fileYear = fileYearMatch ? Number(fileYearMatch[1]) : null;
   const records = [];
   let group = null;
@@ -2526,6 +2545,10 @@ async function parseOperatorBreakdownFile(file){
   }
   return records;
 }
+async function parseOperatorBreakdownFile(file){
+  const wb = await loadWorkbookFromFile(file);
+  return parseOperatorWorksheet(wb.worksheets[0], file.name);
+}
 async function importOperatorFiles(event){
   const files = Array.from(event.target.files || []);
   if(files.length===0) return;
@@ -2546,6 +2569,119 @@ async function importOperatorFiles(event){
   toast(count ? `Importati ${count} valori` : 'Nessun dato riconosciuto nel file');
   populateOperatorSelectors();
   renderOperatorStatsPage();
+}
+
+/* ============================= IMPORT UNIFICATO (riconosce da solo produzione vs turni/operatori) ============================= */
+// Produzione: riga 2 del foglio ha intestazioni numeriche 1-12 (i mesi).
+// Turni/operatori: colonna 1 contiene blocchi "turno X" / "impianto Y" (scansione delle prime righe).
+function detectImportFileType(ws){
+  const headerRow = ws.getRow(2);
+  let hasMonthHeaders = false;
+  headerRow.eachCell(cell=>{
+    if(typeof cell.value === 'number' && cell.value>=1 && cell.value<=12) hasMonthHeaders = true;
+  });
+  if(hasMonthHeaders) return 'produzione';
+  const maxScan = Math.min(ws.rowCount || 0, 80);
+  for(let r=1; r<=maxScan; r++){
+    const v = ws.getRow(r).getCell(1).value;
+    const c1 = typeof v === 'string' ? v.trim() : v;
+    if(typeof c1 === 'string' && (/^turno\s+[A-Za-z]\b/i.test(c1) || /^impianto\s+\S+/i.test(c1))) return 'operatori';
+  }
+  return null;
+}
+async function importAnyFiles(event){
+  const files = Array.from(event.target.files || []);
+  if(files.length===0) return;
+  toast('Importazione in corso…');
+  const prodImported = [];
+  const opImported = [];
+  const unknown = [];
+  const errors = [];
+  let opCount = 0;
+  let touchedProd = false, touchedOp = false;
+  for(const file of files){
+    try{
+      const wb = await loadWorkbookFromFile(file);
+      const ws = wb.worksheets[0];
+      const type = detectImportFileType(ws);
+      if(type === 'produzione'){
+        const {fase, year, data} = parseProductionWorksheet(ws, file.name);
+        PRODUCTION_STATS[fase] = PRODUCTION_STATS[fase] || {};
+        Object.entries(data).forEach(([voce, months])=>{
+          PRODUCTION_STATS[fase][voce] = Object.assign(PRODUCTION_STATS[fase][voce] || {}, months);
+        });
+        prodImported.push(`${file.name} → produzione, fase ${fase}, anno ${year}`);
+        touchedProd = true;
+      }else if(type === 'operatori'){
+        const recs = parseOperatorWorksheet(ws, file.name);
+        mergeOperatorRecords(recs);
+        opCount += recs.length;
+        opImported.push(`${file.name} → turni/operatori, ${recs.length} valori`);
+        touchedOp = true;
+      }else{
+        unknown.push(file.name);
+      }
+    }catch(e){
+      console.error(e);
+      errors.push(file.name);
+    }
+  }
+  if(touchedProd) await saveProductionStats();
+  if(touchedOp) await saveOperatorRecords();
+  event.target.value = '';
+  populateProductionSelectors();
+  renderProductionPage();
+  populateOperatorSelectors();
+  renderOperatorStatsPage();
+  renderImportSummary();
+
+  const lines = [...prodImported, ...opImported];
+  const el = document.getElementById('importResultsList');
+  if(el){
+    let html = '';
+    if(lines.length) html += '<p class="note" style="color:var(--t2);">✓ ' + lines.join('<br>✓ ') + '</p>';
+    if(unknown.length) html += '<p class="note" style="color:#b3541e;">⚠ File non riconosciuti (formato non atteso): ' + unknown.join(', ') + '</p>';
+    if(errors.length) html += '<p class="note" style="color:#b3541e;">⚠ Errore leggendo: ' + errors.join(', ') + '</p>';
+    el.innerHTML = html;
+  }
+  if(!lines.length && !unknown.length && !errors.length) toast('Nessun file importato');
+  else toast(`Importati ${prodImported.length + opImported.length} file su ${files.length}`);
+}
+function renderImportSummary(){
+  const elProd = document.getElementById('importSummaryProd');
+  if(elProd){
+    const fasi = Object.keys(PRODUCTION_STATS);
+    if(!fasi.length){ elProd.innerHTML = '<p class="empty">Statistiche produzione: nessun file importato.</p>'; }
+    else{
+      const rows = fasi.map(fase=>{
+        const voci = PRODUCTION_STATS[fase] || {};
+        const years = new Set();
+        Object.values(voci).forEach(months=>{
+          Object.keys(months).forEach(k=>{ const m = k.match(/^(\d{4})/); if(m) years.add(m[1]); });
+        });
+        const yearList = [...years].sort().join(', ') || '—';
+        return `<div class="roster-row"><div class="roster-main"><strong>Fase ${fase.replace(/_/g,' + ')}</strong></div><div class="roster-tags">anni: ${yearList}</div></div>`;
+      }).join('');
+      elProd.innerHTML = '<h3 class="panel-subtitle">Statistiche produzione</h3>' + rows;
+    }
+  }
+  const elOp = document.getElementById('importSummaryOp');
+  if(elOp){
+    if(!OPERATOR_RECORDS.length){ elOp.innerHTML = '<p class="empty">Statistiche turni/operatori: nessun file importato.</p>'; }
+    else{
+      const byDim = {};
+      OPERATOR_RECORDS.forEach(r=>{
+        const k = r.dimension + ' ' + r.groupKey;
+        byDim[k] = byDim[k] || new Set();
+        byDim[k].add(r.year);
+      });
+      const rows = Object.keys(byDim).sort().map(k=>{
+        const years = [...byDim[k]].sort().join(', ');
+        return `<div class="roster-row"><div class="roster-main"><strong>${k}</strong></div><div class="roster-tags">anni: ${years}</div></div>`;
+      }).join('');
+      elOp.innerHTML = '<h3 class="panel-subtitle">Statistiche turni/operatori</h3>' + rows;
+    }
+  }
 }
 function populateImpTurSelectors(){
   const impiantiKnown = [...new Set(OPERATOR_RECORDS.filter(r=>r.dimension==='impianto').map(r=>r.groupKey))].sort();
@@ -4532,7 +4668,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-production','panel-opstats','panel-manuals','panel-templates','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-manuals','panel-templates','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
 function showPage(id){
   ALL_APP_PAGES.forEach(p=>{
     const el = document.getElementById(p);
@@ -4550,6 +4686,7 @@ function showPage(id){
   if(id==='panel-teamturni') renderTeamRotationSettings();
   if(id==='panel-clothing') renderClothingSizes();
   if(id==='panel-stats') renderStatsPage();
+  if(id==='panel-import') renderImportSummary();
   if(id==='panel-production') renderProductionPage();
   if(id==='panel-opstats') renderOperatorStatsPage();
   if(id==='panel-manuals') renderManualsList();
