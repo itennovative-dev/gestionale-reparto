@@ -1942,6 +1942,7 @@ async function importFullBackup(event){
   event.target.value = '';
   toast('Backup importato, aggiorno i dati…');
   await loadRoster();
+  await loadSpecialShifts();
   await loadHistory();
   await loadRecipients();
   await loadCapacities();
