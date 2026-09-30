@@ -722,7 +722,7 @@
     </div>
 
     <h3 class="panel-subtitle" style="margin-top:24px;">Turni, operatori e impianti</h3>
-    <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" — anche insieme, anche di anni diversi.</p>
+    <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" (anche quelli intestati "squadra A/B/C") — anche insieme, anche di anni diversi. L'anno si prende dall'intestazione o, se manca, dal nome del file.</p>
     <div class="btn-row">
       <input type="file" accept=".xlsx" multiple onchange="importOperatorFiles(event)">
     </div>
@@ -3059,7 +3059,7 @@ function parseOperatorWorksheet(ws, filename){
     if(typeof c1 === 'string' && c1 !== ''){
       const yearMatch = c1.match(/(20\d{2})/);
       const year = yearMatch ? Number(yearMatch[1]) : fileYear; // se il blocco non riporta l'anno, usa quello dedotto dal nome del file
-      const mTur = c1.match(/^turno\s+([A-Za-z])\b/i);
+      const mTur = c1.match(/^(?:turno|squadra)\s+([A-Za-z])\b/i); // "turno C" o "squadra c": stesso blocco
       const mImp = c1.match(/^impianto\s+(\S+)/i);
       if(mTur && year){
         group = {dimension:'turno', key: mTur[1].toUpperCase(), label: c1, year, cols: [], totalCol: null};
@@ -3140,7 +3140,7 @@ function detectImportFileType(ws){
   for(let r=1; r<=maxScan; r++){
     const v = ws.getRow(r).getCell(1).value;
     const c1 = typeof v === 'string' ? v.trim() : v;
-    if(typeof c1 === 'string' && (/^turno\s+[A-Za-z]\b/i.test(c1) || /^impianto\s+\S+/i.test(c1))) return 'operatori';
+    if(typeof c1 === 'string' && (/^(?:turno|squadra)\s+[A-Za-z]\b/i.test(c1) || /^impianto\s+\S+/i.test(c1))) return 'operatori';
   }
   return null;
 }
