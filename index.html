@@ -3522,18 +3522,35 @@ function rosterMatchInfo(recordName){
 function rosterPlantFor(recordName){ return rosterMatchInfo(recordName).plant; }
 // Operatori di un impianto: dai file "per impianto"; se per quell'anno un operatore non c'è,
 // uso i suoi dati del file "per squadra", attribuendolo all'impianto che ha in anagrafica.
-// Per ogni operatore vale la fonte caricata PIÙ DI RECENTE (i dati importati prima di oggi non hanno data e contano come più vecchi).
+// Chiave unica di una persona: il nome in anagrafica se si riconosce, altrimenti il nome normalizzato
+function operatorKey(name){
+  const cands = EMPLOYEES.filter(e=>namesMatch(e.name, name));
+  return cands.length===1 ? 'ANAG:' + normOperatorName(cands[0].name) : canonicalOperatorName(name);
+}
+// Per un titolare (in anagrafica con impianto) che ha dati nei file squadra di quell'anno, valgono quelli,
+// mostrati sul suo impianto; i dati dei file "per impianto" valgono solo se caricati DOPO il file squadra.
+// Sostituti e persone non in anagrafica: solo i file "per impianto".
 function getImpiantoOperators(impianto, year){
-  const direct = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && String(r.groupKey)===String(impianto) && r.year===year && r.operatore!=='__TOTALE__');
-  const fromTeam = OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.year===year && r.operatore!=='__TOTALE__' && rosterPlantFor(r.operatore)===String(impianto));
+  impianto = String(impianto);
   const newest = recs=>recs.reduce((m,r)=>Math.max(m, r.importedAt||0), 0);
-  const byOp = new Map();
-  direct.forEach(r=>{ const k = canonicalOperatorName(r.operatore); (byOp.get(k) || byOp.set(k,{d:[],t:[]}).get(k)).d.push(r); });
-  fromTeam.forEach(r=>{ const k = canonicalOperatorName(r.operatore); (byOp.get(k) || byOp.set(k,{d:[],t:[]}).get(k)).t.push(r); });
+  const teamByKey = new Map(), directByKey = new Map();
+  OPERATOR_RECORDS.forEach(r=>{
+    if(r.year!==year || r.operatore==='__TOTALE__') return;
+    if(r.dimension==='turno'){ const k = operatorKey(r.operatore); (teamByKey.get(k) || teamByKey.set(k,[]).get(k)).push(r); }
+    else if(r.dimension==='impianto'){ const k = operatorKey(r.operatore); (directByKey.get(k) || directByKey.set(k,[]).get(k)).push(r); }
+  });
   const out = [];
-  byOp.forEach(({d,t})=>{
-    if(d.length && (!t.length || newest(d) >= newest(t))) out.push(...d);
-    else out.push(...t.map(r=>Object.assign({}, r, {dimension:'impianto', groupKey:impianto, derivedFrom:`squadra ${r.groupKey}`})));
+  const keys = new Set([...teamByKey.keys(), ...directByKey.keys()]);
+  keys.forEach(k=>{
+    const team = teamByKey.get(k) || [];
+    const directAll = directByKey.get(k) || [];
+    const plant = team.length ? rosterPlantFor(team[0].operatore) : null;
+    const useTeam = plant && team.length && !(directAll.length && newest(directAll) > newest(team));
+    if(useTeam){
+      if(plant===impianto) out.push(...team.map(r=>Object.assign({}, r, {dimension:'impianto', groupKey:impianto, derivedFrom:`squadra ${r.groupKey}`})));
+    }else{
+      out.push(...directAll.filter(r=>String(r.groupKey)===impianto));
+    }
   });
   return out;
 }
@@ -3547,8 +3564,8 @@ function renderImpiantoLinkCheck(year){
     const info = rosterMatchInfo(op);
     let esito = info.reason, col = info.plant ? 'var(--ok)' : '#b3541e';
     if(info.plant){
-      const shown = getImpiantoOperators(info.plant, year).filter(r=>canonicalOperatorName(r.operatore)===canonicalOperatorName(op));
-      if(shown.length && !shown[0].derivedFrom){ esito += ' — ma per questo impianto vale un file "per impianto" caricato dopo'; col = 'var(--sub)'; }
+      const shown = getImpiantoOperators(info.plant, year).filter(r=>operatorKey(r.operatore)===operatorKey(op));
+      if(!shown.some(r=>r.derivedFrom)){ esito += ' — ma vale un file "per impianto" caricato dopo il file squadra'; col = 'var(--sub)'; }
     }
     return `<tr><td>${escHtml(op)}</td><td style="color:${col};">${escHtml(esito)}</td></tr>`;
   }).join('');
@@ -5559,7 +5576,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · import squadre v6';
+const APP_VERSION = '2026-09-30 · import squadre v7';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
