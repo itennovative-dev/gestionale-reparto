@@ -1,10 +1,9 @@
-# Nel repository vanno solo l'app, la configurazione di pubblicazione e i documenti sorgente.
-# I documenti (manuali/, modelli/) NON vengono pubblicati nel sito: sono caricati nel database protetto.
+# Nel repository vanno solo l'app, la configurazione di pubblicazione e i moduli vuoti.
+# I manuali NON vanno qui: si caricano nel database protetto dalla pagina Manuali ("⬆ file").
+# I modelli presenti sono solo moduli vuoti, senza dati di clienti o persone.
 *
 !.gitignore
 !index.html
-!manuali/
-!manuali/**
 !modelli/
 !modelli/**
 !firebase.json

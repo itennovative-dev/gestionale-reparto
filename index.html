@@ -835,6 +835,10 @@
         <button class="btn-primary" onclick="saveTeamRotation()">Salva modello</button>
       </div>
 
+      <h3 class="panel-subtitle" style="margin-top:24px;">Operatori senza squadra — turni speciali</h3>
+      <p class="note">Usati quando il turnario caricato non copre la data. Ogni modifica si salva subito; poi rigenera la proposta in "Coperture turni".</p>
+      <div id="specialShiftsSettings"></div>
+
       <h3 class="panel-subtitle" style="margin-top:20px;">Eccezioni manuali per la settimana aperta</h3>
       <p class="note">Se per questa settimana specifica un turno differisce dal modello (es. cambio concordato), correggilo qui: ha sempre la priorità sul calcolo automatico.</p>
       <div id="teamTurniGrid"></div>
@@ -1040,15 +1044,15 @@ function scheduleTurno(name, date){
     if(t) return t;
   }
   // fallback 3: operatori senza squadra che si alternano a coppia, settimana per settimana,
-  // tra 3x1°T+2x2°T e 3x2°T+2x1°T (es. Operatore Y. / Operatore X.)
+  // tra 3x1°T+2x2°T e 3x2°T+2x1°T (coppie configurate in "Turni squadre")
   const nName = normName(name);
-  const pair = PAIR_ROTATIONS.find(p=>p.members.some(m=>normName(m)===nName));
+  const pair = SPECIAL_SHIFTS.pairs.find(p=>p.members.some(m=>normName(m)===nName));
   if(pair){
     const t = computePairRotationTurno(pair, nName, date);
     if(t) return t;
   }
-  // fallback 4: operatori senza squadra con turno fisso 1° dal lunedì al venerdì (es. Operatore Z. / D'Esempio Mas.)
-  if((emp && emp.onlyShift1) || FIXED_SHIFT1_NAMES.some(n=>normName(n)===nName)){
+  // fallback 4: operatori senza squadra con turno fisso 1° dal lunedì al venerdì (configurati in "Turni squadre")
+  if((emp && emp.onlyShift1) || SPECIAL_SHIFTS.fixedShift1.some(n=>normName(n)===nName)){
     const wd = new Date(date+"T00:00:00").getDay();
     if(wd!==0 && wd!==6) return '1';
   }
@@ -1058,18 +1062,73 @@ function scheduleTurno(name, date){
   return null;
 }
 // Confronto nomi "tollerante": ignora maiuscole/minuscole, spazi doppi e le diverse varianti di apostrofo
-// (dritto ' vs tipografico ’), per evitare i problemi di corrispondenza già visti con nomi come "D'Esempio".
+// (dritto ' vs tipografico ’), per evitare i problemi di corrispondenza già visti con i cognomi con apostrofo.
 function normName(s){
   return String(s||'').trim().toLowerCase().replace(/[’‘`´]/g, "'").replace(/\s+/g, ' ');
 }
-// Nomi di operatori senza squadra con turno fisso 1° (lun-ven), a prescindere dal flag "solo 1°T" in anagrafica.
-const FIXED_SHIFT1_NAMES = ["Operatore Z.", "D'Esempio Mas."];
-// Coppie di operatori senza squadra che si alternano settimanalmente tra i due pattern a 5 giorni
-// (nessun 3°turno). "anchorMonday" è il lunedì di una settimana nota in cui members[0] fa 3x1°T+2x2°T
-// (lun-mer 1°, gio-ven 2°) e members[1] fa il pattern opposto; dalla settimana successiva si invertono.
-const PAIR_ROTATIONS = [
-  { members:["Operatore X.", "Operatore Y."], anchorMonday:"2026-09-28" },
-];
+/* Turni speciali degli operatori senza squadra. I nomi non sono scritti nel codice (la pagina è pubblica):
+   si configurano dalla pagina "Turni squadre" e sono salvati nel database (chiave "turni-speciali").
+   - fixedShift1: operatori con turno fisso 1° (lun-ven), a prescindere dal flag "solo 1°T" in anagrafica.
+   - pairs: coppie che si alternano settimanalmente tra i due pattern a 5 giorni (nessun 3°turno).
+     "anchorMonday" è il lunedì di una settimana in cui members[0] fa 3x1°T+2x2°T (lun-mer 1°, gio-ven 2°)
+     e members[1] il pattern opposto; dalla settimana successiva si invertono. */
+let SPECIAL_SHIFTS = {fixedShift1:[], pairs:[]};
+async function loadSpecialShifts(){
+  try{
+    const r = await storageGet('turni-speciali');
+    if(r){ const v = JSON.parse(r.value); SPECIAL_SHIFTS = {fixedShift1: v.fixedShift1||[], pairs: v.pairs||[]}; }
+  }catch(e){}
+}
+async function saveSpecialShifts(){
+  try{ await storageSet('turni-speciali', JSON.stringify(SPECIAL_SHIFTS)); }catch(e){}
+  renderSpecialShiftsSettings();
+  toast('Turni speciali salvati: rigenera la proposta per applicarli');
+}
+function renderSpecialShiftsSettings(){
+  const el = document.getElementById('specialShiftsSettings');
+  if(!el) return;
+  const names = EMPLOYEES.map(e=>e.name).sort((a,b)=>a.localeCompare(b));
+  const opts = names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+  const fixed = SPECIAL_SHIFTS.fixedShift1.length
+    ? SPECIAL_SHIFTS.fixedShift1.map((n,i)=>`<div class="roster-row"><div class="roster-main">${escHtml(n)}</div><div class="roster-tags">1° turno lun–ven</div><button class="btn-danger" onclick="removeFixedShift1(${i})">rimuovi</button></div>`).join('')
+    : '<p class="empty">Nessun operatore con 1° turno fisso.</p>';
+  const pairs = SPECIAL_SHIFTS.pairs.length
+    ? SPECIAL_SHIFTS.pairs.map((p,i)=>`<div class="roster-row"><div class="roster-main">${escHtml(p.members[0])} / ${escHtml(p.members[1])}</div><div class="roster-tags">nella settimana del ${fmtDate(p.anchorMonday)} ${escHtml(p.members[0])} fa lun–mer 1°, gio–ven 2°</div><button class="btn-danger" onclick="removeShiftPair(${i})">rimuovi</button></div>`).join('')
+    : '<p class="empty">Nessuna coppia a rotazione.</p>';
+  el.innerHTML = `
+    <h3 class="panel-subtitle">Turno fisso 1° (lun–ven)</h3>
+    ${fixed}
+    <div class="roster-add-grid">
+      <div><label>Operatore</label><select id="ssFixedName">${opts}</select></div>
+    </div>
+    <div class="btn-row"><button class="btn-primary" onclick="addFixedShift1()">+ Aggiungi</button></div>
+    <h3 class="panel-subtitle" style="margin-top:20px;">Coppie a rotazione settimanale (3×1°+2×2° / 3×2°+2×1°)</h3>
+    ${pairs}
+    <div class="roster-add-grid">
+      <div><label>Operatore 1</label><select id="ssPairA">${opts}</select></div>
+      <div><label>Operatore 2</label><select id="ssPairB">${opts}</select></div>
+      <div><label>Lunedì in cui l'operatore 1 fa lun–mer 1°, gio–ven 2°</label><input type="date" id="ssPairMonday"></div>
+    </div>
+    <div class="btn-row"><button class="btn-primary" onclick="addShiftPair()">+ Aggiungi coppia</button></div>`;
+}
+function addFixedShift1(){
+  const n = document.getElementById('ssFixedName').value;
+  if(!n) return;
+  if(SPECIAL_SHIFTS.fixedShift1.some(x=>normName(x)===normName(n))){ toast('Già in elenco'); return; }
+  SPECIAL_SHIFTS.fixedShift1.push(n);
+  saveSpecialShifts();
+}
+function removeFixedShift1(i){ SPECIAL_SHIFTS.fixedShift1.splice(i,1); saveSpecialShifts(); }
+function addShiftPair(){
+  const a = document.getElementById('ssPairA').value, b = document.getElementById('ssPairB').value;
+  const monday = document.getElementById('ssPairMonday').value;
+  if(!a || !b || a===b){ toast('Scegli due operatori diversi'); return; }
+  if(!monday || new Date(monday+'T00:00:00').getDay()!==1){ toast('La data di riferimento deve essere un lunedì'); return; }
+  if(SPECIAL_SHIFTS.pairs.some(p=>p.members.some(m=>[a,b].some(x=>normName(x)===normName(m))))){ toast('Uno dei due operatori è già in una coppia'); return; }
+  SPECIAL_SHIFTS.pairs.push({members:[a,b], anchorMonday:monday});
+  saveSpecialShifts();
+}
+function removeShiftPair(i){ SPECIAL_SHIFTS.pairs.splice(i,1); saveSpecialShifts(); }
 function computePairRotationTurno(pair, normalizedName, dateStr){
   const d = new Date(dateStr+"T00:00:00");
   const weekday = d.getDay();
@@ -1286,10 +1345,19 @@ async function openDocument(folder, filename){
   const win = isPdf ? window.open('', '_blank') : null;
   if(win) win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">Apertura del documento in corso…</p>');
   try{
-    const blob = await loadDocumentBlob(folder, filename);
+    let blob = null;
+    try{ blob = await loadDocumentBlob(folder, filename); }
+    catch(e){ console.warn('Lettura documento dal database non riuscita', e); }
+    // Ripiego: se il file non è (ancora) nel database, prova la copia pubblicata insieme al sito, se esiste.
+    if(!blob){
+      try{
+        const res = await fetch(folder+'/'+encodeURIComponent(filename), {cache:'no-store'});
+        if(res.ok) blob = new Blob([await res.blob()], {type: docMime(filename)});
+      }catch(e){}
+    }
     if(!blob){
       if(win) win.close();
-      toast('⚠ Questo file non è ancora stato caricato nel database');
+      toast('⚠ Documento non disponibile: caricalo con "⬆ file"');
       return;
     }
     const url = URL.createObjectURL(blob);
@@ -4932,7 +5000,7 @@ function showPage(id){
   if(id==='panel-roster' || id==='panel-plants') renderRosterPanels();
   if(id==='panel-capacity') renderCapacitySettings();
   if(id==='panel-fermo') renderFermoOrderSettings();
-  if(id==='panel-teamturni') renderTeamRotationSettings();
+  if(id==='panel-teamturni'){ renderTeamRotationSettings(); renderSpecialShiftsSettings(); }
   if(id==='panel-clothing') renderClothingSizes();
   if(id==='panel-stats') renderStatsPage();
   if(id==='panel-import') renderImportSummary();
@@ -4967,6 +5035,7 @@ function toast(msg){
 /* ============================= AVVIO ============================= */
 async function startApp(){
   await loadRoster();
+  await loadSpecialShifts();
   populateSelect();
   document.getElementById('newDate').valueAsDate = new Date();
   currentWeek = isoWeek(todayStr());
