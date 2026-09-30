@@ -5559,8 +5559,26 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · import squadre v5';
+const APP_VERSION = '2026-09-30 · import squadre v6';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
+// Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
+async function checkNewVersion(){
+  try{
+    const res = await fetch(location.pathname + '?nocache=' + Date.now(), {cache:'no-store'});
+    const txt = await res.text();
+    const m = txt.match(/const APP_VERSION = '([^']+)'/);
+    if(m && m[1] !== APP_VERSION && !document.getElementById('newVersionBar')){
+      const bar = document.createElement('div');
+      bar.id = 'newVersionBar';
+      bar.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;background:var(--ink,#152233);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:14px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);';
+      bar.innerHTML = '<span>È disponibile una versione nuova del sito</span><button class="btn-primary" style="padding:6px 12px;">Aggiorna</button>';
+      bar.querySelector('button').onclick = ()=>{ location.replace(location.pathname + '?v=' + Date.now() + location.hash); };
+      document.body.appendChild(bar);
+    }
+  }catch(e){}
+}
+window.addEventListener('load', ()=>{ setTimeout(checkNewVersion, 3000); setInterval(checkNewVersion, 10*60*1000); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') checkNewVersion(); });
 /* ============================= AVVIO ============================= */
 async function startApp(){
   await loadRoster();
