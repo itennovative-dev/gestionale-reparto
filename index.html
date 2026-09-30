@@ -690,6 +690,9 @@
       <div id="impStatsYoy"></div>
       <h3 class="panel-subtitle" style="margin-top:18px;">Tabella completa — tutte le voci</h3>
       <div class="table-scroll" id="impStatsTable"></div>
+      <details style="margin-top:14px;"><summary class="note" style="cursor:pointer;"><strong>Verifica collegamento operatori → impianto</strong> (perché qualcuno non compare?)</summary>
+        <div class="table-scroll" id="impLinkCheck" style="margin-top:8px;"></div>
+      </details>
     </div>
 
     <div class="card">
@@ -3088,6 +3091,8 @@ function groupFromFilename(filename){
 // un file è la fotografia completa di quella squadra/impianto per quell'anno:
 // sostituisce i dati vecchi dello stesso gruppo (es. un operatore passato ad altra squadra)
 function importOperatorFileRecords(recs){
+  const now = Date.now();
+  recs.forEach(r=>{ r.importedAt = now; });
   const groups = new Set(recs.map(r=>`${r.dimension}|${r.groupKey}|${r.year}`));
   OPERATOR_RECORDS = OPERATOR_RECORDS.filter(r=>!groups.has(`${r.dimension}|${r.groupKey}|${r.year}`));
   mergeOperatorRecords(recs);
@@ -3492,29 +3497,63 @@ function renderGenericGroupTable(targetId, groupBy, year){
   html += '</tbody></table>';
   el.innerHTML = html;
 }
-// Impianto assegnato in anagrafica a un operatore dei file squadra ("DI GIOVANNI ALFONSO" ↔ "DI GIOVANNI A.")
-function rosterPlantFor(recordName){
-  const rn = normOperatorName(recordName);
-  const cands = EMPLOYEES.filter(e=>{
-    const en = normOperatorName(e.name);
-    if(en===rn) return true;
-    const m = en.match(/^(.*\S)\s([A-Z])$/);           // anagrafica "COGNOME N."
-    if(m && rn.startsWith(m[1]+' '+m[2])) return true;
-    const m2 = rn.match(/^(.*\S)\s([A-Z])$/);          // file "COGNOME N.", anagrafica per esteso
-    if(m2 && en.startsWith(m2[1]+' '+m2[2])) return true;
-    return false;
-  });
-  return (cands.length===1 && cands[0].plant) ? String(cands[0].plant) : null;
+// Collega un nome dei file statistiche a una persona dell'anagrafica.
+// Regge: maiuscole/minuscole, accenti, apostrofi, "COGNOME N.", "COGNOME NOME", "NOME COGNOME".
+function nameTokens(n){ return normOperatorName(String(n||'').replace(/[’‘`´']/g,' ')).split(' ').filter(Boolean); }
+function namesMatch(a, b){
+  const ta = nameTokens(a), tb = nameTokens(b);
+  if(!ta.length || !tb.length) return false;
+  const full = t=>t.filter(x=>x.length>1), ini = t=>t.filter(x=>x.length===1);
+  // il nome più "corto" (es. anagrafica "DI GIOVANNI A") deve stare tutto dentro quello più lungo
+  const [sh, lo] = ta.length <= tb.length ? [ta, tb] : [tb, ta];
+  const rest = [...lo];
+  for(const w of full(sh)){ const i = rest.indexOf(w); if(i<0) return false; rest.splice(i,1); }
+  for(const c of ini(sh)){ const i = rest.findIndex(w=>w[0]===c); if(i<0) return false; rest.splice(i,1); }
+  return full(sh).length>0;
 }
+function rosterMatchInfo(recordName){
+  const cands = EMPLOYEES.filter(e=>namesMatch(e.name, recordName));
+  if(!cands.length) return {plant:null, reason:'non trovato in anagrafica'};
+  if(cands.length>1) return {plant:null, reason:'ambiguo in anagrafica: ' + cands.map(e=>e.name).join(', ')};
+  const e = cands[0];
+  if(!e.plant) return {plant:null, reason:`in anagrafica come "${e.name}" ma senza impianto` + (e.role ? ` (ruolo: ${e.role})` : '')};
+  return {plant:String(e.plant), reason:`anagrafica "${e.name}" → impianto ${e.plant}`};
+}
+function rosterPlantFor(recordName){ return rosterMatchInfo(recordName).plant; }
 // Operatori di un impianto: dai file "per impianto"; se per quell'anno un operatore non c'è,
 // uso i suoi dati del file "per squadra", attribuendolo all'impianto che ha in anagrafica.
+// Per ogni operatore vale la fonte caricata PIÙ DI RECENTE (i dati importati prima di oggi non hanno data e contano come più vecchi).
 function getImpiantoOperators(impianto, year){
-  const direct = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.groupKey===impianto && r.year===year && r.operatore!=='__TOTALE__');
-  const have = new Set(direct.map(r=>canonicalOperatorName(r.operatore)));
-  const derived = OPERATOR_RECORDS
-    .filter(r=>r.dimension==='turno' && r.year===year && r.operatore!=='__TOTALE__' && !have.has(canonicalOperatorName(r.operatore)) && rosterPlantFor(r.operatore)===String(impianto))
-    .map(r=>Object.assign({}, r, {dimension:'impianto', groupKey:impianto, derivedFrom:`squadra ${r.groupKey}`}));
-  return direct.concat(derived);
+  const direct = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && String(r.groupKey)===String(impianto) && r.year===year && r.operatore!=='__TOTALE__');
+  const fromTeam = OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.year===year && r.operatore!=='__TOTALE__' && rosterPlantFor(r.operatore)===String(impianto));
+  const newest = recs=>recs.reduce((m,r)=>Math.max(m, r.importedAt||0), 0);
+  const byOp = new Map();
+  direct.forEach(r=>{ const k = canonicalOperatorName(r.operatore); (byOp.get(k) || byOp.set(k,{d:[],t:[]}).get(k)).d.push(r); });
+  fromTeam.forEach(r=>{ const k = canonicalOperatorName(r.operatore); (byOp.get(k) || byOp.set(k,{d:[],t:[]}).get(k)).t.push(r); });
+  const out = [];
+  byOp.forEach(({d,t})=>{
+    if(d.length && (!t.length || newest(d) >= newest(t))) out.push(...d);
+    else out.push(...t.map(r=>Object.assign({}, r, {dimension:'impianto', groupKey:impianto, derivedFrom:`squadra ${r.groupKey}`})));
+  });
+  return out;
+}
+// Verifica: per ogni operatore dei file squadra dell'anno, a quale impianto viene collegato e perché
+function renderImpiantoLinkCheck(year){
+  const el = document.getElementById('impLinkCheck');
+  if(!el) return;
+  const ops = [...new Set(OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.year===year && r.operatore!=='__TOTALE__').map(r=>r.operatore))].sort();
+  if(!ops.length){ el.innerHTML = `<p class="empty">Nessun file per squadra caricato per il ${year}.</p>`; return; }
+  const rows = ops.map(op=>{
+    const info = rosterMatchInfo(op);
+    let esito = info.reason, col = info.plant ? 'var(--ok)' : '#b3541e';
+    if(info.plant){
+      const shown = getImpiantoOperators(info.plant, year).filter(r=>canonicalOperatorName(r.operatore)===canonicalOperatorName(op));
+      if(shown.length && !shown[0].derivedFrom){ esito += ' — ma per questo impianto vale un file "per impianto" caricato dopo'; col = 'var(--sub)'; }
+    }
+    return `<tr><td>${escHtml(op)}</td><td style="color:${col};">${escHtml(esito)}</td></tr>`;
+  }).join('');
+  el.innerHTML = `<table><thead><tr><th>Operatore (file squadra ${year})</th><th>Collegamento</th></tr></thead><tbody>${rows}</tbody></table>
+    <p class="note" style="margin-top:6px;">In anagrafica ci sono ${EMPLOYEES.length} persone, di cui ${EMPLOYEES.filter(e=>e.plant).length} con impianto. Chi è "non trovato" o "senza impianto" non compare nella sezione 1: correggi il nome o l'impianto in anagrafica.</p>`;
 }
 function derivedPlantsKnown(){
   const out = new Set();
@@ -3547,6 +3586,7 @@ function renderImpiantoView(){
   const impianto = document.getElementById('impStatsPlant').value;
   const year = Number(document.getElementById('impStatsYear').value) || null;
   const voce = document.getElementById('impStatsVoce').value;
+  if(year) renderImpiantoLinkCheck(year);
   if(!impianto || !year || !voce){
     document.getElementById('impStatsBars').innerHTML = '<p class="empty">Importa almeno un file per iniziare.</p>';
     document.getElementById('impStatsYoy').innerHTML = '';
@@ -5519,7 +5559,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · import squadre v4';
+const APP_VERSION = '2026-09-30 · import squadre v5';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 /* ============================= AVVIO ============================= */
 async function startApp(){
