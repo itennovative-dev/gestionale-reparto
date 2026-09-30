@@ -748,7 +748,7 @@
     </div>
 
     <h3 class="panel-subtitle" style="margin-top:24px;">Turni, operatori e impianti</h3>
-    <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" (anche quelli intestati "squadra A/B/C") — anche insieme, anche di anni diversi. L'anno si prende dall'intestazione o, se manca, dal nome del file.</p>
+    <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" (anche quelli per squadra, es. <em>2026_squadra_a.xlsx</em>: se il foglio non riporta la squadra, la prendo dal nome del file) — anche insieme, anche di anni diversi. L'anno si prende dall'intestazione o, se manca, dal nome del file.</p>
     <div class="btn-row">
       <input type="file" accept=".xlsx" multiple onchange="importOperatorFiles(event)">
     </div>
@@ -2818,10 +2818,10 @@ async function importProductionFilesForced(event, forcedFase){
     try{
       const wb = await loadWorkbookFromFile(file);
       const ws = wb.worksheets[0];
-      const type = detectImportFileType(ws);
+      const type = detectImportFileType(ws, file.name);
       if(type === 'operatori'){
         const recs = parseOperatorWorksheet(ws, file.name);
-        mergeOperatorRecords(recs);
+        importOperatorFileRecords(recs);
         rerouted.push(`${file.name} → riconosciuto come turni/operatori`);
         touchedOp = true;
         continue;
@@ -3073,11 +3073,30 @@ function mergeOperatorRecords(newRecords){
   newRecords.forEach(r=> map.set(`${r.dimension}|${r.groupKey}|${r.year}|${r.operatore}|${r.voce}`, r));
   OPERATOR_RECORDS = Array.from(map.values());
 }
+// squadra/turno/impianto dedotti dal nome del file (es. "2026_squadra_a.xlsx", "impianto_116_2026.xlsx")
+function groupFromFilename(filename){
+  const name = String(filename||'').replace(/\.[^.]+$/,'');
+  const yearMatch = name.match(/(20\d{2})/);
+  const year = yearMatch ? Number(yearMatch[1]) : null;
+  const mTur = name.match(/(?:squadra|turno)[\s_-]*([A-Za-z])(?![A-Za-z])/i);
+  if(mTur) return {dimension:'turno', key: mTur[1].toUpperCase(), label: 'squadra ' + mTur[1].toUpperCase(), year};
+  const mImp = name.match(/impianto[\s_-]*([A-Za-z0-9]+)/i);
+  if(mImp) return {dimension:'impianto', key: mImp[1], label: 'impianto ' + mImp[1], year};
+  return null;
+}
+// un file è la fotografia completa di quella squadra/impianto per quell'anno:
+// sostituisce i dati vecchi dello stesso gruppo (es. un operatore passato ad altra squadra)
+function importOperatorFileRecords(recs){
+  const groups = new Set(recs.map(r=>`${r.dimension}|${r.groupKey}|${r.year}`));
+  OPERATOR_RECORDS = OPERATOR_RECORDS.filter(r=>!groups.has(`${r.dimension}|${r.groupKey}|${r.year}`));
+  mergeOperatorRecords(recs);
+}
 function parseOperatorWorksheet(ws, filename){
   const fileYearMatch = filename.match(/(20\d{2})/);
   const fileYear = fileYearMatch ? Number(fileYearMatch[1]) : null;
   const records = [];
   let group = null;
+  const fromName = groupFromFilename(filename);
   for(let r=1; r<=ws.rowCount; r++){
     const row = ws.getRow(r);
     const raw = row.getCell(1).value;
@@ -3095,6 +3114,10 @@ function parseOperatorWorksheet(ws, filename){
         group = {dimension:'impianto', key: mImp[1], label: c1, year, cols: [], totalCol: null};
         continue;
       }
+    }
+    if(!group && c1 === 'Valori' && fromName && fromName.year){
+      // intestazione "squadra X" assente nel foglio: la prendo dal nome del file
+      group = {dimension: fromName.dimension, key: fromName.key, label: fromName.label, year: fromName.year, cols: [], totalCol: null};
     }
     if(!group) continue;
     if(c1 === 'Valori'){
@@ -3155,7 +3178,7 @@ async function importOperatorFiles(event){
 /* ============================= IMPORT UNIFICATO (riconosce da solo produzione vs turni/operatori) ============================= */
 // Produzione: riga 2 del foglio ha intestazioni numeriche 1-12 (i mesi).
 // Turni/operatori: colonna 1 contiene blocchi "turno X" / "impianto Y" (scansione delle prime righe).
-function detectImportFileType(ws){
+function detectImportFileType(ws, filename){
   const headerRow = ws.getRow(2);
   let hasMonthHeaders = false;
   headerRow.eachCell(cell=>{
@@ -3167,6 +3190,14 @@ function detectImportFileType(ws){
     const v = ws.getRow(r).getCell(1).value;
     const c1 = typeof v === 'string' ? v.trim() : v;
     if(typeof c1 === 'string' && (/^(?:turno|squadra)\s+[A-Za-z]\b/i.test(c1) || /^impianto\s+\S+/i.test(c1))) return 'operatori';
+  }
+  // foglio senza intestazione: basta la riga "Valori" + squadra/impianto e anno nel nome del file
+  const g = groupFromFilename(filename);
+  if(g && g.year){
+    for(let r=1; r<=Math.min(ws.rowCount || 0, 10); r++){
+      const v = ws.getRow(r).getCell(1).value;
+      if(typeof v === 'string' && v.trim() === 'Valori') return 'operatori';
+    }
   }
   return null;
 }
@@ -3184,7 +3215,7 @@ async function importAnyFiles(event){
     try{
       const wb = await loadWorkbookFromFile(file);
       const ws = wb.worksheets[0];
-      const type = detectImportFileType(ws);
+      const type = detectImportFileType(ws, file.name);
       if(type === 'produzione'){
         const {fase, year, data} = parseProductionWorksheet(ws, file.name);
         PRODUCTION_STATS[fase] = PRODUCTION_STATS[fase] || {};
@@ -3195,7 +3226,7 @@ async function importAnyFiles(event){
         touchedProd = true;
       }else if(type === 'operatori'){
         const recs = parseOperatorWorksheet(ws, file.name);
-        mergeOperatorRecords(recs);
+        importOperatorFileRecords(recs);
         opCount += recs.length;
         const grp = {};
         recs.filter(r=>r.operatore!=='__TOTALE__').forEach(r=>{ const k = (r.dimension==='turno'?'squadra ':'impianto ')+r.groupKey+' '+r.year; (grp[k] = grp[k] || new Set()).add(r.operatore); });
