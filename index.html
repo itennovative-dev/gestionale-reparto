@@ -397,6 +397,7 @@
       <button class="footer-link" onclick="showPage('panel-backup')"><svg class="ico-sm"><use href="#i-db"/></svg>Backup e sincronizzazione</button>
       <button class="footer-link" onclick="showPage('panel-hours')"><svg class="ico-sm"><use href="#i-clock"/></svg>Area personale · Conteggio ore</button>
     </div>
+    <p class="note" style="grid-column:1 / -1; text-align:center; margin-top:6px;">Versione sito: <span id="appVersion"></span></p>
 
   </div>
 </div>
@@ -3157,22 +3158,47 @@ async function importOperatorFiles(event){
   const files = Array.from(event.target.files || []);
   if(files.length===0) return;
   toast('Importazione in corso…');
+  const ok = [], ko = [];
   let count = 0;
   for(const file of files){
     try{
       const recs = await parseOperatorBreakdownFile(file);
-      mergeOperatorRecords(recs);
+      if(!recs.length){
+        ko.push(`${escHtml(file.name)}: nessun dato riconosciuto — nel foglio manca l'intestazione "squadra X"/"impianto N" e il nome del file non contiene squadra/impianto e anno (es. 2026_squadra_a.xlsx)`);
+        continue;
+      }
+      importOperatorFileRecords(recs);
       count += recs.length;
+      const grp = {};
+      recs.filter(r=>r.operatore!=='__TOTALE__').forEach(r=>{ const k = (r.dimension==='turno'?'squadra ':'impianto ')+r.groupKey+' · '+r.year; (grp[k] = grp[k] || new Set()).add(r.operatore); });
+      ok.push(`${escHtml(file.name)} → ${Object.entries(grp).map(([k,set])=>`${k}: ${set.size} operatori`).join('; ') || 'solo totali'}`);
     }catch(e){
       console.error(e);
-      toast('Errore importando '+file.name);
+      ko.push(`${escHtml(file.name)}: errore in lettura (${escHtml(e && e.message || e)})`);
     }
   }
-  await saveOperatorRecords();
   event.target.value = '';
-  toast(count ? `Importati ${count} valori` : 'Nessun dato riconosciuto nel file');
+  let saveMsg = '';
+  if(count){
+    const json = JSON.stringify(OPERATOR_RECORDS);
+    if(CLOUD_ENABLED && json.length > CLOUD_MAX_VALUE){
+      saveMsg = `⚠ ATTENZIONE: i dati operatori sono troppo grandi per il database online (${Math.round(json.length/1024)} KB): sono visibili ora ma NON salvati. Avvisami e li divido.`;
+    }
+    await saveOperatorRecords();
+  }
   populateOperatorSelectors();
   renderOperatorStatsPage();
+  renderImportSummary();
+  const el = document.getElementById('importResultsList');
+  if(el){
+    let html = '';
+    if(ok.length) html += '<p class="note" style="color:var(--t2);">✓ ' + ok.join('<br>✓ ') + '</p>';
+    if(ko.length) html += '<p class="note" style="color:#b3541e;">⚠ ' + ko.join('<br>⚠ ') + '</p>';
+    if(saveMsg) html += `<p class="note" style="color:var(--danger); font-weight:700;">${saveMsg}</p>`;
+    if(ok.length) html += `<div class="btn-row"><button class="btn-primary" onclick="showPage('${document.getElementById('sqStatsTeam').closest('.panel-section').id}')">Vai alle statistiche operatori</button></div>`;
+    el.innerHTML = html;
+  }
+  toast(count ? `Importati ${count} valori da ${ok.length} file` : 'Nessun dato riconosciuto: vedi il dettaglio sotto il pulsante');
 }
 
 /* ============================= IMPORT UNIFICATO (riconosce da solo produzione vs turni/operatori) ============================= */
@@ -3598,6 +3624,8 @@ function renderOperatorCard(){
   html += '</tbody></table><p class="note" style="margin-top:6px;">"vs anno precedente": variazione rispetto allo stesso tipo di file dell\'anno prima. Per voci come scarti e fermi, un valore in calo è un miglioramento.</p>';
   el.innerHTML = html;
 }
+// (era richiamata dopo le importazioni ma non esisteva: bloccava l'aggiornamento della pagina)
+function populateOperatorSelectors(){ populateImpTurSelectors(); }
 function renderOperatorStatsPage(){
   populateImpTurSelectors();
   renderImpiantoView();
@@ -5459,6 +5487,8 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
+const APP_VERSION = '2026-09-30 · import squadre v3';
+document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 /* ============================= AVVIO ============================= */
 async function startApp(){
   await loadRoster();
