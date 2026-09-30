@@ -17,7 +17,7 @@ service cloud.firestore {
       allow read, write: if autorizzato();
     }
 
-    // Manuali e modelli, divisi in parti
+    // Documenti caricati in passato (manuali/modelli): la sezione è stata tolta dal sito, restano protetti
     match /documenti/{id} {
       allow read, write: if autorizzato();
       match /parti/{parte} {

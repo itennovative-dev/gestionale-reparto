@@ -262,7 +262,6 @@
   .checkbox-inline{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--steel); font-weight:normal;}
   .checkbox-inline input{width:auto;}
   .roster-row{display:flex; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid var(--line); font-size:12.5px; flex-wrap:wrap;}
-  .doc-upload-btn{padding:5px 10px; font-size:11.5px; cursor:pointer; white-space:nowrap;}
   .doc-status{font-size:11px;}
   .every-select{width:auto; padding:4px 6px; font-size:11.5px;}
   .roster-row .roster-main{flex:1; min-width:160px;}
@@ -322,7 +321,6 @@
   <symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/></symbol>
   <symbol id="i-bars" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M8 17v-5M13 17V8M18 17v-9"/></symbol>
   <symbol id="i-userx" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M17 8l5 5M22 8l-5 5"/></symbol>
-  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M6.5 17A2.5 2.5 0 0 0 4 19.5 2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
   <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></symbol>
   <symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -382,13 +380,6 @@
         <button class="menu-tile" onclick="showPage('panel-production')"><svg class="ico"><use href="#i-trend"/></svg><span>Statistiche produzione</span></button>
         <button class="menu-tile" onclick="showPage('panel-opstats')"><svg class="ico"><use href="#i-bars"/></svg><span>Statistiche turni e operatori</span></button>
         <button class="menu-tile" onclick="showPage('panel-stats')"><svg class="ico"><use href="#i-userx"/></svg><span>Statistiche assenze</span></button>
-      </div>
-    </div>
-
-    <div class="menu-group">
-      <h2>Documenti</h2>
-      <div class="menu-grid">
-        <button class="menu-tile" onclick="showPage('panel-manuals')"><svg class="ico"><use href="#i-book"/></svg><span>Manuali e documentazione</span></button>
       </div>
     </div>
 
@@ -624,24 +615,6 @@
     <div class="table-scroll"><table id="dashboardHoursTable"></table></div>
   </div>
 </div>
-<div class="panel-section" id="panel-manuals" style="display:none;">
-  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
-  <div class="page-body" style="max-width:900px;">
-    <h2><span class="n">•</span>Manuali e documentazione</h2>
-    <p class="note">I manuali sono salvati nel database protetto: si aprono solo dopo l'accesso, da qualsiasi dispositivo. I file grandi (es. Eutrolog, 79 MB) richiedono qualche secondo la prima volta. Con "⬆ file" sostituisci un file con una versione aggiornata.</p>
-    <div id="manualsList"></div>
-    <h3 class="panel-subtitle" style="margin-top:22px;">Aggiungi un manuale</h3>
-    <div class="roster-add-grid">
-      <div><label>Titolo</label><input type="text" id="manualNewTitle" placeholder="Es. Manuale tecnico TR415"></div>
-      <div><label>Impianto</label><select id="manualNewPlant"></select></div>
-      <div><label>File PDF</label><input type="file" id="manualNewFile" accept=".pdf"></div>
-    </div>
-    <div class="btn-row">
-      <button class="btn-primary" onclick="addManual()">+ Aggiungi manuale</button>
-    </div>
-  </div>
-</div>
-
 <div class="panel-section" id="panel-opstats" style="display:none;">
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1300px;">
@@ -1439,160 +1412,8 @@ async function uploadLocalDataToCloud(askFirst){
   return true;
 }
 
-/* ============================= DOCUMENTI (manuali) NEL DATABASE =============================
-   I file non sono più pubblicati insieme al sito: stanno nel database, raccolta "documenti", leggibile
-   solo dopo l'accesso. Firestore accetta al massimo ~1 MB per documento, quindi ogni file è diviso in
-   parti da 700 KB (sottoraccolta "parti") e ricomposto al momento dell'apertura.
-   Lo stesso formato è usato da tools/carica-documenti.mjs per il caricamento iniziale. */
-const DOCS_COLLECTION = 'documenti';
-const DOC_CHUNK = 700*1024;
-const DOC_BATCH = 8;            // parti lette per volta (per mostrare l'avanzamento)
-const DOC_BLOB_CACHE = new Map(); // file già aperti in questa sessione
-const DOC_MIME = {
-  pdf:'application/pdf', doc:'application/msword', xls:'application/vnd.ms-excel',
-  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-};
 function escHtml(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-function docMime(filename){ const ext = String(filename).split('.').pop().toLowerCase(); return DOC_MIME[ext] || 'application/octet-stream'; }
-function docRef(folder, filename){
-  return cloudDb.collection(DOCS_COLLECTION).doc(encodeURIComponent((folder+'/'+filename).normalize('NFC')));
-}
-function fmtMB(bytes){
-  if(bytes < 1048576) return Math.max(1, Math.round(bytes/1024))+' KB';
-  return (bytes/1048576).toLocaleString('it-IT',{maximumFractionDigits:1})+' MB';
-}
-
-async function docExists(folder, filename){
-  if(!CLOUD_ENABLED) return null;
-  try{ const s = await docRef(folder, filename).get(); return s.exists ? s.data() : false; }catch(e){ return null; }
-}
-async function loadDocumentBlob(folder, filename){
-  const cacheKey = folder+'/'+filename;
-  if(DOC_BLOB_CACHE.has(cacheKey)) return DOC_BLOB_CACHE.get(cacheKey);
-  const ref = docRef(folder, filename);
-  const meta = await ref.get();
-  if(!meta.exists) return null;
-  const {parts, size, mime} = meta.data();
-  const chunks = [];
-  for(let start=0; start<parts; start+=DOC_BATCH){
-    if(parts > DOC_BATCH) toast(`Apertura ${filename} — ${Math.round(start/parts*100)}% di ${fmtMB(size)}`);
-    const snap = await ref.collection('parti').orderBy('i').startAt(start).limit(DOC_BATCH).get();
-    snap.forEach(d=>chunks.push(d.data().d.toUint8Array()));
-  }
-  if(chunks.length !== parts) throw new Error('file incompleto nel database');
-  const blob = new Blob(chunks, {type: mime || docMime(filename)});
-  DOC_BLOB_CACHE.set(cacheKey, blob);
-  return blob;
-}
-async function openDocument(folder, filename){
-  if(!CLOUD_ENABLED){ window.open(folder+'/'+encodeURIComponent(filename), '_blank'); return; }
-  const isPdf = docMime(filename)==='application/pdf';
-  // La finestra va aperta subito al clic, altrimenti il browser la blocca come popup.
-  const win = isPdf ? window.open('', '_blank') : null;
-  if(win) win.document.write('<p style="font-family:sans-serif;padding:24px;color:#555">Apertura del documento in corso…</p>');
-  try{
-    let blob = null;
-    try{ blob = await loadDocumentBlob(folder, filename); }
-    catch(e){ console.warn('Lettura documento dal database non riuscita', e); }
-    // Ripiego: se il file non è (ancora) nel database, prova la copia pubblicata insieme al sito, se esiste.
-    if(!blob){
-      try{
-        const res = await fetch(folder+'/'+encodeURIComponent(filename), {cache:'no-store'});
-        if(res.ok) blob = new Blob([await res.blob()], {type: docMime(filename)});
-      }catch(e){}
-    }
-    if(!blob){
-      if(win) win.close();
-      toast('⚠ Documento non disponibile: caricalo con "⬆ file"');
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    if(win){ win.location.href = url; }
-    else{
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-    }
-    toast(isPdf ? 'Documento aperto' : 'Documento scaricato');
-    setTimeout(()=>URL.revokeObjectURL(url), 60000);
-  }catch(e){
-    console.error(e);
-    if(win) win.close();
-    toast('⚠ Impossibile aprire il documento: '+(e.message||e));
-  }
-}
-/* Carica (o sostituisce) un file nel database con il nome indicato. */
-async function uploadDocument(folder, filename, file){
-  if(!CLOUD_ENABLED){ toast('Database online non configurato: impossibile caricare file'); return false; }
-  const buf = new Uint8Array(await file.arrayBuffer());
-  const parts = Math.max(1, Math.ceil(buf.length/DOC_CHUNK));
-  const ref = docRef(folder, filename);
-  const user = firebase.auth().currentUser;
-  cloudPendingWrites++;
-  try{
-    const old = await ref.get();
-    const oldParts = old.exists ? (old.data().parts||0) : 0;
-    for(let i=0;i<parts;i++){
-      toast(`Caricamento ${filename} — ${Math.round(i/parts*100)}%`);
-      await ref.collection('parti').doc(String(i).padStart(4,'0')).set({
-        i, d: firebase.firestore.Blob.fromUint8Array(buf.subarray(i*DOC_CHUNK, (i+1)*DOC_CHUNK))
-      });
-    }
-    for(let i=parts;i<oldParts;i++) await ref.collection('parti').doc(String(i).padStart(4,'0')).delete();
-    await ref.set({
-      folder, name: filename, mime: docMime(filename), size: buf.length, parts,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: user ? user.email : ''
-    });
-    DOC_BLOB_CACHE.delete(folder+'/'+filename);
-    toast(`✓ ${filename} caricato (${fmtMB(buf.length)})`);
-    return true;
-  }catch(e){
-    console.error(e);
-    toast('⚠ Caricamento non riuscito: '+(e.message||e));
-    return false;
-  }finally{ cloudPendingWrites--; }
-}
-async function deleteDocumentFile(folder, filename){
-  if(!CLOUD_ENABLED) return;
-  try{
-    const ref = docRef(folder, filename);
-    const snap = await ref.collection('parti').get();
-    for(const d of snap.docs) await d.ref.delete();
-    await ref.delete();
-  }catch(e){ console.error(e); }
-}
-/* Riga di un elenco documenti: link che apre il file dal database, stato e pulsante per (ri)caricarlo. */
-function docRowHtml(folder, entry, labelHtml, deleteFn){
-  const fnJs = escHtml(escJs(entry.filename));
-  const statusId = 'docst-'+folder+'-'+encodeURIComponent(entry.filename).replace(/[^a-zA-Z0-9]/g,'_');
-  return `<div class="roster-row">
-    <div class="roster-main">${labelHtml ? labelHtml+' — ' : ''}<a href="#" onclick="openDocument('${folder}','${fnJs}'); return false;">${escHtml(entry.title)}</a></div>
-    <div class="roster-tags">${escHtml(entry.filename)} <span id="${statusId}" class="doc-status"></span></div>
-    <label class="btn-ghost doc-upload-btn" title="Carica o sostituisci il file nel database">⬆ file<input type="file" style="display:none;" onchange="uploadDocForEntry('${folder}','${fnJs}', this)"></label>
-    <button class="btn-danger" onclick="${deleteFn}('${escHtml(escJs(entry.id))}')">rimuovi</button>
-  </div>`;
-}
-async function refreshDocStatuses(folder, entries){
-  if(!CLOUD_ENABLED) return;
-  for(const e of entries){
-    const el = document.getElementById('docst-'+folder+'-'+encodeURIComponent(e.filename).replace(/[^a-zA-Z0-9]/g,'_'));
-    if(!el) continue;
-    const meta = await docExists(folder, e.filename);
-    if(meta===null) el.textContent = '';
-    else if(meta===false){ el.textContent = '· ⚠ file non caricato'; el.style.color = 'var(--danger)'; }
-    else{ el.textContent = '· '+fmtMB(meta.size); el.style.color = ''; }
-  }
-}
-async function uploadDocForEntry(folder, filename, input){
-  const file = input.files && input.files[0];
-  input.value = '';
-  if(!file) return;
-  if(await uploadDocument(folder, filename, file)){
-    if(folder==='manuali') renderManualsList();
-  }
 }
 
 /* ============================= STATO ============================= */
@@ -3945,80 +3766,6 @@ async function downloadTurnoExcel(){
   toast('Excel scaricato');
 }
 
-/* ============================= MANUALI E DOCUMENTAZIONE ============================= */
-const DEFAULT_MANUALS = [
-  {title:"Manuale istruzioni taglierina Euromac 100 con scaricatore", plant:"100", filename:"100_-_Manuale_d_istruzioni_taglierina_Euromac_100_con_Scaricatore.pdf"},
-  {title:"Manuale taglierina M1440i (2021)", plant:"119", filename:"119-_MANUALE_TAGLIERINA_M1440i2021.pdf"},
-  {title:"Manuale TR415 - 1080 (Laem)", plant:"115", filename:"115-_Manuale_TR415_-_1080_-_Ita_-Laem_1.pdf"},
-  {title:"Manuale FIFE CDP-01", plant:"116", filename:"FIFE_CDP-01_IMP_116.pdf"},
-  {title:"Manuale Eutrolog - Commessa 4002 (Rev. 0)", plant:"", filename:"Manuale_Eutrolog_-_Commessa_4002_-_Rev_0.pdf"},
-  {title:"Manuale istruzioni TR415 - 1191 (rev. 2)", plant:"118", filename:"118-_Manuale_di_istruzioni_TR415_-_1191_IT_rev_2.pdf"},
-  {title:"Manuale tecnico TR415", plant:"116", filename:"116-Manuale_Tecnico_TR_415_-_116.pdf"},
-];
-/* I manuali "di base" (DEFAULT_MANUALS, inclusi nel sito) sono sempre visibili, a meno che l'utente
-   non li rimuova esplicitamente (finiscono in MANUALS_HIDDEN). Quelli aggiunti dall'utente stanno
-   in MANUALS_EXTRA. Così un vecchio elenco salvato in precedenza (es. nel database cloud) non può
-   più "nascondere" per errore i manuali di base. */
-let MANUALS_EXTRA = [];
-let MANUALS_HIDDEN = [];
-async function loadManuals(){
-  try{ const r = await storageGet('manuals-extra'); MANUALS_EXTRA = r ? JSON.parse(r.value) : []; }catch(e){ MANUALS_EXTRA = []; }
-  try{ const r = await storageGet('manuals-hidden'); MANUALS_HIDDEN = r ? JSON.parse(r.value) : []; }catch(e){ MANUALS_HIDDEN = []; }
-  const sel = document.getElementById('manualNewPlant');
-  if(sel) renderPlantSelectOptions(sel, true, true);
-  renderManualsList();
-}
-function getManualsList(){
-  const base = DEFAULT_MANUALS
-    .filter(m=>!MANUALS_HIDDEN.includes(m.filename))
-    .map(m=>({id:'default:'+m.filename, isDefault:true, ...m}));
-  return [...base, ...MANUALS_EXTRA];
-}
-async function saveManualsExtra(){ try{ await storageSet('manuals-extra', JSON.stringify(MANUALS_EXTRA)); }catch(e){} }
-async function saveManualsHidden(){ try{ await storageSet('manuals-hidden', JSON.stringify(MANUALS_HIDDEN)); }catch(e){} }
-async function addManual(){
-  const title = document.getElementById('manualNewTitle').value.trim();
-  const plant = document.getElementById('manualNewPlant').value;
-  const input = document.getElementById('manualNewFile');
-  const file = input.files && input.files[0];
-  if(!title || !file){ toast('Inserisci il titolo e scegli il file'); return; }
-  const filename = file.name;
-  if(getManualsList().some(m=>m.filename===filename)){ toast('Esiste già un manuale con questo nome file: usa "⬆ file" su quella riga per sostituirlo'); return; }
-  if(!(await uploadDocument('manuali', filename, file))) return;
-  MANUALS_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, plant, filename});
-  document.getElementById('manualNewTitle').value = '';
-  input.value = '';
-  saveManualsExtra();
-  renderManualsList();
-  toast('Manuale aggiunto');
-}
-function deleteManual(id){
-  if(id.indexOf('default:')===0){
-    if(!confirm("Rimuovere questo manuale dall'elenco? (il file resta nel database)")) return;
-    const filename = id.slice('default:'.length);
-    if(!MANUALS_HIDDEN.includes(filename)){ MANUALS_HIDDEN.push(filename); saveManualsHidden(); }
-  }else{
-    const m = MANUALS_EXTRA.find(x=>x.id===id);
-    if(!confirm("Rimuovere questo manuale? Il file viene cancellato anche dal database.")) return;
-    MANUALS_EXTRA = MANUALS_EXTRA.filter(x=>x.id!==id);
-    saveManualsExtra();
-    if(m) deleteDocumentFile('manuali', m.filename);
-  }
-  renderManualsList();
-}
-async function renderManualsList(){
-  const el = document.getElementById('manualsList');
-  if(!el) return;
-  const list = getManualsList();
-  if(list.length===0){ el.innerHTML = '<p class="empty">Nessun manuale in elenco.</p>'; return; }
-  const sorted = list.slice().sort((a,b)=> (a.plant||'zzz').localeCompare(b.plant||'zzz'));
-  el.innerHTML = sorted.map(m=>{
-    const plantTag = m.plant ? (m.plant==='TA' ? 'Taglio anime' : `Impianto ${escHtml(m.plant)}`) : 'Generale';
-    return docRowHtml('manuali', m, `<strong>${plantTag}</strong>`, 'deleteManual');
-  }).join('');
-  refreshDocStatuses('manuali', sorted);
-}
-
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
 let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39};
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
@@ -5520,7 +5267,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-manuals','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
 function showPage(id){
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
@@ -5543,7 +5290,6 @@ function showPage(id){
   if(id==='panel-import') renderImportSummary();
   if(id==='panel-production') renderProductionPage();
   if(id==='panel-opstats') renderOperatorStatsPage();
-  if(id==='panel-manuals') renderManualsList();
   if(id==='panel-hours') renderHoursPage();
   if(id==='panel-hours-settings') renderHoursSettingsForm();
   if(id==='panel-hours-months'){ populateMonthFilterSelectors(); renderMonthlyParamsTable(); }
@@ -5568,7 +5314,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · senza modelli v9';
+const APP_VERSION = '2026-09-30 · senza modelli e manuali v10';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -5605,7 +5351,6 @@ async function startApp(){
   loadClothingSizes();
   loadProductionStats();
   loadOperatorRecords();
-  loadManuals();
   loadHoursData();
   renderHomeBanner();
 }

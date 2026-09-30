@@ -1,5 +1,4 @@
-# Nel repository vanno solo l'app, la configurazione di pubblicazione e i moduli vuoti.
-# I manuali NON vanno qui: si caricano nel database protetto dalla pagina Manuali ("⬆ file").
+# Nel repository vanno solo l'app e la configurazione di pubblicazione: nessun documento aziendale.
 *
 !.gitignore
 !index.html
@@ -8,5 +7,3 @@
 !firestore.rules
 !.github/
 !.github/**
-!tools/
-!tools/*.mjs

@@ -4,11 +4,6 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-    inputs:
-      carica_documenti:
-        description: "Carica anche i manuali (cartella manuali/) nel database"
-        type: boolean
-        default: false
 
 concurrency:
   group: pubblica
@@ -40,14 +35,6 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
         run: npx --yes firebase-tools@14 deploy --only hosting,firestore:rules --project gestionale-giovanni --non-interactive
-
-      - name: Carica i manuali nel database
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.carica_documenti }}
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
-        run: |
-          npm install --prefix tools --no-save --no-audit --no-fund firebase-admin@12
-          node tools/carica-documenti.mjs
 
       - name: Pulizia credenziali
         if: always()
