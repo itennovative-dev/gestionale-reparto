@@ -706,6 +706,32 @@
       <h3 class="panel-subtitle" style="margin-top:18px;">Tabella completa — tutte le voci</h3>
       <div class="table-scroll" id="turStatsTable"></div>
     </div>
+
+    <div class="card">
+      <h2><span class="n">3</span>Per squadra — confronto tra operatori</h2>
+      <p class="note">I macchinisti di una squadra messi a confronto, dai file "squadra/turno" (es. <em>2026_squadra_c.xlsx</em>).</p>
+      <div class="btn-row">
+        <label class="cap-note">Squadra <select id="sqStatsTeam" onchange="renderSquadraView()"></select></label>
+        <label class="cap-note">Anno <select id="sqStatsYear" onchange="renderSquadraView()"></select></label>
+        <label class="cap-note">Voce (grafico) <select id="sqStatsVoce" onchange="renderSquadraView()" style="min-width:220px;"></select></label>
+      </div>
+      <h3 class="panel-subtitle" style="margin-top:18px;">Confronto operatori — voce selezionata</h3>
+      <div id="sqStatsBars"></div>
+      <h3 class="panel-subtitle" style="margin-top:18px;">Velocità di marcia vs anno precedente (per operatore)</h3>
+      <div id="sqStatsYoy"></div>
+      <h3 class="panel-subtitle" style="margin-top:18px;">Tabella completa — tutte le voci</h3>
+      <div class="table-scroll" id="sqStatsTable"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="n">4</span>Scheda operatore</h2>
+      <p class="note">Tutti i dati di un operatore, sia dai file per squadra sia da quelli per impianto. Nomi scritti in modo diverso (es. "DI GIOVANNI A." e "DI GIOVANNI ALFONSO") vengono riconosciuti come la stessa persona quando non c'è ambiguità.</p>
+      <div class="btn-row">
+        <label class="cap-note">Operatore <select id="opCardName" onchange="renderOperatorCard()" style="min-width:240px;"></select></label>
+        <label class="cap-note">Anno <select id="opCardYear" onchange="renderOperatorCard()"></select></label>
+      </div>
+      <div class="table-scroll" id="opCardTable" style="margin-top:14px;"></div>
+    </div>
   </div>
 </div>
 
@@ -3171,7 +3197,10 @@ async function importAnyFiles(event){
         const recs = parseOperatorWorksheet(ws, file.name);
         mergeOperatorRecords(recs);
         opCount += recs.length;
-        opImported.push(`${file.name} → turni/operatori, ${recs.length} valori`);
+        const grp = {};
+        recs.filter(r=>r.operatore!=='__TOTALE__').forEach(r=>{ const k = (r.dimension==='turno'?'squadra ':'impianto ')+r.groupKey+' '+r.year; (grp[k] = grp[k] || new Set()).add(r.operatore); });
+        const det = Object.entries(grp).map(([k,set])=>`${k}: ${set.size} operatori`).join('; ');
+        opImported.push(`${file.name} → ${det || 'solo totali'} (${recs.length} valori) — li trovi in Statistiche turni/operatori`);
         touchedOp = true;
       }else{
         unknown.push(file.name);
@@ -3281,8 +3310,22 @@ function populateImpTurSelectors(){
     plantSel.innerHTML = impiantiKnown.length ? impiantiKnown.map(p=>`<option value="${p}">${p}</option>`).join('') : '<option value="">—</option>';
     if(impiantiKnown.includes(prev)) plantSel.value = prev;
   }
+  const teams = [...new Set(OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.operatore!=='__TOTALE__').map(r=>r.groupKey))].sort();
+  const teamSel = document.getElementById('sqStatsTeam');
+  if(teamSel){
+    const prev = teamSel.value;
+    teamSel.innerHTML = teams.length ? teams.map(t=>`<option value="${t}">Squadra ${t}</option>`).join('') : '<option value="">—</option>';
+    if(teams.includes(prev)) teamSel.value = prev;
+  }
+  const opSel = document.getElementById('opCardName');
+  if(opSel){
+    const prev = opSel.value;
+    const names = [...new Set(OPERATOR_RECORDS.filter(r=>r.operatore!=='__TOTALE__').map(r=>canonicalOperatorName(r.operatore)))].sort();
+    opSel.innerHTML = names.length ? names.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('') : '<option value="">—</option>';
+    if(names.includes(prev)) opSel.value = prev;
+  }
   const years = [...new Set(OPERATOR_RECORDS.map(r=>r.year))].sort((a,b)=>b-a);
-  ['impStatsYear','turStatsYear'].forEach(id=>{
+  ['impStatsYear','turStatsYear','sqStatsYear','opCardYear'].forEach(id=>{
     const sel = document.getElementById(id);
     if(!sel) return;
     const prev = sel.value;
@@ -3290,7 +3333,7 @@ function populateImpTurSelectors(){
     if(years.map(String).includes(prev)) sel.value = prev;
   });
   const voci = [...new Set(OPERATOR_RECORDS.map(r=>r.voce))];
-  ['impStatsVoce','turStatsVoce'].forEach(id=>{
+  ['impStatsVoce','turStatsVoce','sqStatsVoce'].forEach(id=>{
     const sel = document.getElementById(id);
     if(!sel) return;
     const prev = sel.value;
@@ -3451,10 +3494,85 @@ function renderTurnoView(){
   document.getElementById('turStatsYoy').innerHTML = renderYoyBox(rows);
   renderGenericGroupTable('turStatsTable', 'turno', year);
 }
+// ---- nomi operatori: "DI GIOVANNI A." e "DI GIOVANNI ALFONSO" sono la stessa persona se non c'è ambiguità ----
+function normOperatorName(n){
+  return String(n||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[.,]/g,' ').replace(/\s+/g,' ').trim();
+}
+function canonicalOperatorName(n){
+  const norm = normOperatorName(n);
+  const m = norm.match(/^(.*\S)\s([A-Z])$/); // cognome + iniziale
+  if(!m) return norm;
+  const [, surname, initial] = m;
+  const full = [...new Set(OPERATOR_RECORDS.filter(r=>r.operatore!=='__TOTALE__').map(r=>normOperatorName(r.operatore)))]
+    .filter(x=> x!==norm && x.startsWith(surname+' ' + initial) && !/\s[A-Z]$/.test(x));
+  return full.length===1 ? full[0] : norm;
+}
+function getSquadraOperators(team, year){
+  return OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.groupKey===team && r.year===year && r.operatore!=='__TOTALE__');
+}
+function renderSquadraView(){
+  const team = document.getElementById('sqStatsTeam').value;
+  const year = Number(document.getElementById('sqStatsYear').value) || null;
+  const voce = document.getElementById('sqStatsVoce').value;
+  const recs = (team && year) ? getSquadraOperators(team, year) : [];
+  if(!recs.length || !voce){
+    document.getElementById('sqStatsBars').innerHTML = '<p class="empty">' + (team ? 'Nessun dato per operatore per questa squadra/anno.' : 'Importa un file per squadra (es. "2026_squadra_c.xlsx") per vedere i macchinisti a confronto.') + '</p>';
+    document.getElementById('sqStatsYoy').innerHTML = '';
+    document.getElementById('sqStatsTable').innerHTML = '';
+    return;
+  }
+  const ops = [...new Set(recs.map(r=>r.operatore))].sort();
+  const val = (op, y, v)=>{
+    const key = canonicalOperatorName(op);
+    const rec = OPERATOR_RECORDS.find(r=>r.dimension==='turno' && r.groupKey===team && r.year===y && r.voce===v && r.operatore!=='__TOTALE__' && canonicalOperatorName(r.operatore)===key);
+    return rec ? rec.value : null;
+  };
+  renderBarsInto('sqStatsBars', ops.map(op=>[op, val(op, year, voce)]).filter(([,v])=>v!=null).sort((a,b)=>b[1]-a[1]));
+  document.getElementById('sqStatsYoy').innerHTML = renderYoyBox(ops.map(op=>{
+    const curr = val(op, year, 'Velocità di marcia'), prev = val(op, year-1, 'Velocità di marcia');
+    return [op, {curr, prev, delta:(curr!=null && prev!=null) ? ((curr-prev)/(prev||1))*100 : null}];
+  }));
+  const voci = [...new Set(recs.map(r=>r.voce))];
+  const tot = OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.groupKey===team && r.year===year && r.operatore==='__TOTALE__');
+  let html = `<table><thead><tr><th>Operatore</th>${voci.map(v=>`<th>${escHtml(v)}</th>`).join('')}</tr></thead><tbody>`;
+  ops.forEach(op=>{
+    html += `<tr><td><strong>${escHtml(op)}</strong></td>${voci.map(v=>{ const x = val(op, year, v); return `<td>${x!=null?formatProdNum(x):''}</td>`; }).join('')}</tr>`;
+  });
+  if(tot.length) html += `<tr><td><strong>Totale squadra ${team}</strong></td>${voci.map(v=>{ const r = tot.find(t=>t.voce===v); return `<td><strong>${r?formatProdNum(r.value):''}</strong></td>`; }).join('')}</tr>`;
+  html += '</tbody></table>';
+  document.getElementById('sqStatsTable').innerHTML = html;
+}
+function renderOperatorCard(){
+  const el = document.getElementById('opCardTable');
+  if(!el) return;
+  const name = document.getElementById('opCardName').value;
+  const year = Number(document.getElementById('opCardYear').value) || null;
+  if(!name || !year){ el.innerHTML = '<p class="empty">Importa almeno un file per iniziare.</p>'; return; }
+  const mine = OPERATOR_RECORDS.filter(r=>r.operatore!=='__TOTALE__' && canonicalOperatorName(r.operatore)===name);
+  const sources = [...new Set(mine.filter(r=>r.year===year).map(r=>r.dimension+'|'+r.groupKey))]
+    .sort((a,b)=> (a.startsWith('turno')?0:1)-(b.startsWith('turno')?0:1) || a.localeCompare(b));
+  if(!sources.length){ el.innerHTML = `<p class="empty">Nessun dato per ${escHtml(name)} nel ${year}.</p>`; return; }
+  const voci = [...new Set(mine.filter(r=>r.year===year).map(r=>r.voce))];
+  const get = (src, y, v)=>{ const [d,k] = src.split('|'); const r = mine.find(x=>x.dimension===d && x.groupKey===k && x.year===y && x.voce===v); return r ? r.value : null; };
+  const label = src=>{ const [d,k] = src.split('|'); return d==='turno' ? `Squadra ${k}` : `Impianto ${k}`; };
+  let html = `<table><thead><tr><th>Voce</th>${sources.map(src=>`<th>${label(src)}</th><th>vs ${year-1}</th>`).join('')}</tr></thead><tbody>`;
+  voci.forEach(v=>{
+    html += `<tr><td><strong>${escHtml(v)}</strong></td>` + sources.map(src=>{
+      const c = get(src, year, v), p = get(src, year-1, v);
+      const d = (c!=null && p!=null && p!==0) ? ((c-p)/p)*100 : null;
+      const col = d==null ? 'var(--sub)' : (d>=0 ? 'var(--ok)' : 'var(--danger)');
+      return `<td>${c!=null?formatProdNum(c):''}</td><td style="color:${col};">${d==null?'—':(d>=0?'+':'')+d.toFixed(1)+'%'}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table><p class="note" style="margin-top:6px;">"vs anno precedente": variazione rispetto allo stesso tipo di file dell\'anno prima. Per voci come scarti e fermi, un valore in calo è un miglioramento.</p>';
+  el.innerHTML = html;
+}
 function renderOperatorStatsPage(){
   populateImpTurSelectors();
   renderImpiantoView();
   renderTurnoView();
+  renderSquadraView();
+  renderOperatorCard();
 }
 async function downloadImpiantoExcel(){
   const impianto = document.getElementById('impStatsPlant').value;
