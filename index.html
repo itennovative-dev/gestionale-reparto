@@ -3360,7 +3360,7 @@ function renderImportSummary(){
   }
 }
 function populateImpTurSelectors(){
-  const impiantiKnown = [...new Set(OPERATOR_RECORDS.filter(r=>r.dimension==='impianto').map(r=>r.groupKey))].sort();
+  const impiantiKnown = [...new Set([...OPERATOR_RECORDS.filter(r=>r.dimension==='impianto').map(r=>r.groupKey), ...derivedPlantsKnown()])].sort();
   const plantSel = document.getElementById('impStatsPlant');
   if(plantSel){
     const prev = plantSel.value;
@@ -3416,7 +3416,7 @@ function buildOperatorTableRows(groupBy, year){
   if(groupBy==='impianto'){
     return [...new Set(OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.year===year).map(r=>r.groupKey))].sort()
       .map(k=>({label:`Impianto ${k}`, get:(voce)=>{
-        const recs = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.groupKey===k && r.year===year && r.voce===voce && r.operatore!=='__TOTALE__');
+        const recs = getImpiantoOperators(k, year).filter(r=>r.voce===voce);
         return recs.length ? recs.reduce((a,r)=>a+r.value,0) : null;
       }}));
   }
@@ -3436,7 +3436,7 @@ function getGroupVoceValue(groupBy, key, year, voce){
   }
   if(groupBy==='impianto'){
     // media tra gli operatori (adatta per voci di velocità, che non sono additive)
-    const recs = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.groupKey===key && r.year===year && r.voce===voce && r.operatore!=='__TOTALE__');
+    const recs = getImpiantoOperators(key, year).filter(r=>r.voce===voce);
     if(recs.length===0) return null;
     return recs.reduce((a,r)=>a+r.value,0) / recs.length;
   }
@@ -3492,8 +3492,38 @@ function renderGenericGroupTable(targetId, groupBy, year){
   html += '</tbody></table>';
   el.innerHTML = html;
 }
+// Impianto assegnato in anagrafica a un operatore dei file squadra ("DI GIOVANNI ALFONSO" ↔ "DI GIOVANNI A.")
+function rosterPlantFor(recordName){
+  const rn = normOperatorName(recordName);
+  const cands = EMPLOYEES.filter(e=>{
+    const en = normOperatorName(e.name);
+    if(en===rn) return true;
+    const m = en.match(/^(.*\S)\s([A-Z])$/);           // anagrafica "COGNOME N."
+    if(m && rn.startsWith(m[1]+' '+m[2])) return true;
+    const m2 = rn.match(/^(.*\S)\s([A-Z])$/);          // file "COGNOME N.", anagrafica per esteso
+    if(m2 && en.startsWith(m2[1]+' '+m2[2])) return true;
+    return false;
+  });
+  return (cands.length===1 && cands[0].plant) ? String(cands[0].plant) : null;
+}
+// Operatori di un impianto: dai file "per impianto"; se per quell'anno un operatore non c'è,
+// uso i suoi dati del file "per squadra", attribuendolo all'impianto che ha in anagrafica.
 function getImpiantoOperators(impianto, year){
-  return OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.groupKey===impianto && r.year===year && r.operatore!=='__TOTALE__');
+  const direct = OPERATOR_RECORDS.filter(r=>r.dimension==='impianto' && r.groupKey===impianto && r.year===year && r.operatore!=='__TOTALE__');
+  const have = new Set(direct.map(r=>canonicalOperatorName(r.operatore)));
+  const derived = OPERATOR_RECORDS
+    .filter(r=>r.dimension==='turno' && r.year===year && r.operatore!=='__TOTALE__' && !have.has(canonicalOperatorName(r.operatore)) && rosterPlantFor(r.operatore)===String(impianto))
+    .map(r=>Object.assign({}, r, {dimension:'impianto', groupKey:impianto, derivedFrom:`squadra ${r.groupKey}`}));
+  return direct.concat(derived);
+}
+function derivedPlantsKnown(){
+  const out = new Set();
+  OPERATOR_RECORDS.forEach(r=>{ if(r.dimension==='turno' && r.operatore!=='__TOTALE__'){ const p = rosterPlantFor(r.operatore); if(p) out.add(p); } });
+  return out;
+}
+function impiantoSourceNote(recs){
+  const d = [...new Set(recs.filter(r=>r.derivedFrom).map(r=>`${r.operatore} (${r.derivedFrom})`))];
+  return d.length ? `<p class="note" style="margin-top:6px;">* Dati dal file per squadra, attribuiti a questo impianto secondo l'anagrafica: ${d.map(escHtml).join(', ')}. Sono i totali dell'operatore su tutte le macchine su cui ha lavorato nell'anno.</p>` : '';
 }
 function renderImpiantoTable(impianto, year){
   const el = document.getElementById('impStatsTable');
@@ -3504,12 +3534,13 @@ function renderImpiantoTable(impianto, year){
   if(operatori.length===0){ el.innerHTML = '<p class="empty">Nessun dato disponibile per questo impianto/anno.</p>'; return; }
   let html = `<table><thead><tr><th>Operatore</th>${voci.map(v=>`<th>${v}</th>`).join('')}</tr></thead><tbody>`;
   operatori.forEach(op=>{
-    html += `<tr><td><strong>${op}</strong></td>${voci.map(v=>{
+    const star = recs.some(r=>r.operatore===op && r.derivedFrom) ? ' *' : '';
+    html += `<tr><td><strong>${escHtml(op)}${star}</strong></td>${voci.map(v=>{
       const rec = recs.find(r=>r.operatore===op && r.voce===v);
       return `<td>${rec?formatProdNum(rec.value):''}</td>`;
     }).join('')}</tr>`;
   });
-  html += '</tbody></table>';
+  html += '</tbody></table>' + impiantoSourceNote(recs);
   el.innerHTML = html;
 }
 function renderImpiantoView(){
@@ -3524,7 +3555,7 @@ function renderImpiantoView(){
   }
   const recs = getImpiantoOperators(impianto, year);
   const bars = [...new Set(recs.map(r=>r.operatore))]
-    .map(op=>{ const rec = recs.find(r=>r.operatore===op && r.voce===voce); return [op, rec?rec.value:null]; })
+    .map(op=>{ const rec = recs.find(r=>r.operatore===op && r.voce===voce); return [op + (rec && rec.derivedFrom ? ' *' : ''), rec?rec.value:null]; })
     .filter(([,v])=>v!=null).sort((a,b)=>b[1]-a[1]);
   renderBarsInto('impStatsBars', bars);
   document.getElementById('impStatsYoy').innerHTML = renderYoyBox([
@@ -3663,7 +3694,8 @@ async function downloadImpiantoExcel(){
   operatori.forEach((op,ri)=>{
     const r = 3+ri;
     const nameCell = ws.getCell(r,1);
-    nameCell.value = op;
+    const der = recs.find(x=>x.operatore===op && x.derivedFrom);
+    nameCell.value = der ? `${op} (da file ${der.derivedFrom})` : op;
     nameCell.font = {name:'Calibri', size:10, bold:true};
     nameCell.border = border;
     voci.forEach((v,ci)=>{
@@ -5487,7 +5519,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · import squadre v3';
+const APP_VERSION = '2026-09-30 · import squadre v4';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 /* ============================= AVVIO ============================= */
 async function startApp(){
