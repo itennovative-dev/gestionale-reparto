@@ -1,11 +1,8 @@
 # Nel repository vanno solo l'app, la configurazione di pubblicazione e i moduli vuoti.
 # I manuali NON vanno qui: si caricano nel database protetto dalla pagina Manuali ("⬆ file").
-# I modelli presenti sono solo moduli vuoti, senza dati di clienti o persone.
 *
 !.gitignore
 !index.html
-!modelli/
-!modelli/**
 !firebase.json
 !.firebaserc
 !firestore.rules

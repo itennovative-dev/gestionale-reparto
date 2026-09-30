@@ -389,7 +389,6 @@
       <h2>Documenti</h2>
       <div class="menu-grid">
         <button class="menu-tile" onclick="showPage('panel-manuals')"><svg class="ico"><use href="#i-book"/></svg><span>Manuali e documentazione</span></button>
-        <button class="menu-tile" onclick="showPage('panel-templates')"><svg class="ico"><use href="#i-file"/></svg><span>Modelli</span></button>
       </div>
     </div>
 
@@ -625,29 +624,6 @@
     <div class="table-scroll"><table id="dashboardHoursTable"></table></div>
   </div>
 </div>
-<div class="panel-section" id="panel-templates" style="display:none;">
-  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
-  <div class="page-body" style="max-width:900px;">
-    <h2><span class="n">•</span>Modelli</h2>
-    <p class="note">Documenti e moduli operativi (checklist, etichette, schede qualità...). I file sono salvati nel database protetto: si aprono solo dopo l'accesso, da qualsiasi dispositivo. Con "⬆ file" sostituisci un file con una versione aggiornata.</p>
-    <div id="templatesList"></div>
-    <h3 class="panel-subtitle" style="margin-top:22px;">Aggiungi un modello</h3>
-    <div class="roster-add-grid">
-      <div><label>Titolo</label><input type="text" id="templateNewTitle" placeholder="Es. Checklist avvio produzione"></div>
-      <div><label>Categoria</label>
-        <select id="templateNewCategory">
-          <option>Checklist</option><option>Etichette</option><option>Qualità</option>
-          <option>Schede tecniche</option><option>Materiali</option><option>Monitoraggio</option><option>Formazione</option><option>Altro</option>
-        </select>
-      </div>
-      <div><label>File</label><input type="file" id="templateNewFile"></div>
-    </div>
-    <div class="btn-row">
-      <button class="btn-primary" onclick="addTemplate()">+ Aggiungi modello</button>
-    </div>
-  </div>
-</div>
-
 <div class="panel-section" id="panel-manuals" style="display:none;">
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:900px;">
@@ -1463,7 +1439,7 @@ async function uploadLocalDataToCloud(askFirst){
   return true;
 }
 
-/* ============================= DOCUMENTI (manuali e modelli) NEL DATABASE =============================
+/* ============================= DOCUMENTI (manuali) NEL DATABASE =============================
    I file non sono più pubblicati insieme al sito: stanno nel database, raccolta "documenti", leggibile
    solo dopo l'accesso. Firestore accetta al massimo ~1 MB per documento, quindi ogni file è diviso in
    parti da 700 KB (sottoraccolta "parti") e ricomposto al momento dell'apertura.
@@ -1615,7 +1591,7 @@ async function uploadDocForEntry(folder, filename, input){
   input.value = '';
   if(!file) return;
   if(await uploadDocument(folder, filename, file)){
-    if(folder==='manuali') renderManualsList(); else renderTemplatesList();
+    if(folder==='manuali') renderManualsList();
   }
 }
 
@@ -4043,83 +4019,6 @@ async function renderManualsList(){
   refreshDocStatuses('manuali', sorted);
 }
 
-/* ============================= MODELLI (checklist, etichette, moduli qualità...) ============================= */
-const DEFAULT_TEMPLATES = [
-  {title:"Materiale da decidere", category:"Materiali", filename:"MATERIALE_DA_DECIDERE.xlsx"},
-  {title:"Monitoraggio passi", category:"Monitoraggio", filename:"MONITORAGGIO_PASSI.xlsx"},
-  {title:"Scheda coltelli", category:"Schede tecniche", filename:"SCHEDA_COLTELLI.doc"},
-  {title:"Materiale da inviare in Di Mauro Flexo", category:"Materiali", filename:"MATERIALE_DA_INVIARE_IN_DI_MAURO_FLEXO.docx"},
-  {title:"Check list avvio produzione taglio (IO-RP-006-03)", category:"Checklist", filename:"IO-RP-006-03_Check_list_avvio_produzione_TAGLIO.doc"},
-  {title:"Etichette campionature taglio", category:"Etichette", filename:"Etichette_Campionature_Taglio.xlsx"},
-  {title:"Non conformità interna (GNC-2 Rev.1)", category:"Qualità", filename:"GNC-2_REV1_non_conformità_interna.docx"},
-  {title:"Etichette per taglio esterno", category:"Etichette", filename:"Etichette_x_taglio_esterno.xlsx"},
-  {title:"Tabella taglio Biscuits", category:"Schede tecniche", filename:"Biscuits_Tabella_taglio.docx"},
-  {title:"Materiale non conforme", category:"Qualità", filename:"MATERIALE_NON_CONFORME.DOC"},
-  {title:"Etichette stampa 21 (etichette frecce)", category:"Etichette", filename:"etichette_stampa_21_etichette_frecce.doc"},
-  {title:"Formazione commerciale – Reparto Taglio", category:"Formazione", filename:"Formazione_commerciale_Reparto_Taglio.docx"},
-];
-/* Stesso schema dei manuali: i modelli "di base" (DEFAULT_TEMPLATES, inclusi nel sito) sono sempre
-   visibili a meno che l'utente non li rimuova esplicitamente (TEMPLATES_HIDDEN); quelli aggiunti
-   dall'utente stanno in TEMPLATES_EXTRA. */
-let TEMPLATES_EXTRA = [];
-let TEMPLATES_HIDDEN = [];
-async function loadTemplates(){
-  try{ const r = await storageGet('templates-extra'); TEMPLATES_EXTRA = r ? JSON.parse(r.value) : []; }catch(e){ TEMPLATES_EXTRA = []; }
-  try{ const r = await storageGet('templates-hidden'); TEMPLATES_HIDDEN = r ? JSON.parse(r.value) : []; }catch(e){ TEMPLATES_HIDDEN = []; }
-  renderTemplatesList();
-}
-function getTemplatesList(){
-  const base = DEFAULT_TEMPLATES
-    .filter(t=>!TEMPLATES_HIDDEN.includes(t.filename))
-    .map(t=>({id:'default:'+t.filename, isDefault:true, ...t}));
-  return [...base, ...TEMPLATES_EXTRA];
-}
-async function saveTemplatesExtra(){ try{ await storageSet('templates-extra', JSON.stringify(TEMPLATES_EXTRA)); }catch(e){} }
-async function saveTemplatesHidden(){ try{ await storageSet('templates-hidden', JSON.stringify(TEMPLATES_HIDDEN)); }catch(e){} }
-async function addTemplate(){
-  const title = document.getElementById('templateNewTitle').value.trim();
-  const category = document.getElementById('templateNewCategory').value;
-  const input = document.getElementById('templateNewFile');
-  const file = input.files && input.files[0];
-  if(!title || !file){ toast('Inserisci il titolo e scegli il file'); return; }
-  const filename = file.name;
-  if(getTemplatesList().some(t=>t.filename===filename)){ toast('Esiste già un modello con questo nome file: usa "⬆ file" su quella riga per sostituirlo'); return; }
-  if(!(await uploadDocument('modelli', filename, file))) return;
-  TEMPLATES_EXTRA.push({id: Date.now()+'-'+Math.random().toString(36).slice(2,7), title, category, filename});
-  document.getElementById('templateNewTitle').value = '';
-  input.value = '';
-  saveTemplatesExtra();
-  renderTemplatesList();
-  toast('Modello aggiunto');
-}
-function deleteTemplate(id){
-  if(id.indexOf('default:')===0){
-    if(!confirm("Rimuovere questo modello dall'elenco? (il file resta nel database)")) return;
-    const filename = id.slice('default:'.length);
-    if(!TEMPLATES_HIDDEN.includes(filename)){ TEMPLATES_HIDDEN.push(filename); saveTemplatesHidden(); }
-  }else{
-    const t = TEMPLATES_EXTRA.find(x=>x.id===id);
-    if(!confirm("Rimuovere questo modello? Il file viene cancellato anche dal database.")) return;
-    TEMPLATES_EXTRA = TEMPLATES_EXTRA.filter(x=>x.id!==id);
-    saveTemplatesExtra();
-    if(t) deleteDocumentFile('modelli', t.filename);
-  }
-  renderTemplatesList();
-}
-function renderTemplatesList(){
-  const el = document.getElementById('templatesList');
-  if(!el) return;
-  const list = getTemplatesList();
-  if(list.length===0){ el.innerHTML = '<p class="empty">Nessun modello in elenco.</p>'; return; }
-  const categories = [...new Set(list.map(t=>t.category||'Altro'))].sort();
-  el.innerHTML = categories.map(cat=>{
-    const items = list.filter(t=>(t.category||'Altro')===cat);
-    const rows = items.map(t=>docRowHtml('modelli', t, '', 'deleteTemplate')).join('');
-    return `<h3 class="panel-subtitle" style="margin-top:16px;">${escHtml(cat)}</h3>${rows}`;
-  }).join('');
-  refreshDocStatuses('modelli', list);
-}
-
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
 let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39};
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
@@ -5621,7 +5520,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-manuals','panel-templates','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-manuals','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
 function showPage(id){
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
@@ -5645,7 +5544,6 @@ function showPage(id){
   if(id==='panel-production') renderProductionPage();
   if(id==='panel-opstats') renderOperatorStatsPage();
   if(id==='panel-manuals') renderManualsList();
-  if(id==='panel-templates') renderTemplatesList();
   if(id==='panel-hours') renderHoursPage();
   if(id==='panel-hours-settings') renderHoursSettingsForm();
   if(id==='panel-hours-months'){ populateMonthFilterSelectors(); renderMonthlyParamsTable(); }
@@ -5670,7 +5568,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · excel sezioni 3-4 v8';
+const APP_VERSION = '2026-09-30 · senza modelli v9';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -5708,7 +5606,6 @@ async function startApp(){
   loadProductionStats();
   loadOperatorRecords();
   loadManuals();
-  loadTemplates();
   loadHoursData();
   renderHomeBanner();
 }
