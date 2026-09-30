@@ -718,6 +718,7 @@
         <label class="cap-note">Squadra <select id="sqStatsTeam" onchange="renderSquadraView()"></select></label>
         <label class="cap-note">Anno <select id="sqStatsYear" onchange="renderSquadraView()"></select></label>
         <label class="cap-note">Voce (grafico) <select id="sqStatsVoce" onchange="renderSquadraView()" style="min-width:220px;"></select></label>
+        <button class="btn-ghost" onclick="downloadSquadraExcel()">⬇ Scarica Excel</button>
       </div>
       <h3 class="panel-subtitle" style="margin-top:18px;">Confronto operatori — voce selezionata</h3>
       <div id="sqStatsBars"></div>
@@ -733,6 +734,7 @@
       <div class="btn-row">
         <label class="cap-note">Operatore <select id="opCardName" onchange="renderOperatorCard()" style="min-width:240px;"></select></label>
         <label class="cap-note">Anno <select id="opCardYear" onchange="renderOperatorCard()"></select></label>
+        <button class="btn-ghost" onclick="downloadOperatorCardExcel()">⬇ Scarica Excel</button>
       </div>
       <div class="table-scroll" id="opCardTable" style="margin-top:14px;"></div>
     </div>
@@ -3687,6 +3689,16 @@ function renderSquadraView(){
   html += '</tbody></table>';
   document.getElementById('sqStatsTable').innerHTML = html;
 }
+// Fonti della scheda operatore: per un titolare con file squadra, i vecchi file "per impianto" dello stesso anno
+// (caricati prima del file squadra) non si mostrano, come nella sezione 1.
+function operatorCardSources(mine, year){
+  const yr = mine.filter(r=>r.year===year);
+  const team = yr.filter(r=>r.dimension==='turno'), direct = yr.filter(r=>r.dimension==='impianto');
+  const newest = recs=>recs.reduce((m,r)=>Math.max(m, r.importedAt||0), 0);
+  const hideDirect = team.length && direct.length && rosterPlantFor(team[0].operatore) && !(newest(direct) > newest(team));
+  return [...new Set(yr.filter(r=>!(hideDirect && r.dimension==='impianto')).map(r=>r.dimension+'|'+r.groupKey))]
+    .sort((a,b)=> (a.startsWith('turno')?0:1)-(b.startsWith('turno')?0:1) || a.localeCompare(b));
+}
 function renderOperatorCard(){
   const el = document.getElementById('opCardTable');
   if(!el) return;
@@ -3694,8 +3706,7 @@ function renderOperatorCard(){
   const year = Number(document.getElementById('opCardYear').value) || null;
   if(!name || !year){ el.innerHTML = '<p class="empty">Importa almeno un file per iniziare.</p>'; return; }
   const mine = OPERATOR_RECORDS.filter(r=>r.operatore!=='__TOTALE__' && canonicalOperatorName(r.operatore)===name);
-  const sources = [...new Set(mine.filter(r=>r.year===year).map(r=>r.dimension+'|'+r.groupKey))]
-    .sort((a,b)=> (a.startsWith('turno')?0:1)-(b.startsWith('turno')?0:1) || a.localeCompare(b));
+  const sources = operatorCardSources(mine, year);
   if(!sources.length){ el.innerHTML = `<p class="empty">Nessun dato per ${escHtml(name)} nel ${year}.</p>`; return; }
   const voci = [...new Set(mine.filter(r=>r.year===year).map(r=>r.voce))];
   const get = (src, y, v)=>{ const [d,k] = src.split('|'); const r = mine.find(x=>x.dimension===d && x.groupKey===k && x.year===y && x.voce===v); return r ? r.value : null; };
@@ -3796,6 +3807,89 @@ async function downloadImpiantoExcel(){
   const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   downloadBlob(new Blob([buffer], {type:mime}), `statistiche_impianto_${impianto}_${year}.xlsx`);
   toast('Excel scaricato');
+}
+// Foglio Excel standard: titolo, intestazione scura, righe (numeri come numeri), eventuale riga totale in grassetto
+function writeSimpleTableSheet(wb, sheetName, title, headers, rows, opts={}){
+  const thin = {style:'thin', color:{argb:'FFE3E3E3'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+  const ws = wb.addWorksheet(sheetName.slice(0,31));
+  ws.mergeCells(1,1,1,headers.length);
+  const t = ws.getCell(1,1);
+  t.value = title;
+  t.font = {name:'Arial Black', size:14};
+  t.alignment = {horizontal:'center', vertical:'middle'};
+  ws.getRow(1).height = 22;
+  headers.forEach((h,ci)=>{
+    const c = ws.getCell(2, ci+1);
+    c.value = h;
+    c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}};
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF152233'}};
+    c.alignment = {wrapText:true, vertical:'middle'};
+    c.border = border;
+  });
+  rows.forEach((row,ri)=>{
+    const bold = opts.boldRows && opts.boldRows.includes(ri);
+    row.forEach((val,ci)=>{
+      const c = ws.getCell(3+ri, ci+1);
+      c.value = (val==null) ? '' : val;
+      c.font = {name:'Calibri', size:10, bold: ci===0 || bold};
+      if(typeof val === 'number') c.numFmt = Number.isInteger(val) ? '#,##0' : '#,##0.00';
+      c.border = border;
+    });
+  });
+  ws.getColumn(1).width = opts.firstColWidth || 26;
+  for(let c=2;c<=headers.length;c++) ws.getColumn(c).width = opts.colWidth || 12;
+  if(opts.note){ const n = ws.getCell(4+rows.length, 1); n.value = opts.note; n.font = {name:'Calibri', size:9, italic:true, color:{argb:'FF666666'}}; }
+  return ws;
+}
+async function saveWorkbook(wb, filename){
+  const buffer = await wb.xlsx.writeBuffer();
+  downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), filename);
+  toast('Excel scaricato');
+}
+function fileSafe(s){ return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+async function downloadSquadraExcel(){
+  const team = document.getElementById('sqStatsTeam').value;
+  const year = Number(document.getElementById('sqStatsYear').value) || null;
+  if(!team || !year){ toast('Seleziona squadra e anno'); return; }
+  const recs = getSquadraOperators(team, year);
+  if(!recs.length){ toast('Nessun dato per questa squadra/anno'); return; }
+  toast('Generazione Excel in corso…');
+  const wb = new ExcelJS.Workbook();
+  const ops = [...new Set(recs.map(r=>r.operatore))].sort();
+  const voci = [...new Set(recs.map(r=>r.voce))];
+  const val = (op, y, v)=>{ const r = OPERATOR_RECORDS.find(x=>x.dimension==='turno' && x.groupKey===team && x.year===y && x.voce===v && x.operatore!=='__TOTALE__' && canonicalOperatorName(x.operatore)===canonicalOperatorName(op)); return r ? r.value : null; };
+  const tot = OPERATOR_RECORDS.filter(r=>r.dimension==='turno' && r.groupKey===team && r.year===year && r.operatore==='__TOTALE__');
+  const rows = ops.map(op=>[op, ...voci.map(v=>val(op, year, v))]);
+  if(tot.length) rows.push([`Totale squadra ${team}`, ...voci.map(v=>{ const r = tot.find(t=>t.voce===v); return r ? r.value : null; })]);
+  writeSimpleTableSheet(wb, 'Operatori', `SQUADRA ${team} — OPERATORI A CONFRONTO — ${year}`, ['Operatore', ...voci], rows, {boldRows: tot.length ? [rows.length-1] : []});
+  const yoy = ['Velocità di marcia','Velocità lorda'].flatMap(v=>ops.map(op=>{
+    const c = val(op, year, v), p = val(op, year-1, v);
+    return [op, v, c, p, (c!=null && p!=null && p!==0) ? Math.round((c-p)/p*1000)/10 : null];
+  }));
+  writeSimpleTableSheet(wb, 'Scostamento velocità', `SCOSTAMENTO VELOCITÀ — SQUADRA ${team} — ${year} vs ${year-1}`, ['Operatore','Voce',`Valore ${year}`,`Valore ${year-1}`,'Variazione %'], yoy, {colWidth:16});
+  await saveWorkbook(wb, `statistiche_squadra_${team}_${year}.xlsx`);
+}
+async function downloadOperatorCardExcel(){
+  const name = document.getElementById('opCardName').value;
+  const year = Number(document.getElementById('opCardYear').value) || null;
+  if(!name || !year){ toast('Seleziona operatore e anno'); return; }
+  const mine = OPERATOR_RECORDS.filter(r=>r.operatore!=='__TOTALE__' && canonicalOperatorName(r.operatore)===name);
+  const sources = operatorCardSources(mine, year);
+  if(!sources.length){ toast('Nessun dato per questo operatore/anno'); return; }
+  toast('Generazione Excel in corso…');
+  const voci = [...new Set(mine.filter(r=>r.year===year).map(r=>r.voce))];
+  const get = (src, y, v)=>{ const [d,k] = src.split('|'); const r = mine.find(x=>x.dimension===d && x.groupKey===k && x.year===y && x.voce===v); return r ? r.value : null; };
+  const label = src=>{ const [d,k] = src.split('|'); return d==='turno' ? `Squadra ${k}` : `Impianto ${k}`; };
+  const headers = ['Voce', ...sources.flatMap(src=>[`${label(src)} ${year}`, `${label(src)} ${year-1}`, 'Variazione %'])];
+  const rows = voci.map(v=>[v, ...sources.flatMap(src=>{
+    const c = get(src, year, v), p = get(src, year-1, v);
+    return [c, p, (c!=null && p!=null && p!==0) ? Math.round((c-p)/p*1000)/10 : null];
+  })]);
+  const wb = new ExcelJS.Workbook();
+  writeSimpleTableSheet(wb, 'Scheda operatore', `SCHEDA OPERATORE — ${name} — ${year}`, headers, rows,
+    {colWidth:14, note:'Variazione % rispetto allo stesso tipo di file dell\'anno prima. Per scarti e fermi un valore in calo è un miglioramento.'});
+  await saveWorkbook(wb, `scheda_operatore_${fileSafe(name)}_${year}.xlsx`);
 }
 async function downloadTurnoExcel(){
   const year = Number(document.getElementById('turStatsYear').value) || null;
@@ -5576,7 +5670,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · import squadre v7';
+const APP_VERSION = '2026-09-30 · excel sezioni 3-4 v8';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
