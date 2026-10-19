@@ -508,14 +508,18 @@
           <button class="btn-ghost" onclick="resetAndRecalcAll()" style="color:var(--danger); border-color:#edd;">⟲ Cancella e ricalcola tutto</button>
         </div>
         <div class="btn-row">
-          <button class="btn-ghost" onclick="exportCombinedExcel()">⬇ Excel (proposta + riepilogo)</button>
-          <button class="btn-ghost" onclick="shareExcelScreenshot()"><svg class="ico-sm"><use href="#i-share"/></svg>Condividi screenshot (proposta+riepilogo)</button>
+          <button class="btn-ghost" onclick="exportCombinedExcel()">⬇ Excel completo (con motivi)</button>
+          <button class="btn-ghost" onclick="shareExcelScreenshot()"><svg class="ico-sm"><use href="#i-share"/></svg>Condividi screenshot completo (con motivi)</button>
+        </div>
+        <div class="btn-row">
+          <button class="btn-ghost" onclick="exportCombinedExcel(true)">⬇ Excel operatori (senza motivi)</button>
+          <button class="btn-ghost" onclick="shareExcelScreenshot(true)"><svg class="ico-sm"><use href="#i-share"/></svg>Condividi screenshot operatori (senza motivi)</button>
         </div>
         <div class="btn-row">
           <button class="btn-ghost" onclick="openMailDraft()"><svg class="ico-sm"><use href="#i-mail"/></svg>Prepara email</button>
           <button class="btn-ghost" onclick="printProposal()"><svg class="ico-sm"><use href="#i-printer"/></svg>Stampa A4 per bacheca</button>
         </div>
-        <p class="note" style="margin-top:8px;">"Prepara email" apre il tuo client di posta con testo già pronto, da allegare a mano. "Condividi screenshot" apre il menu di condivisione nativo del telefono con l'immagine già agganciata — su smartphone puoi scegliere WhatsApp e inviarla in un tocco; da computer questa funzione di solito non è supportata dal browser, quindi scarica semplicemente il file.</p>
+        <p class="note" style="margin-top:8px;">"Prepara email" apre il tuo client di posta con testo già pronto, da allegare a mano. "Condividi screenshot" apre il menu di condivisione nativo del telefono con l'immagine già agganciata — su smartphone puoi scegliere WhatsApp e inviarla in un tocco; da computer questa funzione di solito non è supportata dal browser, quindi scarica semplicemente il file. Le versioni "operatori" e la stampa per la bacheca non riportano il motivo delle assenze: usale per chi fa le sostituzioni; le versioni "complete" sono per personale, buste paga e portineria.</p>
       </div>
     </div>
 
@@ -2176,7 +2180,7 @@ function printProposal(){
   const days = weekWeekdays(currentWeek);
   const rows = proposal.map(p=>`<tr>
       <td>${fmtDate(p.date)}</td><td>${turnoLabel(p.turno)}</td><td>${escHtml(p.plant)}</td>
-      <td>${escHtml(p.absentName)}<br><small>${escHtml(p.motivo)}</small></td>
+      <td>${escHtml(p.absentName)}</td>
       <td class="${p.assigned?'':'nocov'}">${p.assigned ? escHtml(p.assigned) : (p.fermo ? 'NESSUN SOSTITUTO — impianto fermo' : 'DA ASSEGNARE')}</td>
     </tr>`).join('');
   // Riepilogo per sostituto: copia del riquadro a video, con le tendine sostituite dal testo scelto
@@ -5262,7 +5266,8 @@ async function downloadMonthlyCalendar(){
   toast('Calendario scaricato');
 }
 
-function buildCombinedRows(){
+// operativo=true → versione per gli operatori sostituti: senza la colonna del motivo dell'assenza
+function buildCombinedRows(operativo){
   const mainSubs = SUBSTITUTES.filter(s=>!s.conditional);
   const data = buildFullSummaryData();
 
@@ -5278,20 +5283,25 @@ function buildCombinedRows(){
 
   const rightRows = [];
   rightRows.push({type:'sectionTitle', vals:['Dettaglio assenze settimana']});
-  rightRows.push({type:'header', vals:['Data','Turno','Impianto','Assente','Motivo','Sostituto','Note']});
+  rightRows.push({type:'header', vals: operativo
+    ? ['Data','Turno','Impianto','Assente','Sostituto','Note']
+    : ['Data','Turno','Impianto','Assente','Motivo','Sostituto','Note']});
   proposal.forEach(p=>{
     const subCell = p.assigned || (p.fermo ? 'NESSUN SOSTITUTO' : 'DA ASSEGNARE');
     const noteCell = (p.chain||[]).concat(p.warn?[p.warn]:[]).join(' | ');
-    rightRows.push({type:'data', vals:[fmtDate(p.date), turnoLabel(p.turno), p.plant, p.absentName, p.motivo, subCell, noteCell]});
+    rightRows.push({type:'data', vals: operativo
+      ? [fmtDate(p.date), turnoLabel(p.turno), p.plant, p.absentName, subCell, noteCell]
+      : [fmtDate(p.date), turnoLabel(p.turno), p.plant, p.absentName, p.motivo, subCell, noteCell]});
   });
 
   return {leftRows, rightRows};
 }
 
-async function buildCombinedExcelBlob(){
-  const {leftRows, rightRows} = buildCombinedRows();
+async function buildCombinedExcelBlob(operativo){
+  const {leftRows, rightRows} = buildCombinedRows(operativo);
   const totalRows = 1 + Math.max(leftRows.length, rightRows.length);
-  const totalCols = 12; // A..L
+  const totalCols = operativo ? 11 : 12; // A..L (A..K senza la colonna Motivo)
+  const subCol = operativo ? 4 : 5;      // posizione della colonna Sostituto nel blocco di destra
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Riepilogo');
@@ -5346,13 +5356,13 @@ async function buildCombinedExcelBlob(){
   rightRows.forEach((row,i)=>{
     const r = i+2;
     if(row.type==='sectionTitle'){
-      ws.mergeCells(r,6,r,12);
+      ws.mergeCells(r,6,r,totalCols);
       const c = ws.getCell(r,6);
       c.value = row.vals[0];
       c.font = {name:'Arial Black', size:12, color:{argb:'FFFFFFFF'}};
       c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF152233'}};
       c.alignment = {horizontal:'center', vertical:'middle'};
-      for(let c2=6;c2<=12;c2++) ws.getCell(r,c2).border = border;
+      for(let c2=6;c2<=totalCols;c2++) ws.getCell(r,c2).border = border;
       ws.getRow(r).height = 19.5;
     } else {
       row.vals.forEach((v,ci)=>{
@@ -5376,7 +5386,7 @@ async function buildCombinedExcelBlob(){
               cell.alignment = {horizontal:'center'};
             }
           }
-          if(ci===5 && (v==='NESSUN SOSTITUTO')){ // colonna Sostituto, evidenzia fermo
+          if(ci===subCol && (v==='NESSUN SOSTITUTO')){ // colonna Sostituto, evidenzia fermo
             cell.font = {name:'Calibri', size:12, bold:true, color:{argb:'FFC94F4F'}};
           }
         }
@@ -5385,21 +5395,24 @@ async function buildCombinedExcelBlob(){
   });
 
   ws.getColumn(1).width = 23.4; ws.getColumn(2).width = 5.5; ws.getColumn(3).width = 8; ws.getColumn(4).width = 25; ws.getColumn(5).width = 2;
-  ws.getColumn(6).width = 9.3; ws.getColumn(7).width = 5.5; ws.getColumn(8).width = 8; ws.getColumn(9).width = 15.5; ws.getColumn(10).width = 9.5; ws.getColumn(11).width = 17.4; ws.getColumn(12).width = 60;
+  const rightWidths = operativo ? [9.3, 5.5, 8, 15.5, 17.4, 60] : [9.3, 5.5, 8, 15.5, 9.5, 17.4, 60];
+  rightWidths.forEach((w,i)=>{ ws.getColumn(6+i).width = w; });
 
   const buffer = await wb.xlsx.writeBuffer();
   const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-  return {blob: new Blob([buffer], {type:mime}), filename: `coperture_${currentWeek}.xlsx`, mime};
+  const filename = operativo ? `coperture_${currentWeek}_operatori.xlsx` : `coperture_${currentWeek}.xlsx`;
+  return {blob: new Blob([buffer], {type:mime}), filename, mime};
 }
-async function exportCombinedExcel(){
+async function exportCombinedExcel(operativo){
   if(proposal.length===0){ toast('Genera prima la proposta'); return; }
   toast('Generazione Excel in corso…');
-  const {blob, filename} = await buildCombinedExcelBlob();
+  const {blob, filename} = await buildCombinedExcelBlob(!!operativo);
   downloadBlob(blob, filename);
-  toast('Excel scaricato');
+  toast(operativo ? 'Excel operatori (senza motivi) scaricato' : 'Excel scaricato');
 }
-function buildScreenshotTableHTML(){
-  const {leftRows, rightRows} = buildCombinedRows();
+function buildScreenshotTableHTML(operativo){
+  const {leftRows, rightRows} = buildCombinedRows(operativo);
+  const rightN = operativo ? 6 : 7;
   const totalRows = Math.max(leftRows.length, rightRows.length);
   const weekNum = Number(currentWeek.split('-W')[1]);
 
@@ -5413,8 +5426,8 @@ function buildScreenshotTableHTML(){
     return lr.vals.map(v=>`<td style="${base} font-weight:${fw};">${v!=null && v!==''?v:''}</td>`).join('');
   }
   function rightCells(rr){
-    if(!rr) return new Array(7).fill(`<td style="${noBorder}"></td>`).join('');
-    if(rr.type==='sectionTitle') return `<td colspan="7" style="${base} font-weight:900; font-family:'Arial Black',Arial,sans-serif; text-align:center;">${rr.vals[0]}</td>`;
+    if(!rr) return new Array(rightN).fill(`<td style="${noBorder}"></td>`).join('');
+    if(rr.type==='sectionTitle') return `<td colspan="${rightN}" style="${base} font-weight:900; font-family:'Arial Black',Arial,sans-serif; text-align:center;">${rr.vals[0]}</td>`;
     const fw = rr.type==='header' ? '700' : '400';
     return rr.vals.map(v=>`<td style="${base} font-weight:${fw}; white-space:normal; max-width:260px;">${v!=null && v!==''?v:''}</td>`).join('');
   }
@@ -5425,11 +5438,11 @@ function buildScreenshotTableHTML(){
   }
 
   return `<table style="border-collapse:collapse; background:#ffffff;">
-    <tr><td colspan="12" style="padding:10px; text-align:center; font-family:'Arial Black',Arial,sans-serif; font-size:24px; border:2px solid #2f8f5b; border-bottom:3px solid #2f8f5b;">COPERTURE SETT. ${weekNum}</td></tr>
+    <tr><td colspan="${5+rightN}" style="padding:10px; text-align:center; font-family:'Arial Black',Arial,sans-serif; font-size:24px; border:2px solid #2f8f5b; border-bottom:3px solid #2f8f5b;">COPERTURE SETT. ${weekNum}</td></tr>
     ${rows}
   </table>`;
 }
-function shareExcelScreenshot(){
+function shareExcelScreenshot(operativo){
   if(proposal.length===0){ toast('Genera prima la proposta'); return; }
   const summaryHidden = document.getElementById('summaryContent').style.display === 'none';
   if(summaryHidden){ toast('Accetta prima la proposta (sezione 2) per generare anche il riepilogo da includere nello screenshot'); return; }
@@ -5440,12 +5453,12 @@ function shareExcelScreenshot(){
   wrapper.style.top = '0';
   wrapper.style.background = '#ffffff';
   wrapper.style.padding = '16px';
-  wrapper.innerHTML = buildScreenshotTableHTML();
+  wrapper.innerHTML = buildScreenshotTableHTML(!!operativo);
   document.body.appendChild(wrapper);
   html2canvas(wrapper, {backgroundColor:'#ffffff', scale:2}).then(canvas=>{
     canvas.toBlob(blob=>{
       document.body.removeChild(wrapper);
-      shareOrDownloadImage(blob, `coperture_${currentWeek}.png`, 'Coperture turni', weekLabel(currentWeek));
+      shareOrDownloadImage(blob, operativo ? `coperture_${currentWeek}_operatori.png` : `coperture_${currentWeek}.png`, 'Coperture turni', weekLabel(currentWeek));
     });
   }).catch(()=>{
     document.body.removeChild(wrapper);
@@ -5509,7 +5522,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-09-30 · senza modelli e manuali v10';
+const APP_VERSION = '2026-10-19 · export operatori senza motivi v11';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
