@@ -543,6 +543,7 @@
       <button class="menu-tile" onclick="showPage('panel-hours-settings')"><svg class="ico"><use href="#i-sliders"/></svg><span>Impostazioni generali</span></button>
       <button class="menu-tile" onclick="showPage('panel-hours-months')"><svg class="ico"><use href="#i-calendar"/></svg><span>Parametri mensili</span></button>
       <button class="menu-tile" onclick="showPage('panel-hours-dashboard')"><svg class="ico"><use href="#i-trend"/></svg><span>Andamento e netto cumulato</span></button>
+      <button class="menu-tile" onclick="showPage('panel-hours-goal')"><svg class="ico"><use href="#i-gauge"/></svg><span>Obiettivo netto mensile</span></button>
     </div>
 
     <div class="card">
@@ -613,6 +614,24 @@
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Andamento e netto cumulato</h2>
     <div class="table-scroll"><table id="dashboardHoursTable"></table></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-hours-goal" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
+  <div class="page-body" style="max-width:1100px;">
+    <h2><span class="n">•</span>Obiettivo netto mensile</h2>
+    <p class="note">Scegli quanto vuoi portare a casa nel mese: calcolo le ore di straordinario necessarie con le stesse regole del cedolino (IVS, IRPEF, CRAL, addizionale) e le distribuisco sui giorni lavorativi che restano. Lo straordinario già timbrato nel mese viene conteggiato.</p>
+    <div class="card">
+      <div class="roster-add-grid">
+        <div><label>Mese</label><input type="month" id="goalMonth" onchange="loadGoalForm()"></div>
+        <div><label>Netto desiderato (€)</label><input type="number" step="10" id="goalTarget" placeholder="es. 2300" onchange="saveGoalForm()"></div>
+        <div><label>Max straord. al giorno (h)</label><input type="number" step="0.5" min="0.5" id="goalMaxDay" onchange="saveGoalForm()"></div>
+        <div><label>Arrotonda a</label><select id="goalStep" onchange="saveGoalForm()"><option value="0.25">15 min</option><option value="0.5">30 min</option><option value="1">1 ora</option></select></div>
+        <div><label style="display:flex; align-items:center; gap:6px; white-space:nowrap;"><input type="checkbox" id="goalSat" onchange="saveGoalForm()" style="width:auto;"> Anche il sabato</label></div>
+      </div>
+    </div>
+    <div id="goalResult"></div>
   </div>
 </div>
 <div class="panel-section" id="panel-opstats" style="display:none;">
@@ -3775,6 +3794,7 @@ async function loadHoursData(){
   try{ const r = await storageGet('hours-settings'); if(r) HOURS_SETTINGS = Object.assign(HOURS_SETTINGS, JSON.parse(r.value)); }catch(e){}
   try{ const r = await storageGet('daily-hours'); DAILY_HOURS = r ? JSON.parse(r.value) : {}; }catch(e){ DAILY_HOURS = {}; }
   try{ const r = await storageGet('monthly-params'); MONTHLY_PARAMS = r ? JSON.parse(r.value) : {}; }catch(e){ MONTHLY_PARAMS = {}; }
+  await loadHoursGoals();
   renderHoursSettingsForm();
 }
 async function saveHoursSettingsData(){ try{ await storageSet('hours-settings', JSON.stringify(HOURS_SETTINGS)); }catch(e){} }
@@ -3842,14 +3862,17 @@ function sumDailyForMonth(monthKey, field){
   });
   return sum;
 }
-function computeMonthSummary(monthKey){
-  const p = MONTHLY_PARAMS[monthKey];
+// opts (facoltativo, usato dall'Obiettivo mensile): {params: parametri da usare al posto di quelli salvati, straordOverride: ore straord. ipotetiche}
+function computeMonthSummary(monthKey, opts){
+  opts = opts || {};
+  const p = opts.params || MONTHLY_PARAMS[monthKey];
   if(!p) return null;
   const hasData = monthHasDailyData(monthKey);
   const giorni = Number(p.giorni)||0;
   const oreOrdinarie = hasData ? sumDailyForMonth(monthKey,'ordinarie') : giorni*HOURS_SETTINGS.oreOrdinarieMax;
-  const oreStraord = hasData ? sumDailyForMonth(monthKey,'straord') : (Number(p.stimaStraord)||0);
-  const importoStraord = hasData ? sumDailyForMonth(monthKey,'importoStraord') : (Number(p.stimaStraord)||0)*(Number(p.tariffa)||0);
+  const override = (opts.straordOverride != null) ? Number(opts.straordOverride) : null;
+  const oreStraord = override != null ? override : (hasData ? sumDailyForMonth(monthKey,'straord') : (Number(p.stimaStraord)||0));
+  const importoStraord = override != null ? override*(Number(p.tariffa)||0) : (hasData ? sumDailyForMonth(monthKey,'importoStraord') : (Number(p.stimaStraord)||0)*(Number(p.tariffa)||0));
   const ordinarieEuro = giorni * (Number(p.baseGiorno)||0);
   const totaleCompetenze = ordinarieEuro + importoStraord + (Number(p.premio)||0);
   const buoniPasto = HOURS_SETTINGS.buoniPastoTariffa * HOURS_SETTINGS.buoniPastoNumero;
@@ -4018,6 +4041,177 @@ function renderDashboardHoursTable(){
   html += '</tbody>';
   el.innerHTML = html;
 }
+/* ---------- Obiettivo netto mensile: ore di straordinario necessarie e distribuzione sui giorni ---------- */
+let HOURS_GOALS = {}; // "YYYY-MM" -> {target, maxDay, step, sat, excluded:[date]}
+async function loadHoursGoals(){
+  try{ const r = await storageGet('hours-goals'); HOURS_GOALS = r ? JSON.parse(r.value) : {}; }catch(e){ HOURS_GOALS = {}; }
+}
+async function saveHoursGoalsData(){ try{ await storageSet('hours-goals', JSON.stringify(HOURS_GOALS)); }catch(e){} }
+
+function easterSunday(y){ // algoritmo di Meeus/Jones/Butcher
+  const a=y%19, b=Math.floor(y/100), c=y%100, d=Math.floor(b/4), e=b%4, f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4, l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31), day=((h+l-7*m+114)%31)+1;
+  return `${y}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+function italianHolidays(y){
+  const fixed = ['01-01','01-06','04-25','05-01','06-02','08-15','11-01','12-08','12-25','12-26'].map(md=>`${y}-${md}`);
+  return new Set([...fixed, shiftDate(easterSunday(y),1)]);
+}
+function goalDefaults(){ return {target:'', maxDay:4, step:0.5, sat:false, excluded:[]}; }
+function goalParamsFor(monthKey){
+  if(MONTHLY_PARAMS[monthKey]) return {params:MONTHLY_PARAMS[monthKey], borrowed:null};
+  const keys = Object.keys(MONTHLY_PARAMS).sort();
+  if(!keys.length) return {params:null, borrowed:null};
+  const prev = keys.filter(k=>k<monthKey);
+  const src = prev.length ? prev[prev.length-1] : keys[0];
+  // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio)
+  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:''});
+  const [y,m] = monthKey.split('-').map(Number);
+  const hol = italianHolidays(y);
+  let giorni = 0; const last = new Date(y,m,0).getDate();
+  for(let d=1; d<=last; d++){
+    const ds = `${monthKey}-${String(d).padStart(2,'0')}`;
+    const wd = new Date(ds+'T00:00:00').getDay();
+    if(wd>=1 && wd<=5 && !hol.has(ds)) giorni++;
+  }
+  p.giorni = giorni;
+  return {params:p, borrowed:src};
+}
+function loadGoalForm(){
+  const monthEl = document.getElementById('goalMonth');
+  if(!monthEl.value) monthEl.value = todayStr().slice(0,7);
+  const g = Object.assign(goalDefaults(), HOURS_GOALS[monthEl.value]||{});
+  document.getElementById('goalTarget').value = g.target;
+  document.getElementById('goalMaxDay').value = g.maxDay;
+  document.getElementById('goalStep').value = String(g.step);
+  document.getElementById('goalSat').checked = !!g.sat;
+  renderGoal();
+}
+function saveGoalForm(){
+  const key = document.getElementById('goalMonth').value;
+  if(!key) return;
+  const prev = HOURS_GOALS[key] || goalDefaults();
+  HOURS_GOALS[key] = Object.assign(prev, {
+    target: document.getElementById('goalTarget').value,
+    maxDay: Number(document.getElementById('goalMaxDay').value) || 4,
+    step: Number(document.getElementById('goalStep').value) || 0.5,
+    sat: document.getElementById('goalSat').checked,
+  });
+  saveHoursGoalsData();
+  renderGoal();
+}
+function toggleGoalDay(date){
+  const key = document.getElementById('goalMonth').value;
+  const g = HOURS_GOALS[key] = Object.assign(goalDefaults(), HOURS_GOALS[key]||{});
+  const i = g.excluded.indexOf(date);
+  if(i>=0) g.excluded.splice(i,1); else g.excluded.push(date);
+  saveHoursGoalsData();
+  renderGoal();
+}
+function computeGoalPlan(monthKey){
+  const g = Object.assign(goalDefaults(), HOURS_GOALS[monthKey]||{});
+  const target = Number(g.target);
+  const {params, borrowed} = goalParamsFor(monthKey);
+  if(!params) return {error:'Inserisci prima almeno un mese in <strong>Parametri mensili</strong>: servono tariffa oraria, giorni, base/giorno e IVS.'};
+  if(!(Number(params.tariffa)>0)) return {error:'La tariffa oraria del mese è vuota o zero: completala in Parametri mensili.'};
+  const netAt = h => computeMonthSummary(monthKey, {params, straordOverride:h}).nettoEffettivo;
+  const doneH = monthHasDailyData(monthKey) ? sumDailyForMonth(monthKey,'straord') : 0;
+  const netZero = netAt(0);
+  const netDone = netAt(doneH);
+  const perHourNet = netAt(doneH+1) - netDone;
+  const perHourGross = Number(params.tariffa);
+  let neededTotal = 0;
+  if(target > netZero){
+    let lo = 0, hi = 1;
+    while(netAt(hi) < target && hi < 2000) hi *= 2;
+    for(let it=0; it<60; it++){ const mid=(lo+hi)/2; if(netAt(mid) >= target) hi = mid; else lo = mid; }
+    neededTotal = hi;
+  }
+  const extra = Math.max(0, neededTotal - doneH);
+
+  // Giorni disponibili: da oggi (o dall'inizio del mese) a fine mese, esclusi festivi e giorni già timbrati
+  const [y,m] = monthKey.split('-').map(Number);
+  const hol = italianHolidays(y);
+  const today = todayStr();
+  const last = new Date(y,m,0).getDate();
+  const days = [];
+  for(let d=1; d<=last; d++){
+    const ds = `${monthKey}-${String(d).padStart(2,'0')}`;
+    if(ds < today) continue;
+    const wd = new Date(ds+'T00:00:00').getDay();
+    if(wd===0 || (wd===6 && !g.sat)) continue;
+    if(hol.has(ds) || DAILY_HOURS[ds]) continue;
+    days.push({date:ds, active: !g.excluded.includes(ds), hours:0});
+  }
+  const active = days.filter(d=>d.active);
+  const step = Number(g.step) || 0.5;
+  if(extra > 0 && active.length){
+    const units = Math.ceil(extra/step - 1e-9);
+    const base = Math.floor(units/active.length), rest = units % active.length;
+    // il resto va ai giorni feriali prima che al sabato, poi in ordine di data
+    const order = active.map((d,i)=>i).sort((a,b)=>{
+      const sa = new Date(active[a].date+'T00:00:00').getDay()===6, sb = new Date(active[b].date+'T00:00:00').getDay()===6;
+      return (sa-sb) || (a-b);
+    });
+    active.forEach(d=>d.hours = base*step);
+    order.slice(0,rest).forEach(i=>active[i].hours += step);
+  }
+  const plannedExtra = active.reduce((s,d)=>s+d.hours,0);
+  const maxPlanned = active.reduce((mx,d)=>Math.max(mx,d.hours),0);
+  return {g, target, params, borrowed, doneH, netZero, netDone, perHourNet, perHourGross, neededTotal, extra, days, active, plannedExtra, maxPlanned,
+          netFinal: netAt(doneH+plannedExtra), netAt, past: `${monthKey}-${String(last).padStart(2,'0')}` < today};
+}
+function renderGoal(){
+  const el = document.getElementById('goalResult');
+  if(!el) return;
+  const key = document.getElementById('goalMonth').value;
+  if(!key){ el.innerHTML=''; return; }
+  const r = computeGoalPlan(key);
+  if(r.error){ el.innerHTML = `<div class="card"><p class="empty">${r.error}</p></div>`; return; }
+  const kpi = (label, num, sub, cls) => `<div class="today-card ${cls||''}" style="cursor:default; min-height:110px;"><div class="tc-label">${label}</div><div class="tc-num">${num}</div><div class="tc-sub">${sub}</div></div>`;
+  let html = '';
+  if(r.borrowed) html += `<p class="note" style="color:#8a6a3b;">Nessun parametro salvato per ${key}: uso quelli di <strong>${r.borrowed}</strong> (senza premio/conguaglio/730) con ${r.params.giorni} giorni lavorativi stimati. Per un calcolo preciso aggiungi il mese in Parametri mensili.</p>`;
+  html += `<div class="today-grid" style="margin-bottom:18px;">
+    ${kpi('Netto senza straord.', fmtEuro(r.netZero)+' €', 'solo ordinarie' + (Number(r.params.premio)?' + premio':''))}
+    ${kpi('Netto per ora di straord.', fmtEuro(r.perHourNet)+' €', 'lordo '+fmtEuro(r.perHourGross)+' €/h · tasse e contributi inclusi')}
+    ${kpi('Straord. già fatto', fmtHours(r.doneH)+' h', 'netto attuale stimato '+fmtEuro(r.netDone)+' €')}
+    ${r.target ? kpi('Straord. che manca', fmtHours(r.extra)+' h', 'totale nel mese '+fmtHours(r.neededTotal)+' h', r.extra>0?'':'good') : kpi('Obiettivo', '—', 'inserisci il netto desiderato')}
+  </div>`;
+  if(!r.target){ el.innerHTML = html; return; }
+  if(r.extra <= 0){
+    html += `<div class="card"><p><span class="flag ok">Obiettivo raggiunto</span> Con lo straordinario già fatto arrivi a circa <strong>${fmtEuro(r.netDone)} €</strong>, sopra i ${fmtEuro(r.target)} € che volevi.</p></div>`;
+    el.innerHTML = html; return;
+  }
+  if(r.past){
+    html += `<div class="card"><p class="empty">Il mese è chiuso: per arrivare a ${fmtEuro(r.target)} € sarebbero servite altre ${fmtHours(r.extra)} h di straordinario.</p></div>`;
+    el.innerHTML = html; return;
+  }
+  const maxDay = Number(r.g.maxDay)||4;
+  let warn = '';
+  if(!r.active.length) warn = `<p><span class="flag">Nessun giorno disponibile</span> Riattiva qualche giorno qui sotto${r.g.sat?'':' o includi i sabati'}.</p>`;
+  else if(r.maxPlanned > maxDay + 1e-9){
+    const feasible = r.active.length*maxDay;
+    warn = `<p><span class="flag">Troppo carico</span> Servirebbero fino a ${fmtHours(r.maxPlanned)} h al giorno, oltre il tuo massimo di ${fmtHours(maxDay)} h. Con ${r.active.length} giorni a ${fmtHours(maxDay)} h arrivi a circa <strong>${fmtEuro(r.netAt(r.doneH+feasible))} €</strong>${r.g.sat?'':' — prova a includere i sabati'}.</p>`;
+  } else {
+    warn = `<p><span class="flag ok">Fattibile</span> Circa <strong>${fmtHours(r.plannedExtra/r.active.length)} h</strong> al giorno su ${r.active.length} giorni: netto stimato <strong>${fmtEuro(r.netFinal)} €</strong>.</p>`;
+  }
+  html += `<div class="card"><h2><span class="n">1</span>Distribuzione sui giorni rimasti</h2>${warn}
+    <p class="note">Togli la spunta ai giorni in cui non puoi fermarti (ferie, fermo, impegni): le ore si ridistribuiscono sugli altri. Esclusi in automatico domeniche, festivi e giorni già timbrati.</p>
+    <div class="table-scroll"><table><thead><tr><th></th><th>Giorno</th><th>Straord.</th><th>Lordo</th><th>Netto cumulato stimato</th></tr></thead><tbody>`;
+  let cum = r.doneH;
+  r.days.forEach(d=>{
+    if(d.active) cum += d.hours;
+    const over = d.active && d.hours > maxDay + 1e-9;
+    html += `<tr style="${d.active?'':'opacity:.45;'}"><td><input type="checkbox" style="width:auto;" ${d.active?'checked':''} onchange="toggleGoalDay('${d.date}')"></td>
+      <td>${fmtDate(d.date)}</td><td>${d.active?`<strong${over?' style="color:var(--danger);"':''}>${fmtHours(d.hours)} h</strong>`:'—'}</td>
+      <td>${d.active?fmtEuro(d.hours*r.perHourGross)+' €':''}</td><td>${d.active?fmtEuro(r.netAt(cum))+' €':''}</td></tr>`;
+  });
+  html += `</tbody></table></div>
+    <p class="note" style="margin-top:8px;">Stima basata sulle regole del cedolino: il netto reale può scostarsi di qualche euro (arrotondamenti, conguagli di fine anno).</p></div>`;
+  el.innerHTML = html;
+}
+
 function renderHoursPage(){
   renderHoursSettingsForm();
   populateMonthFilterSelectors();
@@ -5267,7 +5461,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-weeks','panel-email','panel-backup'];
 function showPage(id){
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
@@ -5294,6 +5488,7 @@ function showPage(id){
   if(id==='panel-hours-settings') renderHoursSettingsForm();
   if(id==='panel-hours-months'){ populateMonthFilterSelectors(); renderMonthlyParamsTable(); }
   if(id==='panel-hours-dashboard') renderDashboardHoursTable();
+  if(id==='panel-hours-goal') loadGoalForm();
 }
 function showProposalPanel(hasData){
   document.getElementById('proposalEmpty').style.display = hasData ? 'none' : 'block';
