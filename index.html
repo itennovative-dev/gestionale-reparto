@@ -35,7 +35,7 @@
   table{width:100%; border-collapse:collapse; font-size:13px;}
   th{text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--sub); padding:8px 8px; border-bottom:1px solid var(--line); font-weight:600;}
   td{padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:middle;}
-  input[type=date], select, input[type=text], input[type=email], input[type=number]{
+  input[type=date], input[type=month], select, input[type=text], input[type=email], input[type=number]{
     font:inherit; padding:7px 9px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); width:100%;
   }
   input:focus, select:focus{outline:none; border-color:var(--steel);}
@@ -592,24 +592,20 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
   <div class="page-body" style="max-width:1100px;">
     <h2><span class="n">•</span>Parametri mensili</h2>
-    <p class="note">Un rigo per mese. Se non hai ancora inserito le timbrature di quel mese, si usa la stima di straordinario.</p>
-    <div class="roster-add-grid">
-      <div><label>Anno</label><input type="number" id="mpNewYear"></div>
-      <div><label>Mese (1-12)</label><input type="number" min="1" max="12" id="mpNewMonth"></div>
-      <div><label>Tipo</label><select id="mpNewTipo"><option>Reale</option><option>Stima</option></select></div>
-      <div><label>Tariffa oraria (€)</label><input type="number" step="0.00001" id="mpNewTariffa"></div>
-      <div><label>Giorni lavorativi</label><input type="number" id="mpNewGiorni"></div>
-      <div><label>Importo base/giorno (€)</label><input type="number" step="0.01" id="mpNewBaseGiorno"></div>
-      <div><label>Aliquota IVS</label><input type="number" step="0.0001" id="mpNewIVS"></div>
-      <div><label>Etichetta premio</label><input type="text" id="mpNewEtichettaPremio"></div>
-      <div><label>Premio (€)</label><input type="number" step="0.01" id="mpNewPremio"></div>
-      <div><label>Conguaglio IRPEF (€)</label><input type="number" step="0.01" id="mpNewConguaglio"></div>
-      <div><label>Rettifica imponibile IRPEF (€)</label><input type="number" step="0.01" id="mpNewRettifica" placeholder="lascia vuoto se non serve"></div>
-      <div><label>Rimborso 730 (€)</label><input type="number" step="0.01" id="mpNewRimborso" placeholder="lascia vuoto se non serve"></div>
-      <div><label>Stima ore straord. (se nessuna timbratura)</label><input type="number" step="0.25" id="mpNewStima"></div>
+    <div class="card">
+      <h2><span class="n">1</span>Nuovo mese</h2>
+      <p class="note">Scegli solo il mese. Tariffa oraria, base/giorno, IVS e stima straordinario vengono ripresi dall'ultimo mese inserito; i giorni lavorativi si calcolano dal calendario (lun–ven, festivi esclusi). Premio, conguaglio, rettifica e 730 partono vuoti: li compili nella tabella sotto solo nei mesi in cui ci sono.</p>
+      <div class="roster-add-grid">
+        <div style="max-width:220px;"><label>Mese</label><input type="month" id="mpNewMonthKey" onchange="renderNewMonthPreview()"></div>
+        <div class="btn-row" style="margin:0;"><button class="btn-primary" onclick="quickAddMonth()">+ Crea mese</button></div>
+      </div>
+      <div id="mpNewPreview" class="note" style="margin-top:10px;"></div>
     </div>
-    <div class="btn-row"><button class="btn-primary" onclick="addMonthlyParams()">+ Aggiungi/aggiorna mese</button></div>
-    <div class="table-scroll" style="margin-top:14px;"><table id="monthlyParamsTable"></table></div>
+    <div class="card">
+      <h2><span class="n">2</span>Mesi inseriti</h2>
+      <p class="note">Correggi direttamente nelle celle: si salva da solo. Se inserisci una timbratura in un mese che non c'è ancora, il mese viene creato in automatico. A dicembre compare la <strong>13ª</strong>: se la lasci vuota viene stimata sulla media della retribuzione ordinaria degli ultimi mesi dell'anno.</p>
+      <div class="table-scroll"><table id="monthlyParamsTable"></table></div>
+    </div>
   </div>
 </div>
 
@@ -3878,20 +3874,45 @@ function computeMonthSummary(monthKey, opts){
   const oreStraord = override != null ? override : (hasData ? sumDailyForMonth(monthKey,'straord') : (Number(p.stimaStraord)||0));
   const importoStraord = override != null ? override*(Number(p.tariffa)||0) : (hasData ? sumDailyForMonth(monthKey,'importoStraord') : (Number(p.stimaStraord)||0)*(Number(p.tariffa)||0));
   const ordinarieEuro = giorni * (Number(p.baseGiorno)||0);
-  const totaleCompetenze = ordinarieEuro + importoStraord + (Number(p.premio)||0);
+  const competenzeMese = ordinarieEuro + importoStraord + (Number(p.premio)||0);
   const buoniPasto = HOURS_SETTINGS.buoniPastoTariffa * HOURS_SETTINGS.buoniPastoNumero;
-  const ivs = totaleCompetenze * (Number(p.ivs)||0);
-  const imponibileIrpef = totaleCompetenze - ivs;
+  const aliqIvs = Number(p.ivs)||0;
+  const ivsMese = competenzeMese * aliqIvs;
+  const imponibileIrpef = competenzeMese - ivsMese;
   const rettificaVal = (p.rettifica !== '' && p.rettifica != null) ? Number(p.rettifica) : null;
   const baseIrpef = rettificaVal != null ? rettificaVal : imponibileIrpef;
-  const irpef = (baseIrpef - HOURS_SETTINGS.irpefSoglia) * HOURS_SETTINGS.irpefAliquota + HOURS_SETTINGS.irpefQuotaFissa + (Number(p.conguaglio)||0);
+  const irpefMese = (baseIrpef - HOURS_SETTINGS.irpefSoglia) * HOURS_SETTINGS.irpefAliquota + HOURS_SETTINGS.irpefQuotaFissa + (Number(p.conguaglio)||0);
+  // 13ª (solo dicembre): IVS con la stessa aliquota del mese, IRPEF all'aliquota marginale (niente detrazioni), niente CRAL/addizionale in più
+  const tred = tredicesimaFor(monthKey, p);
+  const tredLordo = tred ? tred.lordo : 0;
+  const ivsTred = tredLordo * aliqIvs;
+  const irpefTred = (tredLordo - ivsTred) * HOURS_SETTINGS.irpefAliquota;
+  const totaleCompetenze = competenzeMese + tredLordo;
+  const ivs = ivsMese + ivsTred;
+  const irpef = irpefMese + irpefTred;
   const cral = HOURS_SETTINGS.cral;
   const addReg = HOURS_SETTINGS.addRegionale;
   const totaleTrattenute = ivs + irpef + cral + addReg;
   const nettoMese = totaleCompetenze - totaleTrattenute;
   const rimb730Val = (p.rimborso730 !== '' && p.rimborso730 != null) ? Number(p.rimborso730) : 0;
   const nettoEffettivo = nettoMese + rimb730Val;
-  return {hasData, oreOrdinarie, oreStraord, importoStraord, ordinarieEuro, totaleCompetenze, buoniPasto, ivs, imponibileIrpef, irpef, cral, addReg, totaleTrattenute, nettoMese, nettoEffettivo};
+  const nettoTred = tredLordo - ivsTred - irpefTred;
+  return {hasData, oreOrdinarie, oreStraord, importoStraord, ordinarieEuro, totaleCompetenze, buoniPasto, ivs, imponibileIrpef, irpef, cral, addReg, totaleTrattenute, nettoMese, nettoEffettivo,
+          tred, tredLordo, ivsTred, irpefTred, nettoTred};
+}
+// 13ª mensilità: valore inserito a mano nel mese di dicembre, altrimenti stima = media della retribuzione ordinaria
+// (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno già inseriti (preferendo quelli "Reale").
+function tredicesimaFor(monthKey, p){
+  if(!monthKey || monthKey.slice(5)!=='12') return null;
+  const manual = (p && p.tredicesima !== '' && p.tredicesima != null && !isNaN(Number(p.tredicesima))) ? Number(p.tredicesima) : null;
+  if(manual != null) return {lordo:manual, stimata:false, mesi:[]};
+  const y = monthKey.slice(0,4);
+  const keys = Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(0,4)===y && k<monthKey).sort();
+  const reali = keys.filter(k=>MONTHLY_PARAMS[k].tipo==='Reale');
+  const mesi = (reali.length ? reali : keys).slice(-6);
+  if(!mesi.length) return {lordo:0, stimata:true, mesi:[]};
+  const tot = mesi.reduce((s,k)=>s + (Number(MONTHLY_PARAMS[k].giorni)||0)*(Number(MONTHLY_PARAMS[k].baseGiorno)||0), 0);
+  return {lordo: tot/mesi.length, stimata:true, mesi};
 }
 function fmtEuro(v){ return (Math.round(v*100)/100).toLocaleString('it-IT',{minimumFractionDigits:2, maximumFractionDigits:2}); }
 function fmtHours(v){ return (Math.round(v*100)/100).toLocaleString('it-IT'); }
@@ -3909,8 +3930,11 @@ function addDailyHours(){
   };
   ['dhNewE1','dhNewU1','dhNewE2','dhNewU2','dhNewManual','dhNewFerie'].forEach(id=>document.getElementById(id).value='');
   saveDailyHoursData();
+  const mk = date.slice(0,7);
+  let msg = 'Giorno salvato';
+  if(!MONTHLY_PARAMS[mk] && Object.keys(MONTHLY_PARAMS).length){ createMonthParams(mk); msg = `Giorno salvato · mese ${mk} creato in automatico`; }
   renderHoursPage();
-  toast('Giorno salvato');
+  toast(msg);
 }
 function deleteDailyHours(date){
   delete DAILY_HOURS[date];
@@ -3947,49 +3971,131 @@ function renderDailyHoursTable(){
   html += '</tbody>';
   el.innerHTML = html;
 }
-function addMonthlyParams(){
-  const year = Number(document.getElementById('mpNewYear').value);
-  const month = Number(document.getElementById('mpNewMonth').value);
-  if(!year || !month || month<1 || month>12){ toast('Inserisci anno e mese validi'); return; }
-  const key = `${year}-${String(month).padStart(2,'0')}`;
-  MONTHLY_PARAMS[key] = {
-    tipo: document.getElementById('mpNewTipo').value,
-    tariffa: document.getElementById('mpNewTariffa').value,
-    giorni: document.getElementById('mpNewGiorni').value,
-    baseGiorno: document.getElementById('mpNewBaseGiorno').value,
-    ivs: document.getElementById('mpNewIVS').value,
-    etichettaPremio: document.getElementById('mpNewEtichettaPremio').value,
-    premio: document.getElementById('mpNewPremio').value,
-    conguaglio: document.getElementById('mpNewConguaglio').value,
-    rettifica: document.getElementById('mpNewRettifica').value,
-    rimborso730: document.getElementById('mpNewRimborso').value,
-    stimaStraord: document.getElementById('mpNewStima').value,
-  };
-  saveMonthlyParamsData();
-  renderHoursPage();
-  toast('Mese salvato');
+/* ---------- Parametri mensili: creazione rapida (copia dal mese precedente + giorni da calendario) ---------- */
+const MONTH_COPY_FIELDS = ['tariffa','baseGiorno','ivs','stimaStraord'];
+function workingDaysInMonth(monthKey){
+  const [y,m] = monthKey.split('-').map(Number);
+  const hol = italianHolidays(y);
+  let giorni = 0; const last = new Date(y,m,0).getDate();
+  for(let d=1; d<=last; d++){
+    const ds = `${monthKey}-${String(d).padStart(2,'0')}`;
+    const wd = new Date(ds+'T00:00:00').getDay();
+    if(wd>=1 && wd<=5 && !hol.has(ds)) giorni++;
+  }
+  return giorni;
 }
+function sourceMonthFor(monthKey){
+  const keys = Object.keys(MONTHLY_PARAMS).filter(k=>k!==monthKey).sort();
+  if(!keys.length) return null;
+  const prev = keys.filter(k=>k<monthKey);
+  return prev.length ? prev[prev.length-1] : keys[keys.length-1];
+}
+function nextMonthKey(key){
+  let [y,m] = key.split('-').map(Number);
+  m++; if(m>12){ m=1; y++; }
+  return `${y}-${String(m).padStart(2,'0')}`;
+}
+function suggestedNewMonth(){
+  // il mese successivo all'ultimo inserito (o quello corrente se non ce n'è nessuno)
+  const keys = Object.keys(MONTHLY_PARAMS).sort();
+  return keys.length ? nextMonthKey(keys[keys.length-1]) : todayStr().slice(0,7);
+}
+function buildMonthParams(monthKey){
+  const src = sourceMonthFor(monthKey);
+  const sp = src ? MONTHLY_PARAMS[src] : {};
+  const p = {tipo: monthKey < todayStr().slice(0,7) ? 'Reale' : 'Stima', giorni: workingDaysInMonth(monthKey),
+             etichettaPremio:'', premio:'', conguaglio:'', rettifica:'', rimborso730:'', tredicesima:''};
+  MONTH_COPY_FIELDS.forEach(f=>p[f] = sp[f] != null ? sp[f] : '');
+  return {params:p, src};
+}
+function createMonthParams(monthKey){
+  const {params, src} = buildMonthParams(monthKey);
+  MONTHLY_PARAMS[monthKey] = params;
+  saveMonthlyParamsData();
+  return src;
+}
+function renderNewMonthPreview(){
+  const inp = document.getElementById('mpNewMonthKey');
+  const el = document.getElementById('mpNewPreview');
+  if(!inp || !el) return;
+  if(!inp.value) inp.value = suggestedNewMonth();
+  const key = inp.value;
+  if(MONTHLY_PARAMS[key]){ el.innerHTML = `<span class="flag">Già presente</span> ${key} è già inserito: modificalo nella tabella qui sotto.`; return; }
+  const {params:p, src} = buildMonthParams(key);
+  if(!src){ el.innerHTML = `Primo mese: verrà creato con ${p.giorni} giorni lavorativi; tariffa, base/giorno e IVS li inserisci nella tabella.`; return; }
+  el.innerHTML = `Verrà creato con: <strong>${p.giorni}</strong> giorni lavorativi · tariffa <strong>${p.tariffa||'—'}</strong> €/h · base/giorno <strong>${p.baseGiorno||'—'}</strong> € · IVS <strong>${p.ivs||'—'}</strong> · stima straord. <strong>${p.stimaStraord||0}</strong> h <span style="opacity:.75;">(ripresi da ${src})</span>`
+    + (key.slice(5)==='12' ? ` · <strong>13ª</strong> stimata in automatico` : '');
+}
+function quickAddMonth(){
+  const inp = document.getElementById('mpNewMonthKey');
+  const key = inp && inp.value;
+  if(!key){ toast('Scegli il mese'); return; }
+  if(MONTHLY_PARAMS[key]){ toast('Mese già presente: modificalo nella tabella'); return; }
+  createMonthParams(key);
+  inp.value = '';
+  renderHoursPage();
+  toast(`Mese ${key} creato`);
+}
+// Campi modificabili direttamente in tabella: [campo, intestazione, tipo, step, larghezza]
+const MONTH_TABLE_FIELDS = [
+  ['tariffa','Tariffa €/h','number','0.00001',90],
+  ['giorni','Giorni','number','1',58],
+  ['baseGiorno','Base/giorno €','number','0.01',85],
+  ['ivs','IVS','number','0.0001',72],
+  ['stimaStraord','Stima straord. h','number','0.25',70],
+  ['etichettaPremio','Etichetta premio','text','',110],
+  ['premio','Premio €','number','0.01',80],
+  ['conguaglio','Conguaglio IRPEF €','number','0.01',85],
+  ['rettifica','Rettifica imp. IRPEF €','number','0.01',90],
+  ['rimborso730','Rimb. 730 €','number','0.01',80],
+  ['tredicesima','13ª lorda €','number','0.01',95],
+];
 function editMonthlyParamsField(key, field, value){
   if(!MONTHLY_PARAMS[key]) return;
   MONTHLY_PARAMS[key][field] = value;
   saveMonthlyParamsData();
-  renderHoursPage();
+  // aggiorna solo i valori calcolati, senza ridisegnare la tabella (non si perde il cursore passando da una cella all'altra)
+  const s = computeMonthSummary(key);
+  const cell = document.getElementById('mpNet_'+key);
+  if(cell && s) cell.innerHTML = `<strong>${fmtEuro(s.nettoEffettivo)}</strong>`;
+  const tc = document.getElementById('mpTred_'+key);
+  if(tc && s && s.tred) tc.placeholder = 'stima ' + fmtEuro(s.tred.lordo);
+  // la 13ª dipende dai mesi precedenti: aggiorna anche i dicembre successivi
+  Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(5)==='12' && k>key).forEach(k=>{
+    const sd = computeMonthSummary(k);
+    const c1 = document.getElementById('mpNet_'+k); if(c1) c1.innerHTML = `<strong>${fmtEuro(sd.nettoEffettivo)}</strong>`;
+    const c2 = document.getElementById('mpTred_'+k); if(c2 && sd.tred) c2.placeholder = 'stima ' + fmtEuro(sd.tred.lordo);
+  });
+  renderCedolino();
+  renderDashboardHoursTable();
 }
 function deleteMonthlyParams(key){
+  if(!confirm(`Rimuovere i parametri di ${key}?`)) return;
   delete MONTHLY_PARAMS[key];
   saveMonthlyParamsData();
   renderHoursPage();
 }
 function renderMonthlyParamsTable(){
   const el = document.getElementById('monthlyParamsTable');
+  renderNewMonthPreview();
   if(!el) return;
-  const keys = Object.keys(MONTHLY_PARAMS).sort();
+  const keys = Object.keys(MONTHLY_PARAMS).sort().reverse();
   if(keys.length===0){ el.innerHTML = '<tr><td class="empty">Nessun mese inserito.</td></tr>'; return; }
-  let html = '<thead><tr><th>Mese</th><th>Tipo</th><th>Netto effettivo</th><th></th></tr></thead><tbody>';
+  const cellStyle = w => `style="width:${w}px; min-width:${w}px; padding:5px 6px;"`;
+  let html = '<thead><tr><th>Mese</th><th>Tipo</th>' + MONTH_TABLE_FIELDS.map(f=>`<th>${f[1]}</th>`).join('') + '<th>Netto effettivo</th><th></th></tr></thead><tbody>';
   keys.forEach(k=>{
     const p = MONTHLY_PARAMS[k];
     const s = computeMonthSummary(k);
-    html += `<tr><td><strong>${k}</strong></td><td>${p.tipo||''}${s&&s.hasData?' <span class="note">(da timbrature)</span>':''}</td><td>${s?fmtEuro(s.nettoEffettivo):''}</td>
+    const isDec = k.slice(5)==='12';
+    html += `<tr><td style="white-space:nowrap;"><strong>${k}</strong>${s&&s.hasData?'<div class="note" style="margin:0;">da timbrature</div>':''}</td>
+      <td><select ${cellStyle(82)} onchange="editMonthlyParamsField('${k}','tipo',this.value)">${['Reale','Stima'].map(t=>`<option${(p.tipo||'')===t?' selected':''}>${t}</option>`).join('')}</select></td>`;
+    MONTH_TABLE_FIELDS.forEach(([f,,type,step,w])=>{
+      if(f==='tredicesima' && !isDec){ html += '<td style="color:var(--sub);">—</td>'; return; }
+      const val = p[f] != null ? String(p[f]).replace(/"/g,'&quot;') : '';
+      const ph = f==='tredicesima' && s && s.tred ? ` id="mpTred_${k}" placeholder="stima ${fmtEuro(s.tred.lordo)}"` : '';
+      html += `<td><input type="${type}"${step?` step="${step}"`:''} value="${val}"${ph} ${cellStyle(w)} onchange="editMonthlyParamsField('${k}','${f}',this.value)"></td>`;
+    });
+    html += `<td id="mpNet_${k}" style="white-space:nowrap;"><strong>${s?fmtEuro(s.nettoEffettivo):''}</strong></td>
       <td><button class="btn-danger" onclick="deleteMonthlyParams('${k}')">rimuovi</button></td></tr>`;
   });
   html += '</tbody>';
@@ -4009,6 +4115,7 @@ function renderCedolino(){
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Ordinarie</div><div style="flex:1; text-align:right;">${fmtEuro(s.ordinarieEuro)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Straordinario (${fmtHours(s.oreStraord)} h)</div><div style="flex:1; text-align:right;">${fmtEuro(s.importoStraord)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">${p.etichettaPremio||'Premio'}</div><div style="flex:1; text-align:right;">${fmtEuro(Number(p.premio)||0)} €</div></div>
+        ${s.tred ? `<div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">13ª mensilità${s.tred.stimata?' (stima)':''}</div><div style="flex:1; text-align:right;">${fmtEuro(s.tredLordo)} €</div></div>` : ''}
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Buoni pasto (non in netto)</div><div style="flex:1; text-align:right;">${fmtEuro(s.buoniPasto)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;"><strong>Totale competenze</strong></div><div style="flex:1; text-align:right;"><strong>${fmtEuro(s.totaleCompetenze)} €</strong></div></div>
       </div>
@@ -4026,6 +4133,9 @@ function renderCedolino(){
       <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">+ Rimb.730 = NETTO EFFETTIVO</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(s.nettoEffettivo)} €</div></div>
     </div>
     <p class="note" style="margin-top:8px;">Ore ordinarie: ${fmtHours(s.oreOrdinarie)} — Dato ${s.hasData?'calcolato dalle timbrature del mese':'stimato (nessuna timbratura ancora inserita per questo mese)'}.</p>
+    ${s.tred ? `<p class="note" style="margin-top:4px;"><strong>13ª:</strong> ${s.tred.stimata
+        ? (s.tred.mesi.length ? `stimata come media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) di ${s.tred.mesi.join(', ')}` : 'nessun mese precedente dell\'anno da cui stimarla: inseriscila a mano in Parametri mensili')
+        : 'importo inserito a mano'}. Trattenute sulla 13ª incluse sopra: IVS ${fmtEuro(s.ivsTred)} € + IRPEF ${fmtEuro(s.irpefTred)} € (aliquota marginale, senza detrazioni) → netto 13ª circa <strong>${fmtEuro(s.nettoTred)} €</strong>.</p>` : ''}
   `;
 }
 function renderDashboardHoursTable(){
@@ -4033,13 +4143,14 @@ function renderDashboardHoursTable(){
   if(!el) return;
   const keys = Object.keys(MONTHLY_PARAMS).sort();
   if(keys.length===0){ el.innerHTML = '<tr><td class="empty">Nessun mese inserito.</td></tr>'; return; }
-  let html = '<thead><tr><th>Mese</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto effettivo</th><th>Netto cumulato</th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Mese</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>13ª</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto effettivo</th><th>Netto cumulato</th></tr></thead><tbody>';
   let cumulato = 0;
   keys.forEach(k=>{
     const p = MONTHLY_PARAMS[k];
     const s = computeMonthSummary(k);
     cumulato += s.nettoEffettivo;
     html += `<tr><td><strong>${k}</strong></td><td>${p.tipo||''}</td><td>${fmtHours(s.oreOrdinarie)}</td><td>${fmtHours(s.oreStraord)}</td><td>${fmtEuro(s.importoStraord)}</td>
+      <td>${s.tred ? fmtEuro(s.tredLordo) + (s.tred.stimata?' <span class="note">(stima)</span>':'') : ''}</td>
       <td>${fmtEuro(s.totaleCompetenze)}</td><td>${fmtEuro(s.totaleTrattenute)}</td><td><strong>${fmtEuro(s.nettoEffettivo)}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
   });
   html += '</tbody>';
@@ -4069,17 +4180,9 @@ function goalParamsFor(monthKey){
   if(!keys.length) return {params:null, borrowed:null};
   const prev = keys.filter(k=>k<monthKey);
   const src = prev.length ? prev[prev.length-1] : keys[0];
-  // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio)
-  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:''});
-  const [y,m] = monthKey.split('-').map(Number);
-  const hol = italianHolidays(y);
-  let giorni = 0; const last = new Date(y,m,0).getDate();
-  for(let d=1; d<=last; d++){
-    const ds = `${monthKey}-${String(d).padStart(2,'0')}`;
-    const wd = new Date(ds+'T00:00:00').getDay();
-    if(wd>=1 && wd<=5 && !hol.has(ds)) giorni++;
-  }
-  p.giorni = giorni;
+  // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio; la 13ª di dicembre torna stimata)
+  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:'', tredicesima:''});
+  p.giorni = workingDaysInMonth(monthKey);
   return {params:p, borrowed:src};
 }
 function loadGoalForm(){
@@ -4274,7 +4377,7 @@ async function downloadHoursExcel(){
   for(let c=2;c<=10;c++) wsDaily.getColumn(c).width = 11;
 
   const wsMonth = wb.addWorksheet('Parametri mensili');
-  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo'];
+  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','13ª lorda','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo'];
   titleRow(wsMonth, monthHeaders.length, 'PARAMETRI MENSILI');
   headerRow(wsMonth, 2, monthHeaders);
   Object.keys(MONTHLY_PARAMS).sort().forEach((k,i)=>{
@@ -4282,7 +4385,7 @@ async function downloadHoursExcel(){
     const s = computeMonthSummary(k);
     const r = 3+i;
     [k, p.tipo||'', Number(p.tariffa)||0, Number(p.giorni)||0, Number(p.baseGiorno)||0, Number(p.ivs)||0, Number(p.premio)||0,
-     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo].forEach((v,ci)=>{
+     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.tredLordo, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo].forEach((v,ci)=>{
       const c = wsMonth.getCell(r, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
     });
   });
