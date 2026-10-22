@@ -326,6 +326,11 @@
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
   <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M12 14l4-4"/><path d="M3.3 19a10 10 0 1 1 17.4 0"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M5 21h14M6 7h12M6 7l-3 7a3 3 0 0 0 6 0zM18 7l-3 7a3 3 0 0 0 6 0z"/></symbol>
+  <symbol id="i-piggy" viewBox="0 0 24 24"><path d="M19 9c-.7-2.9-3.6-5-7-5-4.4 0-8 3.1-8 7 0 2.2 1.2 4.2 3 5.5V20h3v-2h4v2h3v-3.4c1.1-.8 2-1.9 2.5-3.1H21V9z"/><path d="M15 9h.01"/></symbol>
   <symbol id="i-stop" viewBox="0 0 24 24"><path d="M7.9 2h8.2L22 7.9v8.2L16.1 22H7.9L2 16.1V7.9z"/><path d="M8 12h8"/></symbol>
   <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
   <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></symbol>
@@ -362,6 +367,7 @@
       <div class="menu-grid">
         <button class="menu-tile" onclick="showPage('panel-roster')"><svg class="ico"><use href="#i-users"/></svg><span>Operatori e sostituti</span></button>
         <button class="menu-tile" onclick="showPage('panel-clothing')"><svg class="ico"><use href="#i-shirt"/></svg><span>Indumenti operatori</span></button>
+        <button class="menu-tile" onclick="showPage('panel-skills')"><svg class="ico"><use href="#i-grid"/></svg><span>Matrice competenze</span></button>
       </div>
     </div>
 
@@ -370,6 +376,7 @@
       <div class="menu-grid">
         <button class="menu-tile" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
         <button class="menu-tile" onclick="showPage('panel-maintenance')"><svg class="ico"><use href="#i-wrench"/></svg><span>Manutenzione impianti</span></button>
+        <button class="menu-tile" onclick="showPage('panel-downtime')"><svg class="ico"><use href="#i-alert"/></svg><span>Registro fermi macchina</span></button>
         <a class="menu-tile" href="https://claude.ai/artifact/SMzgoU2WjsCHRqmnU5sMNa" target="_blank" rel="noopener" title="Si apre su Claude, visibile solo al proprietario"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
       </div>
     </div>
@@ -548,6 +555,10 @@
       <button class="menu-tile" onclick="showPage('panel-hours-months')"><svg class="ico"><use href="#i-calendar"/></svg><span>Parametri mensili</span></button>
       <button class="menu-tile" onclick="showPage('panel-hours-dashboard')"><svg class="ico"><use href="#i-trend"/></svg><span>Andamento e netto cumulato</span></button>
       <button class="menu-tile" onclick="showPage('panel-hours-goal')"><svg class="ico"><use href="#i-gauge"/></svg><span>Obiettivo netto mensile</span></button>
+      <button class="menu-tile" onclick="showPage('panel-hours-leave')"><svg class="ico"><use href="#i-sun"/></svg><span>Ferie e permessi</span></button>
+      <button class="menu-tile" onclick="showPage('panel-hours-tax')"><svg class="ico"><use href="#i-scale"/></svg><span>Conguaglio IRPEF di fine anno</span></button>
+      <button class="menu-tile" onclick="showPage('panel-hours-tfr')"><svg class="ico"><use href="#i-piggy"/></svg><span>TFR maturato</span></button>
+      <button class="menu-tile" onclick="showPage('panel-hours-import')"><svg class="ico"><use href="#i-upload"/></svg><span>Importa timbrature</span></button>
     </div>
 
     <div class="card">
@@ -561,6 +572,7 @@
         <div><label>Uscita 2</label><input type="time" id="dhNewU2"></div>
         <div><label>Straord. manuale (h)</label><input type="number" step="0.25" id="dhNewManual" placeholder="solo se senza timbratura"></div>
         <div><label>Ferie/Perm. (h)</label><input type="number" step="0.25" id="dhNewFerie"></div>
+        <div><label>Tipo assenza</label><select id="dhNewFerieTipo"><option value="ferie">Ferie</option><option value="rol">ROL / permesso</option></select></div>
       </div>
       <div class="btn-row"><button class="btn-primary" onclick="addDailyHours()">+ Aggiungi giorno</button></div>
       <h3 class="panel-subtitle" style="margin-top:18px;">Filtra per mese <select id="dhFilterMonth" onchange="renderDailyHoursTable()" style="width:auto; display:inline-block; margin-left:6px;"></select></h3>
@@ -604,6 +616,7 @@
     <div class="card">
       <h2><span class="n">2</span>Mesi inseriti</h2>
       <p class="note">Correggi direttamente nelle celle: si salva da solo. Se inserisci una timbratura in un mese che non c'è ancora, il mese viene creato in automatico.</p>
+      <div id="realVsCalc"></div>
       <div class="table-scroll"><table id="monthlyParamsTable"></table></div>
     </div>
     <div class="card">
@@ -618,6 +631,7 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Andamento e netto cumulato</h2>
+    <p class="note">In ordine di accredito. Il netto cumulato usa il netto della busta reale quando l'hai inserito, altrimenti quello calcolato.</p>
     <div class="table-scroll"><table id="dashboardHoursTable"></table></div>
   </div>
 </div>
@@ -639,6 +653,129 @@
     <div id="goalResult"></div>
   </div>
 </div>
+<div class="panel-section" id="panel-hours-leave" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
+  <div class="page-body" style="max-width:1100px;">
+    <h2><span class="n">•</span>Ferie e permessi</h2>
+    <p class="note">Parti dal saldo scritto in busta paga (di solito in fondo, con la data del mese). Il residuo si aggiorna da solo: aggiunge la maturazione di ogni mese e toglie le ore di ferie/permesso che inserisci nelle timbrature.</p>
+    <div class="card">
+      <h2><span class="n">1</span>Saldo di partenza e maturazione</h2>
+      <div class="roster-add-grid" id="leaveSettingsGrid"></div>
+    </div>
+    <div id="leaveResult"></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-hours-tax" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
+  <div class="page-body" style="max-width:1100px;">
+    <h2><span class="n">•</span>Conguaglio IRPEF di fine anno</h2>
+    <p class="note">Ogni mese l'IRPEF viene trattenuta "a rate". A fine anno l'azienda la ricalcola sul reddito di tutto l'anno (stipendi + 13ª) con scaglioni, detrazioni da lavoro dipendente e taglio del cuneo fiscale: la differenza è il conguaglio, a favore o a debito, che trovi nella busta di dicembre o gennaio. Qui lo stimo in anticipo. I mesi non ancora inseriti vengono stimati dall'ultimo mese disponibile.</p>
+    <div class="card">
+      <div class="roster-add-grid">
+        <div style="max-width:160px;"><label>Anno</label><select id="taxYear" onchange="renderTaxPage()"></select></div>
+        <div style="max-width:220px;"><label>Altre detrazioni annue (€)</label><input type="number" step="1" id="taxOtherDed" placeholder="es. familiari a carico" onchange="saveTaxForm()"></div>
+      </div>
+      <h3 class="panel-subtitle" style="margin-top:16px;">Progressivi dall'ultima busta (consigliato)</h3>
+      <p class="note">In fondo alla busta trovi i "progressivi" dell'anno: imponibile IRPEF e IRPEF già trattenuta da gennaio. Se li inserisci, quei mesi usano i numeri veri e la stima diventa molto più precisa.</p>
+      <div class="roster-add-grid">
+        <div style="max-width:180px;"><label>Busta del mese</label><input type="month" id="taxProgMese" onchange="saveTaxForm()"></div>
+        <div style="max-width:220px;"><label>Imponibile IRPEF progressivo (€)</label><input type="number" step="0.01" id="taxProgImp" onchange="saveTaxForm()"></div>
+        <div style="max-width:220px;"><label>IRPEF trattenuta progressiva (€)</label><input type="number" step="0.01" id="taxProgIrpef" onchange="saveTaxForm()"></div>
+      </div>
+    </div>
+    <div id="taxResult"></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-hours-tfr" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
+  <div class="page-body" style="max-width:1100px;">
+    <h2><span class="n">•</span>TFR maturato</h2>
+    <p class="note">Quota annua = retribuzione utile ÷ 13,5, meno lo 0,50% della retribuzione (contributo che l'azienda versa all'INPS e trattiene dal TFR). Il fondo accumulato al 31/12 dell'anno prima si rivaluta ogni anno dell'1,5% + 75% dell'inflazione ISTAT. Importi lordi: al momento della liquidazione il TFR ha una tassazione separata.</p>
+    <div class="card">
+      <h2><span class="n">1</span>Dati di partenza</h2>
+      <div class="roster-add-grid" id="tfrSettingsGrid"></div>
+    </div>
+    <div id="tfrResult"></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-hours-import" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('panel-hours')">← Torna al Conteggio ore</button></div>
+  <div class="page-body" style="max-width:1100px;">
+    <h2><span class="n">•</span>Importa timbrature</h2>
+    <p class="note">Carica l'export del sistema presenze (Excel .xlsx o .csv). Riconosco da solo, in ogni riga, la data e gli orari: va bene sia il formato "una riga per giorno" (data, entrata, uscita, …) sia "una riga per timbratura" (data, ora). Prima di salvare vedi l'anteprima; i giorni già inseriti non vengono toccati, a meno che tu non scelga di sovrascriverli.</p>
+    <div class="card">
+      <div class="roster-add-grid">
+        <div><label>File</label><input type="file" id="importHoursFile" accept=".xlsx,.csv,.txt" onchange="readHoursImportFile(event)"></div>
+        <div style="max-width:260px;"><label style="display:flex; align-items:center; gap:6px; white-space:nowrap;"><input type="checkbox" id="importHoursOverwrite" style="width:auto;" onchange="renderHoursImportPreview()"> Sovrascrivi i giorni già inseriti</label></div>
+      </div>
+    </div>
+    <div id="importHoursPreview"></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-skills" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:1300px;">
+    <h2><span class="n">•</span>Matrice competenze</h2>
+    <p class="note">Chi sa lavorare su quale impianto. Per i <strong>sostituti</strong> la cella è la stessa informazione usata dal calcolo automatico delle coperture (impianti abilitati e resa %): modificarla qui equivale a modificarla in Operatori e sostituti / Capacità produttiva. "In formazione" non viene mai proposto in automatico. Per i <strong>titolari</strong> segni gli impianti diversi dal proprio su cui sanno lavorare: serve a vedere chi può dare una mano e quali impianti dipendono da troppo poche persone.</p>
+    <div class="btn-row">
+      <button class="btn-ghost" onclick="downloadSkillsExcel()">⬇ Scarica Excel</button>
+    </div>
+    <div class="card" style="margin-top:14px;">
+      <h2><span class="n">1</span>Copertura per impianto</h2>
+      <div class="table-scroll"><table id="skillsCoverage"></table></div>
+    </div>
+    <div class="card">
+      <h2><span class="n">2</span>Matrice</h2>
+      <div class="table-scroll"><table id="skillsMatrix"></table></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-downtime" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:1200px;">
+    <h2><span class="n">•</span>Registro fermi macchina</h2>
+    <p class="note">Segna ogni fermo o rallentamento importante: impianto, causa e minuti persi. Il grafico di Pareto mostra quali cause pesano di più, cioè dove conviene intervenire per primo (e con quali numeri presentarsi da fornitori e manutenzione).</p>
+    <div class="card">
+      <h2><span class="n">1</span>Nuovo fermo</h2>
+      <div class="roster-add-grid">
+        <div style="max-width:160px;"><label>Data</label><input type="date" id="dtNewDate"></div>
+        <div style="max-width:130px;"><label>Impianto</label><select id="dtNewPlant"></select></div>
+        <div style="max-width:110px;"><label>Turno</label><select id="dtNewTurno"><option value="">—</option><option value="1">1°</option><option value="2">2°</option><option value="3">3°</option><option value="C">C</option></select></div>
+        <div><label>Causa</label><select id="dtNewCause"></select></div>
+        <div style="max-width:120px;"><label>Minuti persi</label><input type="number" min="1" step="5" id="dtNewMin"></div>
+        <div><label>Note</label><input type="text" id="dtNewNote" placeholder="facoltativo"></div>
+      </div>
+      <div class="btn-row"><button class="btn-primary" onclick="addDowntime()">+ Registra fermo</button></div>
+    </div>
+    <div class="card">
+      <h2><span class="n">2</span>Analisi</h2>
+      <div class="roster-add-grid">
+        <div style="max-width:170px;"><label>Dal</label><input type="date" id="dtFrom" onchange="renderDowntimePage()"></div>
+        <div style="max-width:170px;"><label>Al</label><input type="date" id="dtTo" onchange="renderDowntimePage()"></div>
+        <div style="max-width:150px;"><label>Impianto</label><select id="dtFilterPlant" onchange="renderDowntimePage()"></select></div>
+        <div style="max-width:300px;"><label style="display:flex; align-items:center; gap:6px; white-space:nowrap;"><input type="checkbox" id="dtIncludeMaint" style="width:auto;" onchange="renderDowntimePage()"> Includi i fermi dello storico manutenzioni</label></div>
+        <div class="btn-row" style="margin:0;"><button class="btn-ghost" onclick="downloadDowntimeExcel()">⬇ Scarica Excel</button></div>
+      </div>
+      <div id="downtimeAnalysis" style="margin-top:16px;"></div>
+    </div>
+    <div class="card">
+      <h2><span class="n">3</span>Elenco fermi</h2>
+      <div class="table-scroll"><table id="downtimeList"></table></div>
+    </div>
+    <div class="card">
+      <h2><span class="n">4</span>Cause</h2>
+      <p class="note">L'elenco delle cause tra cui scegliere. Tienilo corto e preciso: cause troppo generiche ("altro") rendono il Pareto inutile.</p>
+      <div id="downtimeCauses"></div>
+      <div class="roster-add-grid"><div style="max-width:320px;"><input type="text" id="dtNewCauseName" placeholder="Nuova causa"></div><div class="btn-row" style="margin:0;"><button class="btn-ghost" onclick="addDowntimeCause()">+ Aggiungi causa</button></div></div>
+    </div>
+  </div>
+</div>
+
 <div class="panel-section" id="panel-opstats" style="display:none;">
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1300px;">
@@ -3790,6 +3927,327 @@ async function downloadTurnoExcel(){
   toast('Excel scaricato');
 }
 
+/* ============================= MATRICE COMPETENZE (operatore × impianto) ============================= */
+// Titolari: impianti diversi dal proprio su cui sanno lavorare -> SKILLS[nome][impianto] = 'A' (abilitato) | 'F' (in formazione)
+// Sostituti: la fonte resta SUBSTITUTES[].plants + capacity (usati dall'ottimizzatore); "in formazione" sta in SKILLS e non viene mai proposto.
+let SKILLS = {};
+async function loadSkills(){
+  try{ const r = await storageGet('skills-matrix'); SKILLS = r ? JSON.parse(r.value) : {}; }catch(e){ SKILLS = {}; }
+}
+async function saveSkills(){ try{ await storageSet('skills-matrix', JSON.stringify(SKILLS)); }catch(e){} }
+function skillPlants(){
+  const used = new Set(ALL_PLANTS);
+  if(EMPLOYEES.some(e=>e.plant==='TA') || SUBSTITUTES.some(s=>(s.plants||[]).includes('TA'))) used.add('TA');
+  return [...used];
+}
+// Livello di una persona su un impianto: {lvl:'T'|'A'|'F'|'', cap}
+function skillOf(name, plant){
+  const sub = byNameSub(name), emp = byName(name);
+  if(emp && emp.plant===plant) return {lvl:'T', cap:100};
+  if(sub && (sub.plants||[]).includes(plant)) return {lvl:'A', cap:capacityOf(sub, plant)};
+  const v = (SKILLS[name]||{})[plant];
+  if(v==='A' && !sub) return {lvl:'A', cap:null};
+  if(v==='F') return {lvl:'F', cap:null};
+  return {lvl:'', cap:null};
+}
+function setSkill(name, plant, value){
+  const sub = byNameSub(name);
+  SKILLS[name] = SKILLS[name] || {};
+  if(sub){
+    sub.plants = (sub.plants||[]).filter(p=>p!==plant);
+    if(sub.capacity) delete sub.capacity[plant];
+    delete SKILLS[name][plant];
+    if(value==='F') SKILLS[name][plant] = 'F';
+    else if(value!==''){
+      sub.plants.push(plant);
+      sub.capacity = sub.capacity || {};
+      sub.capacity[plant] = Math.max(0, Math.min(100, Number(value)||100));
+    }
+    saveRoster();
+    const saved = {}; SUBSTITUTES.forEach(s=>{ saved[s.name] = s.capacity; });
+    storageSet('sub-capacities', JSON.stringify(saved)).catch(()=>{});
+    toast('Salvato: vale da subito per le prossime proposte di copertura');
+  } else {
+    if(value==='') delete SKILLS[name][plant]; else SKILLS[name][plant] = value;
+  }
+  if(!Object.keys(SKILLS[name]).length) delete SKILLS[name];
+  saveSkills();
+  renderSkillsPage();
+}
+function skillRows(){
+  const rows = [];
+  const order = {A:0, B:1, C:2};
+  EMPLOYEES.slice().sort((a,b)=>((order[a.team]??9)-(order[b.team]??9)) || a.name.localeCompare(b.name))
+    .forEach(e=>rows.push({name:e.name, kind: byNameSub(e.name) ? 'titolare + sostituto' : 'titolare', team:e.team||'', plant:e.plant||''}));
+  SUBSTITUTES.filter(s=>!byName(s.name)).sort((a,b)=>a.name.localeCompare(b.name))
+    .forEach(s=>rows.push({name:s.name, kind:'sostituto', team:s.teamOnly||'', plant:''}));
+  return rows;
+}
+function computeSkillsCoverage(){
+  return skillPlants().map(plant=>{
+    const titolari = {A:[], B:[], C:[]};
+    EMPLOYEES.filter(e=>e.plant===plant).forEach(e=>{ if(titolari[e.team]) titolari[e.team].push(e.name); });
+    const subs = SUBSTITUTES.filter(s=>(s.plants||[]).includes(plant));
+    const subsFull = subs.filter(s=>!s.conditional);           // sempre disponibili
+    const interni = EMPLOYEES.filter(e=>e.plant!==plant && !byNameSub(e.name) && (SKILLS[e.name]||{})[plant]==='A').map(e=>e.name);
+    const formazione = rowsWithLevel(plant, 'F');
+    const perTeam = ['A','B','C'].map(t=>({team:t, n: subsFull.filter(s=>!s.teamOnly || s.teamOnly===t).length}));
+    const minTeam = Math.min(...perTeam.map(x=>x.n));
+    let risk = 'ok';
+    if(subsFull.length===0) risk = 'nessuno';
+    else if(subsFull.length===1 || minTeam===0) risk = 'basso';
+    return {plant, titolari, subs, subsFull, interni, formazione, perTeam, risk};
+  });
+}
+function rowsWithLevel(plant, lvl){ return skillRows().filter(r=>skillOf(r.name, plant).lvl===lvl).map(r=>r.name); }
+function renderSkillsPage(){
+  const cov = document.getElementById('skillsCoverage');
+  const mat = document.getElementById('skillsMatrix');
+  if(!cov || !mat) return;
+  const plants = skillPlants();
+  const data = computeSkillsCoverage();
+  const riskFlag = r => r==='nessuno' ? '<span class="flag">nessun sostituto</span>' : r==='basso' ? '<span class="flag">copertura fragile</span>' : '<span class="flag ok">ok</span>';
+  cov.innerHTML = '<thead><tr><th>Impianto</th><th>Titolari A / B / C</th><th>Sostituti abilitati</th><th>Per squadra A / B / C</th><th>Titolari di altri impianti</th><th>In formazione</th><th>Stato</th></tr></thead><tbody>'
+    + data.map(d=>`<tr><td class="plant"><strong>${plantLabel(d.plant)}</strong></td>
+      <td>${['A','B','C'].map(t=>d.titolari[t].length).join(' / ')}</td>
+      <td>${d.subs.length ? d.subs.map(s=>escHtml(s.name)+(s.conditional?' <span class="note">(cond.)</span>':'')).join(', ') : '<span class="note">—</span>'}</td>
+      <td>${d.perTeam.map(x=>x.n===0?`<span style="color:var(--danger); font-weight:600;">0</span>`:x.n).join(' / ')}</td>
+      <td>${d.interni.length ? d.interni.map(escHtml).join(', ') : '<span class="note">—</span>'}</td>
+      <td>${d.formazione.length ? d.formazione.map(escHtml).join(', ') : '<span class="note">—</span>'}</td>
+      <td>${riskFlag(d.risk)}</td></tr>`).join('')
+    + '</tbody>';
+  const capOpts = [100,95,90,85,80,75,70,65,60,55,50];
+  const rows = skillRows();
+  if(!rows.length){ mat.innerHTML = '<tr><td class="empty">Anagrafica vuota.</td></tr>'; return; }
+  let html = '<thead><tr><th>Persona</th><th>Ruolo</th>' + plants.map(p=>`<th style="text-align:center;">${plantLabel(p)}</th>`).join('') + '<th style="text-align:center;">Impianti</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const isSub = !!byNameSub(r.name);
+    let count = 0;
+    html += `<tr><td style="white-space:nowrap;"><strong>${escHtml(r.name)}</strong></td><td class="note" style="margin:0; white-space:nowrap;">${r.kind}${r.team?' · '+r.team:''}</td>`;
+    plants.forEach(p=>{
+      const s = skillOf(r.name, p);
+      if(s.lvl==='T' || s.lvl==='A') count++;
+      if(s.lvl==='T' && !isSub){ html += `<td style="text-align:center; background:var(--ok-bg); color:var(--ok); font-weight:600;">titolare</td>`; return; }
+      const bg = s.lvl==='A' || s.lvl==='T' ? 'background:var(--ok-bg);' : s.lvl==='F' ? 'background:#f7f1e3;' : '';
+      let opts;
+      if(isSub){
+        const cur = s.lvl==='A' || s.lvl==='T' ? (s.cap ?? 100) : null;
+        const list = cur!=null && !capOpts.includes(cur) ? capOpts.concat([cur]).sort((a,b)=>b-a) : capOpts;
+        opts = `<option value=""${!s.lvl?' selected':''}>—</option><option value="F"${s.lvl==='F'?' selected':''}>formaz.</option>`
+          + list.map(c=>`<option value="${c}"${cur===c?' selected':''}>${c}%</option>`).join('');
+      } else {
+        opts = `<option value=""${!s.lvl?' selected':''}>—</option><option value="F"${s.lvl==='F'?' selected':''}>formaz.</option><option value="A"${s.lvl==='A'?' selected':''}>sì</option>`;
+      }
+      html += `<td style="text-align:center; ${bg}"><select style="width:78px; padding:4px 4px; font-size:12px; background:transparent;" onchange="setSkill('${escJs(r.name)}','${p}',this.value)">${opts}</select>${s.lvl==='T'?'<div class="note" style="margin:0;">titolare</div>':''}</td>`;
+    });
+    html += `<td style="text-align:center;"><strong>${count}</strong></td></tr>`;
+  });
+  mat.innerHTML = html + '</tbody>';
+}
+async function downloadSkillsExcel(){
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Matrice competenze');
+  const plants = skillPlants();
+  const thin = {style:'thin', color:{argb:'FFE3E3E3'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+  const headers = ['Persona','Ruolo','Squadra'].concat(plants.map(plantLabel)).concat(['N. impianti']);
+  ws.mergeCells(1,1,1,headers.length);
+  ws.getCell(1,1).value = 'MATRICE COMPETENZE'; ws.getCell(1,1).font = {name:'Arial Black', size:14}; ws.getCell(1,1).alignment = {horizontal:'center'};
+  headers.forEach((h,i)=>{ const c = ws.getCell(2,i+1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF152233'}}; c.border = border; });
+  skillRows().forEach((r,ri)=>{
+    let n = 0;
+    const vals = [r.name, r.kind, r.team].concat(plants.map(p=>{
+      const s = skillOf(r.name, p);
+      if(s.lvl==='T'||s.lvl==='A') n++;
+      return s.lvl==='T' ? 'Titolare' : s.lvl==='A' ? (s.cap!=null ? s.cap+'%' : 'Sì') : s.lvl==='F' ? 'In formazione' : '';
+    })).concat([n]);
+    vals.forEach((v,ci)=>{
+      const c = ws.getCell(3+ri, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
+      if(ci>=3 && ci<3+plants.length && v) c.fill = {type:'pattern', pattern:'solid', fgColor:{argb: v==='In formazione' ? 'FFF7F1E3' : 'FFEEF3EE'}};
+    });
+  });
+  ws.getColumn(1).width = 22; ws.getColumn(2).width = 20; ws.getColumn(3).width = 9;
+  for(let c=4;c<=headers.length;c++) ws.getColumn(c).width = 12;
+  const ws2 = wb.addWorksheet('Copertura impianti');
+  ['Impianto','Titolari A','Titolari B','Titolari C','Sostituti abilitati','Sost. squadra A','Sost. squadra B','Sost. squadra C','Titolari di altri impianti','In formazione','Stato'].forEach((h,i)=>{
+    const c = ws2.getCell(1,i+1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF152233'}}; c.border = border; });
+  computeSkillsCoverage().forEach((d,ri)=>{
+    [plantLabel(d.plant), d.titolari.A.length, d.titolari.B.length, d.titolari.C.length, d.subs.map(s=>s.name).join(', '),
+     d.perTeam[0].n, d.perTeam[1].n, d.perTeam[2].n, d.interni.join(', '), d.formazione.join(', '),
+     d.risk==='nessuno'?'Nessun sostituto':d.risk==='basso'?'Copertura fragile':'OK'].forEach((v,ci)=>{
+      const c = ws2.getCell(2+ri, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border; });
+  });
+  [12,10,10,10,40,13,13,13,30,30,16].forEach((w,i)=>ws2.getColumn(i+1).width = w);
+  const buffer = await wb.xlsx.writeBuffer();
+  downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `matrice_competenze_${todayStr()}.xlsx`);
+  toast('Excel scaricato');
+}
+
+/* ============================= REGISTRO FERMI MACCHINA (con Pareto) ============================= */
+let DOWNTIME_LOG = []; // {id, date, plant, turno, cause, minutes, note}
+const DOWNTIME_DEFAULT_CAUSES = ['Guasto meccanico','Guasto elettrico / elettronico','Guida nastro / allineamento','Cambio lavoro / attrezzaggio','Problemi materiale (bobina, film)','Mancanza materiale','Mancanza operatore','Manutenzione programmata','Pulizia','Attesa qualità / campionatura','Altro'];
+let DOWNTIME_CAUSES = DOWNTIME_DEFAULT_CAUSES.slice();
+async function loadDowntime(){
+  try{ const r = await storageGet('downtime-log'); DOWNTIME_LOG = r ? JSON.parse(r.value) : []; }catch(e){ DOWNTIME_LOG = []; }
+  try{ const r = await storageGet('downtime-causes'); if(r){ const c = JSON.parse(r.value); if(Array.isArray(c) && c.length) DOWNTIME_CAUSES = c; } }catch(e){}
+}
+async function saveDowntime(){ try{ await storageSet('downtime-log', JSON.stringify(DOWNTIME_LOG)); }catch(e){} }
+async function saveDowntimeCauses(){ try{ await storageSet('downtime-causes', JSON.stringify(DOWNTIME_CAUSES)); }catch(e){} }
+function fillDowntimeSelects(){
+  const plantSel = document.getElementById('dtNewPlant');
+  const filterSel = document.getElementById('dtFilterPlant');
+  const causeSel = document.getElementById('dtNewCause');
+  const plants = skillPlants();
+  if(plantSel){ const v = plantSel.value; plantSel.innerHTML = plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); if(plants.includes(v)) plantSel.value = v; }
+  if(filterSel){ const v = filterSel.value; filterSel.innerHTML = '<option value="">Tutti</option>' + plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); filterSel.value = v || ''; }
+  if(causeSel){ const v = causeSel.value; causeSel.innerHTML = DOWNTIME_CAUSES.map(c=>`<option>${escHtml(c)}</option>`).join(''); if(DOWNTIME_CAUSES.includes(v)) causeSel.value = v; }
+  const d = document.getElementById('dtNewDate'); if(d && !d.value) d.value = todayStr();
+  const from = document.getElementById('dtFrom'), to = document.getElementById('dtTo');
+  if(from && !from.value) from.value = shiftDate(todayStr(), -90);
+  if(to && !to.value) to.value = todayStr();
+}
+function addDowntime(){
+  const date = document.getElementById('dtNewDate').value;
+  const minutes = Number(document.getElementById('dtNewMin').value);
+  if(!date){ toast('Inserisci la data'); return; }
+  if(!(minutes>0)){ toast('Inserisci i minuti persi'); return; }
+  DOWNTIME_LOG.push({
+    id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), date,
+    plant: document.getElementById('dtNewPlant').value,
+    turno: document.getElementById('dtNewTurno').value,
+    cause: document.getElementById('dtNewCause').value,
+    minutes, note: document.getElementById('dtNewNote').value.trim(),
+  });
+  document.getElementById('dtNewMin').value = ''; document.getElementById('dtNewNote').value = '';
+  saveDowntime(); renderDowntimePage(); toast('Fermo registrato');
+}
+function deleteDowntime(id){
+  if(!confirm('Eliminare questo fermo?')) return;
+  DOWNTIME_LOG = DOWNTIME_LOG.filter(d=>d.id!==id); saveDowntime(); renderDowntimePage();
+}
+function addDowntimeCause(){
+  const inp = document.getElementById('dtNewCauseName'); const v = inp.value.trim();
+  if(!v) return; if(DOWNTIME_CAUSES.includes(v)){ toast('Causa già presente'); return; }
+  DOWNTIME_CAUSES.push(v); inp.value=''; saveDowntimeCauses(); renderDowntimePage();
+}
+function removeDowntimeCause(i){
+  const c = DOWNTIME_CAUSES[i];
+  const used = DOWNTIME_LOG.filter(d=>d.cause===c).length;
+  if(!confirm(used ? `"${c}" è usata in ${used} fermi registrati, che resteranno con questa causa. Toglierla dall'elenco?` : `Togliere "${c}" dall'elenco?`)) return;
+  DOWNTIME_CAUSES.splice(i,1); saveDowntimeCauses(); renderDowntimePage();
+}
+function moveDowntimeCause(i, delta){
+  const j = i+delta; if(j<0 || j>=DOWNTIME_CAUSES.length) return;
+  [DOWNTIME_CAUSES[i], DOWNTIME_CAUSES[j]] = [DOWNTIME_CAUSES[j], DOWNTIME_CAUSES[i]];
+  saveDowntimeCauses(); renderDowntimePage();
+}
+// Fermi filtrati, eventualmente con quelli dello storico manutenzioni (ore -> minuti, causa "Manutenzione: tipo")
+function filteredDowntime(){
+  const from = (document.getElementById('dtFrom')||{}).value || '0000-01-01';
+  const to = (document.getElementById('dtTo')||{}).value || '9999-12-31';
+  const plant = (document.getElementById('dtFilterPlant')||{}).value || '';
+  const incl = (document.getElementById('dtIncludeMaint')||{}).checked;
+  let rows = DOWNTIME_LOG.map(d=>Object.assign({src:'registro'}, d));
+  if(incl) rows = rows.concat((MAINTENANCE_LOG||[]).filter(m=>Number(m.downtimeHours)>0).map(m=>({
+    id:'m'+m.id, date:m.date, plant:m.plant, turno:'', cause:'Manutenzione: '+(m.type||'intervento'), minutes:Number(m.downtimeHours)*60, note:m.description||'', src:'manutenzione'})));
+  return rows.filter(d=>d.date>=from && d.date<=to && (!plant || d.plant===plant)).sort((a,b)=>b.date.localeCompare(a.date));
+}
+function paretoOf(rows, keyFn){
+  const tot = {}; const cnt = {};
+  rows.forEach(r=>{ const k = keyFn(r); tot[k] = (tot[k]||0) + Number(r.minutes||0); cnt[k] = (cnt[k]||0)+1; });
+  const sum = Object.values(tot).reduce((a,b)=>a+b,0);
+  let cum = 0;
+  return Object.entries(tot).sort((a,b)=>b[1]-a[1]).map(([k,m])=>{ cum += m; return {key:k, minutes:m, count:cnt[k], pct: sum? m/sum*100 : 0, cumPct: sum? cum/sum*100 : 0}; });
+}
+function fmtMin(m){ const h = Math.floor(m/60), mm = Math.round(m%60); return h ? `${h} h ${String(mm).padStart(2,'0')}′` : `${mm}′`; }
+function renderDowntimePage(){
+  fillDowntimeSelects();
+  const an = document.getElementById('downtimeAnalysis');
+  const list = document.getElementById('downtimeList');
+  const causesEl = document.getElementById('downtimeCauses');
+  if(!an) return;
+  const rows = filteredDowntime();
+  const totMin = rows.reduce((s,r)=>s+Number(r.minutes||0),0);
+  if(!rows.length){ an.innerHTML = '<p class="empty">Nessun fermo nel periodo selezionato.</p>'; }
+  else {
+    const byCause = paretoOf(rows, r=>r.cause||'—');
+    const byPlant = paretoOf(rows, r=>r.plant||'—');
+    const max = byCause[0].minutes;
+    // Pareto: barre per causa + linea cumulata (SVG), le cause che fanno l'80% evidenziate
+    const W = 760, H = 260, padL = 44, padR = 44, padB = 70, padT = 14;
+    const n = byCause.length, bw = (W-padL-padR)/n;
+    let svg = `<svg viewBox="0 0 ${W} ${H}" style="width:100%; max-width:${W}px; height:auto; display:block;" role="img" aria-label="Pareto delle cause di fermo">`;
+    [0,25,50,75,100].forEach(t=>{ const y = padT + (H-padT-padB)*(1-t/100);
+      svg += `<line x1="${padL}" x2="${W-padR}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${W-padR+6}" y="${y+4}" font-size="10" fill="var(--sub)">${t}%</text>`; });
+    let pts = [];
+    byCause.forEach((c,i)=>{
+      const x = padL + i*bw, bh = (H-padT-padB) * c.minutes/max, y = H-padB-bh;
+      const vital = (c.cumPct - c.pct) < 80;
+      const bwid = Math.min(bw*0.7, 70);
+      svg += `<rect x="${x+(bw-bwid)/2}" y="${y}" width="${bwid}" height="${bh}" rx="3" fill="${vital?'var(--navy)':'var(--steel)'}" opacity="${vital?1:.45}"><title>${escHtml(c.key)}: ${fmtMin(c.minutes)} (${c.pct.toFixed(1)}%)</title></rect>`;
+      const lbl = c.key.length>18 ? c.key.slice(0,17)+'…' : c.key;
+      svg += `<text transform="translate(${x+bw/2},${H-padB+10}) rotate(35)" font-size="10" fill="var(--ink)">${escHtml(lbl)}</text>`;
+      pts.push(`${x+bw/2},${padT + (H-padT-padB)*(1-c.cumPct/100)}`);
+    });
+    svg += `<text x="${padL-6}" y="${padT+4}" font-size="10" fill="var(--sub)" text-anchor="end">${fmtMin(max)}</text>`;
+    svg += `<polyline points="${pts.join(' ')}" fill="none" stroke="var(--danger)" stroke-width="2"/>`;
+    pts.forEach(pt=>{ const [x,y]=pt.split(','); svg += `<circle cx="${x}" cy="${y}" r="3" fill="var(--danger)"/>`; });
+    svg += `<line x1="${padL}" x2="${W-padR}" y1="${padT+(H-padT-padB)*0.2}" y2="${padT+(H-padT-padB)*0.2}" stroke="var(--danger)" stroke-dasharray="4 4" opacity=".5"/>`;
+    svg += '</svg>';
+    const vitalCount = byCause.filter(c=>(c.cumPct - c.pct) < 80).length;
+    const kpi = (label, num, sub) => `<div class="today-card" style="cursor:default; min-height:96px;"><div class="tc-label">${label}</div><div class="tc-num">${num}</div><div class="tc-sub">${sub}</div></div>`;
+    an.innerHTML = `<div class="today-grid" style="margin-bottom:16px;">
+        ${kpi('Tempo perso', fmtMin(totMin), rows.length+' fermi nel periodo')}
+        ${kpi('Prima causa', fmtMin(byCause[0].minutes), escHtml(byCause[0].key)+' · '+byCause[0].pct.toFixed(0)+'%')}
+        ${kpi('Impianto più fermo', fmtMin(byPlant[0].minutes), 'impianto '+escHtml(plantLabel(byPlant[0].key))+' · '+byPlant[0].pct.toFixed(0)+'%')}
+      </div>
+      <h3 class="panel-subtitle">Pareto delle cause</h3>
+      <p class="note">${vitalCount} ${vitalCount===1?'causa fa':'cause fanno'} circa l'80% del tempo perso (barre scure): è lì che conviene intervenire. La linea rossa è la percentuale cumulata.</p>
+      ${svg}
+      <div class="settings-grid" style="margin-top:14px;">
+        <div><h3 class="panel-subtitle">Per causa</h3><table><thead><tr><th>Causa</th><th>Fermi</th><th>Tempo</th><th>%</th><th>Cumul.</th></tr></thead><tbody>
+          ${byCause.map(c=>`<tr><td>${escHtml(c.key)}</td><td>${c.count}</td><td>${fmtMin(c.minutes)}</td><td>${c.pct.toFixed(1)}</td><td>${c.cumPct.toFixed(0)}%</td></tr>`).join('')}</tbody></table></div>
+        <div><h3 class="panel-subtitle">Per impianto</h3><table><thead><tr><th>Impianto</th><th>Fermi</th><th>Tempo</th><th>%</th><th>Prima causa</th></tr></thead><tbody>
+          ${byPlant.map(p=>{ const top = paretoOf(rows.filter(r=>(r.plant||'—')===p.key), r=>r.cause||'—')[0];
+            return `<tr><td class="plant">${escHtml(plantLabel(p.key))}</td><td>${p.count}</td><td>${fmtMin(p.minutes)}</td><td>${p.pct.toFixed(1)}</td><td>${escHtml(top.key)}</td></tr>`; }).join('')}</tbody></table></div>
+      </div>`;
+  }
+  if(list){
+    list.innerHTML = rows.length ? '<thead><tr><th>Data</th><th>Impianto</th><th>Turno</th><th>Causa</th><th>Tempo</th><th>Note</th><th></th></tr></thead><tbody>'
+      + rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td class="plant">${escHtml(plantLabel(r.plant))}</td><td>${r.turno?turnoLabel(r.turno):''}</td><td>${escHtml(r.cause)}</td><td>${fmtMin(r.minutes)}</td><td>${escHtml(r.note||'')}</td>
+        <td>${r.src==='registro'?`<button class="btn-danger" onclick="deleteDowntime('${r.id}')">rimuovi</button>`:'<span class="note">da manutenzione</span>'}</td></tr>`).join('') + '</tbody>'
+      : '<tr><td class="empty">Nessun fermo nel periodo.</td></tr>';
+  }
+  if(causesEl){
+    causesEl.innerHTML = DOWNTIME_CAUSES.map((c,i)=>`<div class="stat-bar-row"><div style="flex:1;">${escHtml(c)}</div>
+      <button class="btn-ghost" style="padding:3px 8px;" onclick="moveDowntimeCause(${i},-1)" title="Su">↑</button>
+      <button class="btn-ghost" style="padding:3px 8px;" onclick="moveDowntimeCause(${i},1)" title="Giù">↓</button>
+      <button class="btn-danger" onclick="removeDowntimeCause(${i})">togli</button></div>`).join('');
+  }
+}
+async function downloadDowntimeExcel(){
+  const rows = filteredDowntime();
+  const wb = new ExcelJS.Workbook();
+  const thin = {style:'thin', color:{argb:'FFE3E3E3'}};
+  const border = {top:thin, bottom:thin, left:thin, right:thin};
+  const head = (ws, labels) => labels.forEach((h,i)=>{ const c = ws.getCell(1,i+1); c.value = h; c.font = {name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'}}; c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF152233'}}; c.border = border; });
+  const put = (ws, r, vals) => vals.forEach((v,ci)=>{ const c = ws.getCell(r, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border; });
+  const ws1 = wb.addWorksheet('Fermi');
+  head(ws1, ['Data','Impianto','Turno','Causa','Minuti','Note','Origine']);
+  rows.forEach((r,i)=>put(ws1, i+2, [r.date, plantLabel(r.plant), r.turno||'', r.cause, Number(r.minutes), r.note||'', r.src]));
+  [12,11,7,34,9,40,13].forEach((w,i)=>ws1.getColumn(i+1).width = w);
+  const ws2 = wb.addWorksheet('Pareto cause');
+  head(ws2, ['Causa','Fermi','Minuti','Ore','%','% cumulata']);
+  paretoOf(rows, r=>r.cause||'—').forEach((c,i)=>put(ws2, i+2, [c.key, c.count, c.minutes, Math.round(c.minutes/6)/10, Math.round(c.pct*10)/10, Math.round(c.cumPct*10)/10]));
+  [34,8,10,8,8,12].forEach((w,i)=>ws2.getColumn(i+1).width = w);
+  const ws3 = wb.addWorksheet('Per impianto');
+  head(ws3, ['Impianto','Fermi','Minuti','Ore','%']);
+  paretoOf(rows, r=>r.plant||'—').forEach((c,i)=>put(ws3, i+2, [plantLabel(c.key), c.count, c.minutes, Math.round(c.minutes/6)/10, Math.round(c.pct*10)/10]));
+  const buffer = await wb.xlsx.writeBuffer();
+  downloadBlob(new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `fermi_macchina_${todayStr()}.xlsx`);
+  toast('Excel scaricato');
+}
+
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
 let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39, giornoPagaStipendio:6, giornoPagaTredicesima:15, oreTredicesima:173};
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
@@ -3810,6 +4268,7 @@ async function loadHoursData(){
   });
   if(moved){ saveMonthlyParamsData(); saveTredicesimeData(); }
   await loadHoursGoals();
+  await loadHoursExtra();
   renderHoursSettingsForm();
 }
 async function saveHoursSettingsData(){ try{ await storageSet('hours-settings', JSON.stringify(HOURS_SETTINGS)); }catch(e){} }
@@ -3853,8 +4312,9 @@ function timeToDecimal(hhmm){
 }
 function computeDailyHours(day){
   let tot = 0;
-  if(day.e1 && day.u1) tot += (timeToDecimal(day.u1) - timeToDecimal(day.e1));
-  if(day.e2 && day.u2) tot += (timeToDecimal(day.u2) - timeToDecimal(day.e2));
+  const span = (e,u) => { let d = timeToDecimal(u) - timeToDecimal(e); if(d < 0) d += 24; return d; }; // turno a cavallo della mezzanotte
+  if(day.e1 && day.u1) tot += span(day.e1, day.u1);
+  if(day.e2 && day.u2) tot += span(day.e2, day.u2);
   const max = HOURS_SETTINGS.oreOrdinarieMax;
   const ordinarie = Math.min(tot, max);
   let straord;
@@ -3955,7 +4415,7 @@ function renderTredicesimeTable(){
   if(!el) return;
   const years = tredicesimaYears().reverse();
   if(!years.length){ el.innerHTML = '<tr><td class="empty">Compare da sola appena c\'è almeno un mese dell\'anno.</td></tr>'; return; }
-  let html = '<thead><tr><th>Anno</th><th>Accredito</th><th>13ª lorda €</th><th>Aliquota IVS</th><th>IVS</th><th>IRPEF</th><th>Netto</th><th>Base della stima</th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Anno</th><th>Accredito</th><th>13ª lorda €</th><th>Aliquota IVS</th><th>IVS</th><th>IRPEF</th><th>Netto calcolato</th><th>Netto busta reale €</th><th>Scostamento</th><th>Base della stima</th></tr></thead><tbody>';
   years.forEach(y=>{
     const r = computeTredicesima(y);
     const t = TREDICESIME[y] || {};
@@ -3963,6 +4423,8 @@ function renderTredicesimeTable(){
       <td><input type="number" step="0.01" value="${t.lordo!=null?t.lordo:''}" placeholder="stima ${fmtEuro(r.media)}" style="width:120px; min-width:120px; padding:5px 6px;" onchange="editTredicesima('${y}','lordo',this.value)"></td>
       <td><input type="number" step="0.0001" value="${t.ivs!=null?t.ivs:''}" placeholder="${r.ivsAuto}" style="width:90px; min-width:90px; padding:5px 6px;" onchange="editTredicesima('${y}','ivs',this.value)"></td>
       <td>${fmtEuro(r.ivs)}</td><td>${fmtEuro(r.irpef)}</td><td><strong>${fmtEuro(r.netto)}</strong>${r.stimata?' <span class="note">(stima)</span>':''}</td>
+      <td><input type="number" step="0.01" value="${t.nettoReale!=null?t.nettoReale:''}" style="width:110px; min-width:110px; padding:5px 6px;" onchange="editTredicesima('${y}','nettoReale',this.value)"></td>
+      <td>${diffHtml(t.nettoReale, r.netto)}</td>
       <td class="note" style="margin:0;">${r.stimata ? (r.srcKey ? `${fmtEuro(r.pagaOraria)} €/h × ${r.oreTred} h (paga di ${r.srcKey})` : 'nessun mese da cui stimarla') : 'importo inserito a mano'}</td></tr>`;
   });
   el.innerHTML = html + '</tbody>';
@@ -3980,6 +4442,7 @@ function addDailyHours(){
     u2: document.getElementById('dhNewU2').value,
     manuale: document.getElementById('dhNewManual').value,
     ferie: document.getElementById('dhNewFerie').value,
+    ferieTipo: document.getElementById('dhNewFerieTipo').value,
   };
   ['dhNewE1','dhNewU1','dhNewE2','dhNewU2','dhNewManual','dhNewFerie'].forEach(id=>document.getElementById(id).value='');
   saveDailyHoursData();
@@ -4028,7 +4491,7 @@ function renderDailyHoursTable(){
     const calc = computeDailyHours(day);
     const importo = calc.straord * tariffaOrariaForDate(d);
     html += `<tr><td>${fmtDate(d)}</td><td>${day.e1||''}</td><td>${day.u1||''}</td><td>${day.e2||''}</td><td>${day.u2||''}</td>
-      <td>${fmtHours(calc.tot)}</td><td>${fmtHours(calc.ordinarie)}</td><td>${fmtHours(calc.straord)}</td><td>${fmtEuro(importo)}</td><td>${day.ferie||''}</td>
+      <td>${fmtHours(calc.tot)}</td><td>${fmtHours(calc.ordinarie)}</td><td>${fmtHours(calc.straord)}</td><td>${fmtEuro(importo)}</td><td>${day.ferie ? day.ferie + (day.ferieTipo==='rol'?' ROL':' ferie') : ''}</td>
       <td><button class="btn-danger" onclick="deleteDailyHours('${d}')">rimuovi</button></td></tr>`;
   });
   html += '</tbody>';
@@ -4101,6 +4564,7 @@ function quickAddMonth(){
 }
 // Campi modificabili direttamente in tabella: [campo, intestazione, tipo, step, larghezza]
 const MONTH_TABLE_FIELDS = [
+  ['nettoReale','Netto busta reale €','number','0.01',95],
   ['tariffa','Tariffa €/h','number','0.00001',90],
   ['giorni','Giorni','number','1',58],
   ['baseGiorno','Base/giorno €','number','0.01',85],
@@ -4120,9 +4584,44 @@ function editMonthlyParamsField(key, field, value){
   const s = computeMonthSummary(key);
   const cell = document.getElementById('mpNet_'+key);
   if(cell && s) cell.innerHTML = `<strong>${fmtEuro(s.nettoEffettivo)}</strong>`;
+  const dc = document.getElementById('mpDiff_'+key);
+  if(dc && s) dc.innerHTML = diffHtml(MONTHLY_PARAMS[key].nettoReale, s.nettoEffettivo);
+  renderRealVsCalcSummary();
   renderTredicesimeTable(); // la stima della 13ª dipende dai mesi
   renderCedolino();
   renderDashboardHoursTable();
+}
+/* ---------- Confronto con la busta reale ---------- */
+function realNet(v){ return (v !== '' && v != null && !isNaN(Number(v))) ? Number(v) : null; }
+function diffHtml(reale, calcolato){
+  const r = realNet(reale); if(r == null) return '<span class="note">—</span>';
+  const d = r - calcolato;
+  const col = Math.abs(d) < 5 ? 'var(--ok)' : 'var(--danger)';
+  return `<span style="color:${col}; font-weight:600;">${d>=0?'+':'−'}${fmtEuro(Math.abs(d))}</span>`;
+}
+// Scostamenti reale − calcolato: se vanno sempre nella stessa direzione suggerisce dove guardare
+function realVsCalcStats(){
+  const rows = Object.keys(MONTHLY_PARAMS).sort().map(k=>{
+    const r = realNet(MONTHLY_PARAMS[k].nettoReale); if(r == null) return null;
+    return {k, d: r - computeMonthSummary(k).nettoEffettivo};
+  }).filter(Boolean);
+  if(!rows.length) return null;
+  const avg = rows.reduce((s,x)=>s+x.d,0)/rows.length;
+  const allSame = rows.every(x=>x.d>0) || rows.every(x=>x.d<0);
+  const maxAbs = Math.max(...rows.map(x=>Math.abs(x.d)));
+  return {rows, avg, allSame, maxAbs};
+}
+function renderRealVsCalcSummary(){
+  const el = document.getElementById('realVsCalc'); if(!el) return;
+  const st = realVsCalcStats();
+  if(!st){ el.innerHTML = '<p class="note">Scrivi nella colonna <strong>Netto busta reale</strong> il netto vero di ogni busta: vedrai di quanto si scosta il calcolo e se c\'è un parametro da correggere.</p>'; return; }
+  let msg;
+  if(st.maxAbs < 5) msg = `<span class="flag ok">Allineato</span> Su ${st.rows.length} buste il calcolo sbaglia al massimo di ${fmtEuro(st.maxAbs)} €.`;
+  else if(st.allSame && st.rows.length>=2){
+    const dir = st.avg>0 ? 'più bassa' : 'più alta';
+    msg = `<span class="flag">Scostamento sistematico</span> Su ${st.rows.length} buste il calcolo è sempre ${st.avg>0?'più basso':'più alto'} del reale, in media di <strong>${fmtEuro(Math.abs(st.avg))} €</strong>. Se è costante, di solito è una trattenuta fissa ${dir} nel calcolo: controlla in Impostazioni generali la quota fissa IRPEF, l'addizionale regionale e il CRAL rispetto alla busta.`;
+  } else msg = `<span class="flag">Scostamento variabile</span> Su ${st.rows.length} buste la differenza va da un mese all'altro (fino a ${fmtEuro(st.maxAbs)} €): di solito sono voci una tantum (conguagli, arretrati, trattenute particolari) da inserire nel mese.`;
+  el.innerHTML = `<p style="margin:0 0 12px;">${msg}</p>`;
 }
 function deleteMonthlyParams(key){
   if(!confirm(`Rimuovere i parametri di ${key}?`)) return;
@@ -4134,11 +4633,12 @@ function renderMonthlyParamsTable(){
   const el = document.getElementById('monthlyParamsTable');
   renderNewMonthPreview();
   renderTredicesimeTable();
+  renderRealVsCalcSummary();
   if(!el) return;
   const keys = Object.keys(MONTHLY_PARAMS).sort().reverse();
   if(keys.length===0){ el.innerHTML = '<tr><td class="empty">Nessun mese inserito.</td></tr>'; return; }
   const cellStyle = w => `style="width:${w}px; min-width:${w}px; padding:5px 6px;"`;
-  let html = '<thead><tr><th>Mese</th><th>Tipo</th>' + MONTH_TABLE_FIELDS.map(f=>`<th>${f[1]}</th>`).join('') + '<th>Netto effettivo</th><th></th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Mese</th><th>Tipo</th>' + MONTH_TABLE_FIELDS.map(f=>`<th>${f[1]}</th>`).join('') + '<th>Netto calcolato</th><th>Scostamento</th><th></th></tr></thead><tbody>';
   keys.forEach(k=>{
     const p = MONTHLY_PARAMS[k];
     const s = computeMonthSummary(k);
@@ -4149,7 +4649,7 @@ function renderMonthlyParamsTable(){
       const ph = '';
       html += `<td><input type="${type}"${step?` step="${step}"`:''} value="${val}"${ph} ${cellStyle(w)} onchange="editMonthlyParamsField('${k}','${f}',this.value)"></td>`;
     });
-    html += `<td id="mpNet_${k}" style="white-space:nowrap;"><strong>${s?fmtEuro(s.nettoEffettivo):''}</strong></td>
+    html += `<td id="mpNet_${k}" style="white-space:nowrap;"><strong>${s?fmtEuro(s.nettoEffettivo):''}</strong></td><td id="mpDiff_${k}" style="white-space:nowrap;">${s?diffHtml(p.nettoReale, s.nettoEffettivo):''}</td>
       <td><button class="btn-danger" onclick="deleteMonthlyParams('${k}')">rimuovi</button></td></tr>`;
   });
   html += '</tbody>';
@@ -4187,6 +4687,7 @@ function renderCedolino(){
       <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">+ Rimb.730 = NETTO EFFETTIVO</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(s.nettoEffettivo)} €</div></div>
     </div>
     <p class="note" style="margin-top:8px;">Ore ordinarie: ${fmtHours(s.oreOrdinarie)} — Dato ${s.hasData?'calcolato dalle timbrature del mese':'stimato (nessuna timbratura ancora inserita per questo mese)'}.</p>
+    ${realNet(p.nettoReale)!=null ? `<div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">Netto busta reale</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700;">${fmtEuro(realNet(p.nettoReale))} € <span style="font-size:12px;">(${diffHtml(p.nettoReale, s.nettoEffettivo)})</span></div></div>` : ''}
     <p class="note" style="margin-top:4px;">Accredito previsto: <strong>${fmtDate(accreditoStipendio(key))}</strong>.</p>
   `;
 }
@@ -4200,6 +4701,7 @@ function renderCedolinoTredicesima(el, year){
     </div>
     <div class="range-sep">
       <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">NETTO 13ª</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(r.netto)} €</div></div>
+      ${realNet((TREDICESIME[year]||{}).nettoReale)!=null ? `<div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">Netto busta reale</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700;">${fmtEuro(realNet(TREDICESIME[year].nettoReale))} € <span style="font-size:12px;">(${diffHtml(TREDICESIME[year].nettoReale, r.netto)})</span></div></div>` : ''}
     </div>
     <p class="note" style="margin-top:8px;">Accredito previsto: <strong>${fmtDate(r.accredito)}</strong>. ${r.stimata ? (r.srcKey ? `Stima: paga oraria ordinaria ${fmtEuro(r.pagaOraria)} €/h (base/giorno di ${r.srcKey} ÷ ${HOURS_SETTINGS.oreOrdinarieMax} h) × ${r.oreTred} ore.` : 'Nessun mese dell\'anno da cui stimarla.') + ' Inserisci l\'importo vero in Parametri mensili → Tredicesima quando arriva la busta.' : 'Importo inserito a mano.'}</p>`;
 }
@@ -4212,19 +4714,21 @@ function renderDashboardHoursTable(){
   const rows = keys.map(k=>({k, d:accreditoStipendio(k), s:computeMonthSummary(k)}))
     .concat(tredicesimaYears().map(y=>({y, d:computeTredicesima(y).accredito, t:computeTredicesima(y)})))
     .sort((a,b)=>a.d.localeCompare(b.d));
-  let html = '<thead><tr><th>Voce</th><th>Accredito</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto effettivo</th><th>Netto cumulato</th></tr></thead><tbody>';
+  let html = '<thead><tr><th>Voce</th><th>Accredito</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto calcolato</th><th>Netto reale</th><th>Netto cumulato</th></tr></thead><tbody>';
   let cumulato = 0;
   rows.forEach(r=>{
     if(r.t){
-      cumulato += r.t.netto;
+      const real13 = realNet((TREDICESIME[r.y]||{}).nettoReale);
+      cumulato += real13 != null ? real13 : r.t.netto;
       html += `<tr style="background:var(--paper);"><td><strong>13ª ${r.y}</strong></td><td style="white-space:nowrap;">${fmtDate(r.d)}</td><td>${r.t.stimata?'Stima':'Reale'}</td><td></td><td></td><td></td>
-        <td>${fmtEuro(r.t.lordo)}</td><td>${fmtEuro(r.t.ivs+r.t.irpef)}</td><td><strong>${fmtEuro(r.t.netto)}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
+        <td>${fmtEuro(r.t.lordo)}</td><td>${fmtEuro(r.t.ivs+r.t.irpef)}</td><td>${fmtEuro(r.t.netto)}</td><td><strong>${real13!=null?fmtEuro(real13):''}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
       return;
     }
     const s = r.s, p = MONTHLY_PARAMS[r.k];
-    cumulato += s.nettoEffettivo;
+    const realM = realNet(p.nettoReale);
+    cumulato += realM != null ? realM : s.nettoEffettivo;
     html += `<tr><td><strong>${r.k}</strong></td><td style="white-space:nowrap;">${fmtDate(r.d)}</td><td>${p.tipo||''}</td><td>${fmtHours(s.oreOrdinarie)}</td><td>${fmtHours(s.oreStraord)}</td><td>${fmtEuro(s.importoStraord)}</td>
-      <td>${fmtEuro(s.totaleCompetenze)}</td><td>${fmtEuro(s.totaleTrattenute)}</td><td><strong>${fmtEuro(s.nettoEffettivo)}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
+      <td>${fmtEuro(s.totaleCompetenze)}</td><td>${fmtEuro(s.totaleTrattenute)}</td><td>${fmtEuro(s.nettoEffettivo)}</td><td><strong>${realM!=null?fmtEuro(realM):''}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
   });
   html += '</tbody>';
   el.innerHTML = html;
@@ -4254,7 +4758,7 @@ function goalParamsFor(monthKey){
   const prev = keys.filter(k=>k<monthKey);
   const src = prev.length ? prev[prev.length-1] : keys[0];
   // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio)
-  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:''});
+  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:'', nettoReale:''});
   p.giorni = workingDaysInMonth(monthKey);
   return {params:p, borrowed:src};
 }
@@ -4450,7 +4954,7 @@ async function downloadHoursExcel(){
   for(let c=2;c<=10;c++) wsDaily.getColumn(c).width = 11;
 
   const wsMonth = wb.addWorksheet('Parametri mensili');
-  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo'];
+  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo','Netto busta reale'];
   titleRow(wsMonth, monthHeaders.length, 'PARAMETRI MENSILI');
   headerRow(wsMonth, 2, monthHeaders);
   Object.keys(MONTHLY_PARAMS).sort().forEach((k,i)=>{
@@ -4458,7 +4962,7 @@ async function downloadHoursExcel(){
     const s = computeMonthSummary(k);
     const r = 3+i;
     [k, p.tipo||'', Number(p.tariffa)||0, Number(p.giorni)||0, Number(p.baseGiorno)||0, Number(p.ivs)||0, Number(p.premio)||0,
-     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo].forEach((v,ci)=>{
+     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo, realNet(p.nettoReale) ?? ''].forEach((v,ci)=>{
       const c = wsMonth.getCell(r, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
     });
   });
@@ -4481,6 +4985,425 @@ async function downloadHoursExcel(){
   const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   downloadBlob(new Blob([buffer], {type:mime}), `conteggio_ore_${todayStr()}.xlsx`);
   toast('Excel scaricato');
+}
+
+/* ============================= CONTEGGIO ORE · AGGIUNTE (ferie/ROL, conguaglio IRPEF, TFR, import timbrature) ============================= */
+let HOURS_EXTRA = {
+  leave:{ferieSaldo:'', rolSaldo:'', saldoData:'', ferieMese:13.33, rolMese:0},
+  tax:{}, // "YYYY" -> {altreDetrazioni}
+  tfr:{fondoIniziale:'', annoFondo:'', rivalutazione:2.0, includiStraord:false},
+};
+async function loadHoursExtra(){
+  try{ const r = await storageGet('hours-extra'); if(r){ const s = JSON.parse(r.value);
+    HOURS_EXTRA.leave = Object.assign(HOURS_EXTRA.leave, s.leave||{});
+    HOURS_EXTRA.tax = s.tax || {};
+    HOURS_EXTRA.tfr = Object.assign(HOURS_EXTRA.tfr, s.tfr||{}); } }catch(e){}
+}
+async function saveHoursExtra(){ try{ await storageSet('hours-extra', JSON.stringify(HOURS_EXTRA)); }catch(e){} }
+const numOr = (v, d) => (v === '' || v == null || isNaN(Number(v))) ? d : Number(v);
+
+/* ---------- Ferie e permessi (ROL) ---------- */
+// Saldo da busta alla data X (fine mese). Ogni fine mese successiva aggiunge la maturazione; le ore inserite nelle timbrature dopo X vengono scalate.
+function monthEndsBetween(fromDate, toDate){ // fine mese strettamente dopo fromDate e fino a toDate compreso
+  const out = []; if(!fromDate) return out;
+  let [y,m] = fromDate.slice(0,7).split('-').map(Number);
+  for(let guard=0; guard<600; guard++){
+    const end = `${y}-${String(m).padStart(2,'0')}-${String(new Date(y,m,0).getDate()).padStart(2,'0')}`;
+    if(end > toDate) break;
+    if(end > fromDate) out.push(end);
+    m++; if(m>12){ m=1; y++; }
+  }
+  return out;
+}
+function computeLeave(asOf){
+  const L = HOURS_EXTRA.leave;
+  asOf = asOf || todayStr();
+  const start = L.saldoData || '';
+  const used = {ferie:0, rol:0};
+  const byMonth = {};
+  Object.entries(DAILY_HOURS).forEach(([d,day])=>{
+    const h = Number(day.ferie)||0; if(!h) return;
+    if(start && d <= start) return;
+    const tipo = day.ferieTipo === 'rol' ? 'rol' : 'ferie';
+    if(d <= asOf) used[tipo] += h;
+    const mk = d.slice(0,7); byMonth[mk] = byMonth[mk] || {ferie:0, rol:0}; byMonth[mk][tipo] += h;
+  });
+  const ends = monthEndsBetween(start, asOf);
+  const ferieMese = numOr(L.ferieMese,0), rolMese = numOr(L.rolMese,0);
+  const ferie = numOr(L.ferieSaldo,0) + ends.length*ferieMese - used.ferie;
+  const rol = numOr(L.rolSaldo,0) + ends.length*rolMese - used.rol;
+  // proiezione al 31/12 dell'anno corrente (maturazione dei mesi che mancano, senza ferie future non ancora inserite)
+  const yEnd = asOf.slice(0,4)+'-12-31';
+  const restEnds = monthEndsBetween(asOf, yEnd).length;
+  const plannedAfter = {ferie:0, rol:0};
+  Object.entries(DAILY_HOURS).forEach(([d,day])=>{ if(d>asOf && d<=yEnd && Number(day.ferie)){ plannedAfter[day.ferieTipo==='rol'?'rol':'ferie'] += Number(day.ferie); } });
+  return {start, ends, used, ferie, rol, ferieMese, rolMese, byMonth,
+          ferieYearEnd: ferie + restEnds*ferieMese - plannedAfter.ferie, rolYearEnd: rol + restEnds*rolMese - plannedAfter.rol, plannedAfter};
+}
+const LEAVE_FIELDS = [
+  ['saldoData','Saldo riferito al','date'],
+  ['ferieSaldo','Saldo ferie in busta (h)','number'],
+  ['rolSaldo','Saldo ROL/permessi in busta (h)','number'],
+  ['ferieMese','Ferie maturate al mese (h)','number'],
+  ['rolMese','ROL maturati al mese (h)','number'],
+];
+function renderLeavePage(){
+  const g = document.getElementById('leaveSettingsGrid');
+  if(g) g.innerHTML = LEAVE_FIELDS.map(([k,l,t])=>`<div><label>${l}</label><input type="${t}" ${t==='number'?'step="0.01"':''} value="${HOURS_EXTRA.leave[k]??''}" onchange="HOURS_EXTRA.leave['${k}']=this.value; saveHoursExtra(); renderLeavePage();"></div>`).join('');
+  const el = document.getElementById('leaveResult'); if(!el) return;
+  const L = HOURS_EXTRA.leave;
+  if(!L.saldoData){ el.innerHTML = '<div class="card"><p class="empty">Inserisci la data e il saldo dell\'ultima busta paga per iniziare. Per le ore maturate al mese guarda la busta (es. 160 h di ferie l\'anno = 13,33 h al mese).</p></div>'; return; }
+  const r = computeLeave();
+  const days = h => fmtHours(h/(Number(HOURS_SETTINGS.oreOrdinarieMax)||8));
+  const kpi = (label, num, sub, cls) => `<div class="today-card ${cls||''}" style="cursor:default; min-height:110px;"><div class="tc-label">${label}</div><div class="tc-num">${num}</div><div class="tc-sub">${sub}</div></div>`;
+  let html = `<div class="today-grid" style="margin-bottom:18px;">
+    ${kpi('Ferie residue oggi', fmtHours(r.ferie)+' h', days(r.ferie)+' giorni', r.ferie<0?'':'good')}
+    ${kpi('ROL / permessi residui', fmtHours(r.rol)+' h', days(r.rol)+' giorni', r.rol<0?'':'good')}
+    ${kpi('Ferie al 31/12', fmtHours(r.ferieYearEnd)+' h', 'con la maturazione dei mesi che restano'+(r.plannedAfter.ferie?` e ${fmtHours(r.plannedAfter.ferie)} h già pianificate`:''))}
+    ${kpi('ROL al 31/12', fmtHours(r.rolYearEnd)+' h', 'stessa logica')}
+  </div>`;
+  const months = [...new Set([...Object.keys(r.byMonth), ...r.ends.map(e=>e.slice(0,7))])].sort();
+  if(months.length){
+    let sf = numOr(L.ferieSaldo,0), sr = numOr(L.rolSaldo,0);
+    html += `<div class="card"><h2><span class="n">2</span>Movimenti dal ${fmtDate(L.saldoData)}</h2><div class="table-scroll"><table><thead><tr><th>Mese</th><th>Ferie godute</th><th>ROL goduti</th><th>Ferie maturate</th><th>ROL maturati</th><th>Saldo ferie</th><th>Saldo ROL</th></tr></thead><tbody>`;
+    months.forEach(mk=>{
+      const u = r.byMonth[mk] || {ferie:0, rol:0};
+      const matured = r.ends.some(e=>e.slice(0,7)===mk);
+      sf += (matured?r.ferieMese:0) - u.ferie; sr += (matured?r.rolMese:0) - u.rol;
+      html += `<tr><td><strong>${mk}</strong></td><td>${u.ferie?fmtHours(u.ferie):''}</td><td>${u.rol?fmtHours(u.rol):''}</td><td>${matured?fmtHours(r.ferieMese):''}</td><td>${matured?fmtHours(r.rolMese):''}</td>
+        <td>${fmtHours(sf)}</td><td>${fmtHours(sr)}</td></tr>`;
+    });
+    html += '</tbody></table></div><p class="note" style="margin-top:8px;">Quando arriva una busta nuova puoi aggiornare saldo e data qui sopra: è il modo più semplice per riallinearti ai conti dell\'ufficio paghe.</p></div>';
+  }
+  el.innerHTML = html;
+}
+
+/* ---------- Conguaglio IRPEF di fine anno (regole 2026) ---------- */
+// Scaglioni 2026: 23% fino a 28.000, 33% fino a 50.000, 43% oltre.
+function irpefLorda(R){
+  let t = 0;
+  t += Math.min(R, 28000)*0.23;
+  if(R>28000) t += (Math.min(R,50000)-28000)*0.33;
+  if(R>50000) t += (R-50000)*0.43;
+  return Math.max(0,t);
+}
+// Detrazione lavoro dipendente (art. 13 TUIR), per anno intero
+function detrazioneLavoroDip(R){
+  let d = 0;
+  if(R<=15000) d = 1955;
+  else if(R<=28000) d = 1910 + 1190*(28000-R)/13000;
+  else if(R<=50000) d = 1910*(50000-R)/22000;
+  if(R>25000 && R<=35000) d += 65;
+  return Math.max(0,d);
+}
+// Taglio cuneo fiscale (L. 207/2024, confermato 2026): sotto 20.000 somma esente in % del reddito da lavoro, 20.000-40.000 ulteriore detrazione
+function cuneoFiscale(R){
+  if(R<=8500) return {sommaEsente:R*0.071, detrazione:0};
+  if(R<=15000) return {sommaEsente:R*0.053, detrazione:0};
+  if(R<=20000) return {sommaEsente:R*0.048, detrazione:0};
+  if(R<=32000) return {sommaEsente:0, detrazione:1000};
+  if(R<=40000) return {sommaEsente:0, detrazione:1000*(40000-R)/8000};
+  return {sommaEsente:0, detrazione:0};
+}
+function computeAnnualTax(year){
+  year = String(year);
+  const months = [];
+  let imponibile = 0, trattenuta = 0, conguagliPrecedenti = 0;
+  // Progressivi da busta (facoltativi): imponibile e IRPEF trattenuta da gennaio fino al mese indicato compreso
+  const tx = HOURS_EXTRA.tax[year] || {};
+  const prog = (tx.progMese && tx.progMese.slice(0,4)===year && realNet(tx.progImponibile)!=null && realNet(tx.progIrpef)!=null)
+    ? {mese:tx.progMese, imp:Number(tx.progImponibile), irpef:Number(tx.progIrpef)} : null;
+  if(prog){ imponibile += prog.imp; trattenuta += prog.irpef; }
+  for(let m=1; m<=12; m++){
+    const mk = `${year}-${String(m).padStart(2,'0')}`;
+    if(prog && mk <= prog.mese){ months.push({mk, daBusta:true}); continue; }
+    let params = MONTHLY_PARAMS[mk], stimato = false;
+    if(!params){ params = goalParamsFor(mk).params; stimato = true; }
+    if(!params){ months.push({mk, missing:true}); continue; }
+    const s = computeMonthSummary(mk, stimato ? {params} : undefined);
+    const rett = (params.rettifica !== '' && params.rettifica != null) ? Number(params.rettifica) : null;
+    const imp = rett != null ? rett : s.imponibileIrpef;
+    const cong = Number(params.conguaglio)||0;
+    // con i progressivi da busta, i mesi successivi usano l'aliquota effettiva reale (detrazioni comprese) invece della formula mensile
+    const irpefM = (prog && prog.imp > 0) ? imp * (prog.irpef/prog.imp) : s.irpef - cong;
+    imponibile += imp; trattenuta += irpefM; conguagliPrecedenti += cong;
+    months.push({mk, stimato, imp, irpef: irpefM});
+  }
+  const t = computeTredicesima(year);
+  const impTred = t.lordo - t.ivs;
+  const tredInProg = prog && prog.mese >= `${year}-12`; // i progressivi di dicembre comprendono già la 13ª
+  if(!tredInProg){ imponibile += impTred; trattenuta += t.irpef; }
+  const missing = months.filter(x=>x.missing).length;
+  const cf = cuneoFiscale(imponibile);
+  const R = imponibile; // reddito complessivo (solo lavoro dipendente)
+  const lorda = irpefLorda(R);
+  const detr = detrazioneLavoroDip(R);
+  const altre = numOr((HOURS_EXTRA.tax[year]||{}).altreDetrazioni, 0);
+  const netta = Math.max(0, lorda - detr - cf.detrazione - altre);
+  const conguaglio = trattenuta - netta; // >0 = rimborso, <0 = da pagare
+  // detrazione mensile "implicita" nella formula del cedolino: quota fissa vs 23% della soglia
+  const detrImplicitaMese = HOURS_SETTINGS.irpefSoglia*0.23 - HOURS_SETTINGS.irpefQuotaFissa;
+  return {year, months, missing, imponibile, trattenuta, impTred, tred:t, lorda, detr, cuneo:cf, altre, netta, conguaglio, conguagliPrecedenti,
+          stimati: months.filter(x=>x.stimato).map(x=>x.mk), prog, tredInProg, detrImplicitaMese};
+}
+function saveTaxForm(){
+  const y = document.getElementById('taxYear').value;
+  HOURS_EXTRA.tax[y] = Object.assign({}, HOURS_EXTRA.tax[y]||{}, {
+    altreDetrazioni: document.getElementById('taxOtherDed').value,
+    progMese: document.getElementById('taxProgMese').value,
+    progImponibile: document.getElementById('taxProgImp').value,
+    progIrpef: document.getElementById('taxProgIrpef').value,
+  });
+  saveHoursExtra(); renderTaxPage();
+}
+function renderTaxPage(){
+  const sel = document.getElementById('taxYear'), el = document.getElementById('taxResult');
+  if(!sel || !el) return;
+  const years = [...new Set(Object.keys(MONTHLY_PARAMS).map(k=>k.slice(0,4)))].sort();
+  if(!years.length){ el.innerHTML = '<div class="card"><p class="empty">Inserisci almeno un mese in Parametri mensili.</p></div>'; sel.innerHTML=''; return; }
+  const prev = sel.value;
+  sel.innerHTML = years.map(y=>`<option>${y}</option>`).join('');
+  sel.value = years.includes(prev) ? prev : (years.includes(todayStr().slice(0,4)) ? todayStr().slice(0,4) : years[years.length-1]);
+  const y = sel.value;
+  const tx = HOURS_EXTRA.tax[y]||{};
+  document.getElementById('taxOtherDed').value = tx.altreDetrazioni ?? '';
+  document.getElementById('taxProgMese').value = tx.progMese ?? '';
+  document.getElementById('taxProgImp').value = tx.progImponibile ?? '';
+  document.getElementById('taxProgIrpef').value = tx.progIrpef ?? '';
+  const r = computeAnnualTax(y);
+  const row = (l,v,b) => `<div class="stat-bar-row"><div class="stat-bar-label" style="width:280px;">${b?'<strong>'+l+'</strong>':l}</div><div style="flex:1; text-align:right;">${b?'<strong>'+fmtEuro(v)+' €</strong>':fmtEuro(v)+' €'}</div></div>`;
+  const good = r.conguaglio >= 0;
+  const warnDetr = !r.prog && r.detrImplicitaMese < 20 && r.detr > 0
+    ? `<div class="card" style="border-color:var(--danger);"><p style="margin:0;"><span class="flag">Attenzione</span> La formula IRPEF mensile del cedolino (Impostazioni generali: quota fissa ${fmtEuro(HOURS_SETTINGS.irpefQuotaFissa)} € = 23% della soglia) non contiene detrazioni. Se nella tua busta le detrazioni da lavoro dipendente vengono già applicate ogni mese, l'IRPEF trattenuta qui risulta più alta del vero e il conguaglio sotto è <strong>sovrastimato</strong>. Inserisci i progressivi dall'ultima busta qui sopra: il calcolo userà l'IRPEF realmente trattenuta.</p></div>` : '';
+  let html = warnDetr + `<div class="card">
+    <div class="today-grid" style="margin-bottom:16px;">
+      <div class="today-card ${good?'good':''}" style="cursor:default; min-height:110px;"><div class="tc-label">Conguaglio stimato</div><div class="tc-num" style="color:${good?'var(--ok)':'var(--danger)'};">${good?'+':'−'} ${fmtEuro(Math.abs(r.conguaglio))} €</div><div class="tc-sub">${good?'a tuo favore (rimborso in busta)':'a debito (trattenuta in busta)'}</div></div>
+      <div class="today-card" style="cursor:default; min-height:110px;"><div class="tc-label">Reddito imponibile annuo</div><div class="tc-num">${fmtEuro(r.imponibile)} €</div><div class="tc-sub">stipendi + 13ª, al netto dei contributi</div></div>
+    </div>
+    <div class="settings-grid">
+      <div><h3 class="panel-subtitle">IRPEF dovuta sull'anno</h3>
+        ${row('IRPEF lorda (23% / 33% / 43%)', r.lorda)}
+        ${row('− Detrazione lavoro dipendente', r.detr)}
+        ${r.cuneo.detrazione ? row('− Ulteriore detrazione cuneo fiscale', r.cuneo.detrazione) : ''}
+        ${r.altre ? row('− Altre detrazioni', r.altre) : ''}
+        ${row('IRPEF netta dovuta', r.netta, true)}
+      </div>
+      <div><h3 class="panel-subtitle">IRPEF trattenuta</h3>
+        ${r.prog ? row(`Da busta, gennaio → ${r.prog.mese}`, r.prog.irpef) : ''}
+        ${row(r.prog ? 'Stipendi dei mesi successivi (stima)' : 'Trattenuta sugli stipendi', r.trattenuta - (r.prog?r.prog.irpef:0) - (r.tredInProg?0:r.tred.irpef))}
+        ${r.tredInProg ? '' : row('Trattenuta sulla 13ª', r.tred.irpef)}
+        ${row('Totale trattenuto', r.trattenuta, true)}
+      </div>
+    </div>
+    ${r.cuneo.sommaEsente ? `<p class="note" style="margin-top:10px;">Con questo reddito spetta anche la somma esente del cuneo fiscale (circa ${fmtEuro(r.cuneo.sommaEsente)} € l'anno), che arriva in busta come voce a parte e non è conteggiata qui.</p>` : ''}
+    <p class="note" style="margin-top:10px;">${r.stimati.length ? `Mesi stimati (non ancora inseriti): ${r.stimati.join(', ')}. ` : ''}${r.tred.stimata ? 'La 13ª è ancora stimata. ' : ''}${r.conguagliPrecedenti ? `I conguagli già inseriti nei mesi (${fmtEuro(r.conguagliPrecedenti)} €, es. 730) sono esclusi: riguardano altri anni. ` : ''}${r.prog ? `I mesi dopo ${r.prog.mese} usano l'aliquota effettiva dei progressivi (${(r.prog.irpef/r.prog.imp*100).toFixed(1)}%). ` : ''}Esclusi addizionali regionale/comunale e altri redditi (case, secondo lavoro). È una stima: il conguaglio vero lo fa l'ufficio paghe sui dati effettivi.</p>
+  </div>`;
+  html += `<div class="card"><h2><span class="n">2</span>Dettaglio mesi</h2><div class="table-scroll"><table><thead><tr><th>Mese</th><th>Imponibile IRPEF</th><th>IRPEF trattenuta</th><th></th></tr></thead><tbody>
+    ${r.prog ? `<tr><td><strong>gen → ${r.prog.mese.slice(5)}</strong></td><td>${fmtEuro(r.prog.imp)}</td><td>${fmtEuro(r.prog.irpef)}</td><td><span class="note">progressivi da busta</span></td></tr>` : ''}
+    ${r.months.filter(m=>!m.daBusta).map(m=>m.missing?`<tr><td>${m.mk}</td><td colspan="3" class="note">nessun dato</td></tr>`:`<tr><td><strong>${m.mk}</strong></td><td>${fmtEuro(m.imp)}</td><td>${fmtEuro(m.irpef)}</td><td>${m.stimato?'<span class="note">stima</span>':''}</td></tr>`).join('')}
+    ${r.tredInProg ? '' : `<tr><td><strong>13ª</strong></td><td>${fmtEuro(r.impTred)}</td><td>${fmtEuro(r.tred.irpef)}</td><td>${r.tred.stimata?'<span class="note">stima</span>':''}</td></tr>`}
+  </tbody></table></div></div>`;
+  el.innerHTML = html;
+}
+
+/* ---------- TFR maturato ---------- */
+function computeTfr(year){
+  year = String(year);
+  const T = HOURS_EXTRA.tfr;
+  const months = [];
+  let utileAnno = 0;
+  for(let m=1; m<=12; m++){
+    const mk = `${year}-${String(m).padStart(2,'0')}`;
+    let p = MONTHLY_PARAMS[mk], stimato = false;
+    if(!p){ p = goalParamsFor(mk).params; stimato = true; } // mese non inserito: stimato dall'ultimo disponibile
+    if(!p) continue;
+    const s = computeMonthSummary(mk, stimato ? {params:p} : undefined);
+    const utile = s.ordinarieEuro + (Number(p.premio)||0) + (T.includiStraord ? s.importoStraord : 0);
+    utileAnno += utile;
+    months.push({mk, utile, quota: utile/13.5 - utile*0.005, tipo: stimato ? 'Stima' : p.tipo, stimato});
+  }
+  const t = computeTredicesima(year);
+  const utileTot = utileAnno + t.lordo;
+  const quotaTred = t.lordo/13.5 - t.lordo*0.005;
+  const quotaAnno = months.reduce((s,x)=>s+x.quota,0) + quotaTred;
+  const fondo = numOr(T.fondoIniziale, 0);
+  const fondoValido = T.annoFondo ? String(Number(T.annoFondo)+1) === year : true; // il fondo inserito è al 31/12 dell'anno prima
+  const rival = fondoValido ? fondo * (numOr(T.rivalutazione,0)/100) : 0;
+  // rivalutazione: tassata all'17% (imposta sostitutiva) trattenuta dall'azienda
+  const impSost = rival * 0.17;
+  return {year, months, utileAnno, utileTot, tred:t, quotaTred, quotaAnno, fondo: fondoValido?fondo:0, fondoValido, rival, impSost,
+          fondoFine: (fondoValido?fondo:0) + rival - impSost + quotaAnno};
+}
+const TFR_FIELDS = [
+  ['fondoIniziale','TFR accantonato al 31/12 (€)','number','0.01'],
+  ['annoFondo','…dell\'anno','number','1'],
+  ['rivalutazione','Rivalutazione annua stimata (%)','number','0.1'],
+];
+function renderTfrPage(){
+  const g = document.getElementById('tfrSettingsGrid');
+  if(g){
+    g.innerHTML = TFR_FIELDS.map(([k,l,t,st])=>`<div><label>${l}</label><input type="${t}" step="${st}" value="${HOURS_EXTRA.tfr[k]??''}" onchange="HOURS_EXTRA.tfr['${k}']=this.value; saveHoursExtra(); renderTfrPage();"></div>`).join('')
+      + `<div><label style="display:flex; align-items:center; gap:6px; white-space:nowrap;"><input type="checkbox" style="width:auto;" ${HOURS_EXTRA.tfr.includiStraord?'checked':''} onchange="HOURS_EXTRA.tfr.includiStraord=this.checked; saveHoursExtra(); renderTfrPage();"> Includi gli straordinari</label></div>`;
+  }
+  const el = document.getElementById('tfrResult'); if(!el) return;
+  const years = [...new Set(Object.keys(MONTHLY_PARAMS).map(k=>k.slice(0,4)))].sort().reverse();
+  if(!years.length){ el.innerHTML = '<div class="card"><p class="empty">Inserisci almeno un mese in Parametri mensili.</p></div>'; return; }
+  let html = '';
+  years.forEach((y,i)=>{
+    const r = computeTfr(y);
+    html += `<div class="card"><h2><span class="n">${i+2}</span>TFR ${y}</h2>
+      <div class="today-grid" style="margin-bottom:14px;">
+        <div class="today-card" style="cursor:default; min-height:100px;"><div class="tc-label">Quota maturata nell'anno</div><div class="tc-num">${fmtEuro(r.quotaAnno)} €</div><div class="tc-sub">${r.months.filter(m=>!m.stimato).length} mesi inseriti${r.months.some(m=>m.stimato)?`, ${r.months.filter(m=>m.stimato).length} stimati`:''} + 13ª</div></div>
+        ${r.fondo ? `<div class="today-card" style="cursor:default; min-height:100px;"><div class="tc-label">Rivalutazione fondo</div><div class="tc-num">${fmtEuro(r.rival - r.impSost)} €</div><div class="tc-sub">${fmtEuro(r.rival)} € lordi − 17% imposta sostitutiva</div></div>
+        <div class="today-card good" style="cursor:default; min-height:100px;"><div class="tc-label">TFR stimato al 31/12/${y}</div><div class="tc-num">${fmtEuro(r.fondoFine)} €</div><div class="tc-sub">fondo ${fmtEuro(r.fondo)} € + rivalutazione + quota</div></div>` : ''}
+      </div>
+      <div class="table-scroll"><table><thead><tr><th>Mese</th><th>Retribuzione utile</th><th>Quota TFR</th></tr></thead><tbody>
+        ${r.months.map(m=>`<tr><td>${m.mk}${m.tipo==='Stima'?' <span class="note">(stima)</span>':''}</td><td>${fmtEuro(m.utile)}</td><td>${fmtEuro(m.quota)}</td></tr>`).join('')}
+        <tr><td>13ª${r.tred.stimata?' <span class="note">(stima)</span>':''}</td><td>${fmtEuro(r.tred.lordo)}</td><td>${fmtEuro(r.quotaTred)}</td></tr>
+        <tr><td><strong>Totale</strong></td><td><strong>${fmtEuro(r.utileTot)}</strong></td><td><strong>${fmtEuro(r.quotaAnno)}</strong></td></tr>
+      </tbody></table></div>
+      ${!r.fondoValido && numOr(HOURS_EXTRA.tfr.fondoIniziale,0) ? `<p class="note" style="margin-top:8px;">Il fondo inserito è al 31/12/${HOURS_EXTRA.tfr.annoFondo}: per quest'anno mostro solo la quota maturata.</p>` : ''}
+    </div>`;
+  });
+  html += `<p class="note">Retribuzione utile: paga ordinaria + premi + 13ª${HOURS_EXTRA.tfr.includiStraord ? ' + straordinari' : ''}. Molti contratti escludono gli straordinari dal TFR: controlla il tuo. Se il TFR va a un fondo pensione, quello che conta è la quota annua (il fondo lo gestisce il fondo stesso). La rivalutazione vera dipende dall'inflazione ISTAT di dicembre: aggiorna la percentuale quando la trovi in busta.</p>`;
+  el.innerHTML = html;
+}
+
+/* ---------- Import timbrature da file del sistema presenze ---------- */
+let HOURS_IMPORT = null; // {days:{date:{times:[...]}}, file}
+function pad2(n){ return String(n).padStart(2,'0'); }
+// Riconosce una data in vari formati: Date, numero seriale Excel, "gg/mm/aaaa", "aaaa-mm-gg", "gg-mm-aa", "gg.mm.aaaa"
+function parseImportDate(v){
+  if(v == null || v === '') return null;
+  if(v instanceof Date && !isNaN(v)){
+    if(v.getUTCFullYear() < 1950) return null; // è un orario
+    return `${v.getUTCFullYear()}-${pad2(v.getUTCMonth()+1)}-${pad2(v.getUTCDate())}`;
+  }
+  if(typeof v === 'number'){
+    if(v > 20000 && v < 80000){ const d = new Date(Math.round((v - 25569)*86400000)); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth()+1)}-${pad2(d.getUTCDate())}`; }
+    return null;
+  }
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m) return `${m[1]}-${pad2(m[2])}-${pad2(m[3])}`;
+  m = s.match(/^(?:[a-zA-Zàèéìòù]{2,10}\.?\s+)?(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})\b/);
+  if(m){ let y = Number(m[3]); if(y<100) y += 2000; const mo = Number(m[2]), d = Number(m[1]); if(mo>=1 && mo<=12 && d>=1 && d<=31) return `${y}-${pad2(mo)}-${pad2(d)}`; }
+  return null;
+}
+// Riconosce un orario: Date con anno 1899/1900, frazione di giorno, "8:05", "08.05", "8:05:30"
+function parseImportTime(v){
+  if(v == null || v === '') return null;
+  if(v instanceof Date && !isNaN(v)){
+    if(v.getUTCFullYear() >= 1950) return null;
+    return `${pad2(v.getUTCHours())}:${pad2(v.getUTCMinutes())}`;
+  }
+  if(typeof v === 'number'){
+    if(v > 0 && v < 1){ const min = Math.round(v*1440); return `${pad2(Math.floor(min/60)%24)}:${pad2(min%60)}`; }
+    return null;
+  }
+  const s = String(v).trim();
+  const m = s.match(/^(\d{1,2})[:.](\d{2})(?::\d{2})?$/);
+  if(m && Number(m[1])<24 && Number(m[2])<60) return `${pad2(m[1])}:${m[2]}`;
+  return null;
+}
+// Da un elenco di righe (array di celle) ricava i giorni con le relative timbrature
+function parseHoursRows(rows){
+  const days = {};
+  let lastDate = null;
+  rows.forEach(cells=>{
+    let date = null; const times = [];
+    cells.forEach(c=>{
+      if(c && typeof c === 'object' && !(c instanceof Date)){ c = c.result ?? c.text ?? (c.richText ? c.richText.map(x=>x.text).join('') : null); }
+      if(!date){ const d = parseImportDate(c); if(d){ date = d; return; } }
+      // una cella con data e ora insieme (es. "06/10/2026 07:58")
+      if(typeof c === 'string'){
+        const dm = c.match(/^(.+?)[ T](\d{1,2}[:.]\d{2}(?::\d{2})?)$/);
+        if(dm){ const d = parseImportDate(dm[1]); const t = parseImportTime(dm[2]); if(d && t){ if(!date) date = d; times.push(t); return; } }
+      }
+      const t = parseImportTime(c); if(t) times.push(t);
+    });
+    if(!date && times.length && lastDate) date = lastDate; // righe di continuazione senza data
+    if(!date || !times.length) return;
+    lastDate = date;
+    (days[date] = days[date] || {times:[]}).times.push(...times);
+  });
+  // ordina e accoppia: 1ª entrata/uscita e 2ª entrata/uscita; se più di 4 timbrature, la 2ª uscita è l'ultima
+  Object.values(days).forEach(d=>{
+    const t = [...new Set(d.times)].sort();
+    d.e1 = t[0] || ''; d.u1 = t[1] || ''; d.e2 = t[2] || ''; d.u2 = t.length>3 ? t[t.length-1] : '';
+    if(t.length===3){ d.warn = 'timbratura dispari: controlla'; }
+    if(t.length>4){ d.warn = `${t.length} timbrature: tenute la 1ª, 2ª, 3ª e l'ultima`; }
+    d.times = t;
+  });
+  return days;
+}
+function splitCsvLine(line, sep){
+  const out = []; let cur = '', q = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(ch === '"'){ if(q && line[i+1]==='"'){ cur+='"'; i++; } else q = !q; }
+    else if(ch === sep && !q){ out.push(cur); cur=''; }
+    else cur += ch;
+  }
+  out.push(cur); return out.map(s=>s.trim());
+}
+function parseCsvText(text){
+  const lines = text.replace(/\r/g,'').split('\n').filter(l=>l.trim());
+  const first = lines.slice(0,10).join('\n');
+  const sep = [';','\t',','].sort((a,b)=>first.split(b).length - first.split(a).length)[0];
+  return lines.map(l=>splitCsvLine(l, sep));
+}
+async function readHoursImportFile(event){
+  const f = event.target.files[0]; if(!f) return;
+  let rows = [];
+  try{
+    if(/\.xlsx$/i.test(f.name)){
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(await f.arrayBuffer());
+      wb.worksheets.forEach(ws=>ws.eachRow({includeEmpty:false}, row=>{ const vals = row.values.slice(1); rows.push(vals); }));
+    } else {
+      rows = parseCsvText(await f.text());
+    }
+  }catch(e){ toast('File non leggibile: salvalo come .xlsx o .csv'); return; }
+  HOURS_IMPORT = {file:f.name, days: parseHoursRows(rows)};
+  renderHoursImportPreview();
+}
+function renderHoursImportPreview(){
+  const el = document.getElementById('importHoursPreview'); if(!el) return;
+  if(!HOURS_IMPORT){ el.innerHTML = ''; return; }
+  const dates = Object.keys(HOURS_IMPORT.days).sort();
+  if(!dates.length){ el.innerHTML = '<div class="card"><p class="empty">Non ho trovato righe con una data e almeno un orario. Se il file ha un formato particolare, mandamelo (anche con i nomi cancellati) e lo faccio riconoscere.</p></div>'; return; }
+  const ow = document.getElementById('importHoursOverwrite').checked;
+  const nNew = dates.filter(d=>!DAILY_HOURS[d]).length, nOld = dates.length - nNew;
+  let html = `<div class="card"><h2><span class="n">1</span>Anteprima · ${escHtml(HOURS_IMPORT.file)}</h2>
+    <p>${dates.length} giorni trovati (${fmtDate(dates[0])} → ${fmtDate(dates[dates.length-1])}): <strong>${nNew}</strong> nuovi, ${nOld} già inseriti${nOld?(ow?' (verranno <strong>sovrascritti</strong>)':' (verranno lasciati com\'erano)'):''}.</p>
+    <div class="btn-row"><button class="btn-primary" onclick="confirmHoursImport()">Importa ${ow?dates.length:nNew} giorni</button></div>
+    <div class="table-scroll" style="margin-top:10px;"><table><thead><tr><th>Data</th><th>Entr.1</th><th>Usc.1</th><th>Entr.2</th><th>Usc.2</th><th>Ore tot.</th><th>Stato</th></tr></thead><tbody>`;
+  dates.forEach(d=>{
+    const x = HOURS_IMPORT.days[d];
+    const calc = computeDailyHours({e1:x.e1,u1:x.u1,e2:x.e2,u2:x.u2,manuale:''});
+    const stato = DAILY_HOURS[d] ? (ow?'<span class="flag">sovrascrive</span>':'<span class="note">già presente</span>') : '<span class="flag ok">nuovo</span>';
+    html += `<tr><td>${fmtDate(d)}</td><td>${x.e1}</td><td>${x.u1}</td><td>${x.e2}</td><td>${x.u2}</td><td>${fmtHours(calc.tot)}</td><td>${stato}${x.warn?` <span class="flag">${x.warn}</span>`:''}</td></tr>`;
+  });
+  el.innerHTML = html + '</tbody></table></div></div>';
+}
+function confirmHoursImport(){
+  if(!HOURS_IMPORT) return;
+  const ow = document.getElementById('importHoursOverwrite').checked;
+  let n = 0; const months = new Set();
+  Object.entries(HOURS_IMPORT.days).forEach(([d,x])=>{
+    if(DAILY_HOURS[d] && !ow) return;
+    const prev = DAILY_HOURS[d] || {};
+    DAILY_HOURS[d] = {e1:x.e1, u1:x.u1, e2:x.e2, u2:x.u2, manuale: prev.manuale||'', ferie: prev.ferie||'', ferieTipo: prev.ferieTipo||'ferie'};
+    months.add(d.slice(0,7)); n++;
+  });
+  saveDailyHoursData();
+  let created = 0;
+  if(Object.keys(MONTHLY_PARAMS).length) months.forEach(mk=>{ if(!MONTHLY_PARAMS[mk]){ createMonthParams(mk); created++; } });
+  HOURS_IMPORT = null; document.getElementById('importHoursFile').value = '';
+  renderHoursImportPreview(); renderHoursPage();
+  toast(`${n} giorni importati` + (created?` · ${created} mesi creati`:''));
+  showPage('panel-hours');
 }
 
 async function loadRoster(){
@@ -5662,7 +6585,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup'];
 function showPage(id){
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
@@ -5690,6 +6613,12 @@ function showPage(id){
   if(id==='panel-hours-months'){ populateMonthFilterSelectors(); renderMonthlyParamsTable(); }
   if(id==='panel-hours-dashboard') renderDashboardHoursTable();
   if(id==='panel-hours-goal') loadGoalForm();
+  if(id==='panel-hours-leave') renderLeavePage();
+  if(id==='panel-hours-tax') renderTaxPage();
+  if(id==='panel-hours-tfr') renderTfrPage();
+  if(id==='panel-hours-import') renderHoursImportPreview();
+  if(id==='panel-skills') renderSkillsPage();
+  if(id==='panel-downtime') renderDowntimePage();
 }
 function showProposalPanel(hasData){
   document.getElementById('proposalEmpty').style.display = hasData ? 'none' : 'block';
@@ -5710,7 +6639,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-19 · export operatori senza motivi v11';
+const APP_VERSION = '2026-10-22 · competenze, fermi, ferie, IRPEF, TFR, import v12';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -5748,6 +6677,8 @@ async function startApp(){
   loadProductionStats();
   loadOperatorRecords();
   loadHoursData();
+  loadSkills();
+  loadDowntime();
   renderHomeBanner();
 }
 

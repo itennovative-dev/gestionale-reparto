@@ -7,3 +7,5 @@
 !firestore.rules
 !.github/
 !.github/**
+!tests/
+!tests/*.test.mjs

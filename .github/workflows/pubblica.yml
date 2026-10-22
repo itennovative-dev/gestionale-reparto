@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test dei calcoli (se fallisce, il sito non viene aggiornato)
+        run: node tests/calcoli.test.mjs
+
       - name: Prepara la cartella del sito (solo index.html, nessun documento)
         run: |
           mkdir -p public
