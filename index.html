@@ -608,7 +608,7 @@
     </div>
     <div class="card">
       <h2><span class="n">3</span>Tredicesima</h2>
-      <p class="note">Mensilità a parte, con il suo accredito (giorno impostabile in Impostazioni generali). Un rigo per anno, compare da solo. Se lasci vuota la 13ª lorda viene stimata come media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno; quando arriva la busta vera scrivi l'importo. IRPEF all'aliquota marginale, senza detrazioni.</p>
+      <p class="note">Mensilità a parte, con il suo accredito (giorno impostabile in Impostazioni generali). Un rigo per anno, compare da solo. Se lasci vuota la 13ª lorda viene stimata come paga oraria ordinaria × 173 ore (divisore modificabile in Impostazioni generali), senza straordinari e premi; quando arriva la busta vera scrivi l'importo. IRPEF all'aliquota marginale, senza detrazioni.</p>
       <div class="table-scroll"><table id="tredicesimeTable"></table></div>
     </div>
   </div>
@@ -3791,7 +3791,7 @@ async function downloadTurnoExcel(){
 }
 
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
-let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39, giornoPagaStipendio:6, giornoPagaTredicesima:15};
+let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39, giornoPagaStipendio:6, giornoPagaTredicesima:15, oreTredicesima:173};
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
 let MONTHLY_PARAMS = {}; // "YYYY-MM" -> {tipo,tariffa,giorni,baseGiorno,ivs,etichettaPremio,premio,conguaglio,rettifica,rimborso730,stimaStraord}
 
@@ -3827,6 +3827,7 @@ const HOURS_SETTINGS_FIELDS = [
   ['irpefQuotaFissa','IRPEF - quota fissa (€)'],
   ['giornoPagaStipendio','Giorno di accredito stipendio (del mese dopo)'],
   ['giornoPagaTredicesima','Giorno di accredito 13ª (a dicembre)'],
+  ['oreTredicesima','13ª - ore di paga ordinaria (divisore contratto)'],
 ];
 function renderHoursSettingsForm(){
   const el = document.getElementById('hoursSettingsGrid');
@@ -3915,15 +3916,19 @@ function tredicesimaYears(){
   Object.keys(TREDICESIME).forEach(y=>ys.add(y));
   return [...ys].sort();
 }
-// Stima: media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno, preferendo quelli "Reale".
-// IVS con l'aliquota dell'ultimo mese dell'anno, IRPEF all'aliquota marginale senza detrazioni, niente CRAL/addizionale.
+// Stima: paga oraria ordinaria (base/giorno ÷ ore ordinarie/giorno, dall'ultimo mese dell'anno) × ore del divisore contrattuale (default 173).
+// Non dipende dai giorni lavorativi dei singoli mesi (agosto, fermi). IVS con l'aliquota dell'ultimo mese, IRPEF marginale senza detrazioni.
 function computeTredicesima(year){
   year = String(year);
   const t = TREDICESIME[year] || {};
   const keys = Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(0,4)===year).sort();
-  const reali = keys.filter(k=>MONTHLY_PARAMS[k].tipo==='Reale');
-  const mesi = (reali.length ? reali : keys).slice(-6);
-  const media = mesi.length ? mesi.reduce((s,k)=>s + (Number(MONTHLY_PARAMS[k].giorni)||0)*(Number(MONTHLY_PARAMS[k].baseGiorno)||0), 0)/mesi.length : 0;
+  const withBase = keys.filter(k=>Number(MONTHLY_PARAMS[k].baseGiorno)>0);
+  const srcKey = withBase.length ? withBase[withBase.length-1] : null;
+  const oreGiorno = Number(HOURS_SETTINGS.oreOrdinarieMax)||8;
+  const oreTred = Number(HOURS_SETTINGS.oreTredicesima)||173;
+  const pagaOraria = srcKey ? Number(MONTHLY_PARAMS[srcKey].baseGiorno)/oreGiorno : 0;
+  const media = pagaOraria * oreTred; // stima automatica
+  const mesi = srcKey ? [srcKey] : [];
   const manual = (t.lordo !== '' && t.lordo != null && !isNaN(Number(t.lordo))) ? Number(t.lordo) : null;
   const lordo = manual != null ? manual : media;
   const ivsAuto = keys.length ? (Number(MONTHLY_PARAMS[keys[keys.length-1]].ivs)||0) : 0;
@@ -3932,7 +3937,7 @@ function computeTredicesima(year){
   const irpef = (lordo - ivs) * HOURS_SETTINGS.irpefAliquota;
   const netto = lordo - ivs - irpef;
   const accredito = `${year}-12-${String(HOURS_SETTINGS.giornoPagaTredicesima||15).padStart(2,'0')}`;
-  return {year, lordo, stimata: manual == null, mesi, media, aliqIvs, ivsAuto, ivs, irpef, netto, accredito};
+  return {year, lordo, stimata: manual == null, mesi, media, pagaOraria, oreTred, srcKey, aliqIvs, ivsAuto, ivs, irpef, netto, accredito};
 }
 // Data di accredito dello stipendio di un mese: il giorno X del mese successivo
 function accreditoStipendio(monthKey){
@@ -3958,7 +3963,7 @@ function renderTredicesimeTable(){
       <td><input type="number" step="0.01" value="${t.lordo!=null?t.lordo:''}" placeholder="stima ${fmtEuro(r.media)}" style="width:120px; min-width:120px; padding:5px 6px;" onchange="editTredicesima('${y}','lordo',this.value)"></td>
       <td><input type="number" step="0.0001" value="${t.ivs!=null?t.ivs:''}" placeholder="${r.ivsAuto}" style="width:90px; min-width:90px; padding:5px 6px;" onchange="editTredicesima('${y}','ivs',this.value)"></td>
       <td>${fmtEuro(r.ivs)}</td><td>${fmtEuro(r.irpef)}</td><td><strong>${fmtEuro(r.netto)}</strong>${r.stimata?' <span class="note">(stima)</span>':''}</td>
-      <td class="note" style="margin:0;">${r.stimata ? (r.mesi.length ? `media di ${r.mesi.join(', ')}` : 'nessun mese da cui stimarla') : 'importo inserito a mano'}</td></tr>`;
+      <td class="note" style="margin:0;">${r.stimata ? (r.srcKey ? `${fmtEuro(r.pagaOraria)} €/h × ${r.oreTred} h (paga di ${r.srcKey})` : 'nessun mese da cui stimarla') : 'importo inserito a mano'}</td></tr>`;
   });
   el.innerHTML = html + '</tbody>';
 }
@@ -4196,7 +4201,7 @@ function renderCedolinoTredicesima(el, year){
     <div class="range-sep">
       <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">NETTO 13ª</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(r.netto)} €</div></div>
     </div>
-    <p class="note" style="margin-top:8px;">Accredito previsto: <strong>${fmtDate(r.accredito)}</strong>. ${r.stimata ? (r.mesi.length ? `Stima: media della retribuzione ordinaria di ${r.mesi.join(', ')}.` : 'Nessun mese dell\'anno da cui stimarla.') + ' Inserisci l\'importo vero in Parametri mensili → Tredicesima quando arriva la busta.' : 'Importo inserito a mano.'}</p>`;
+    <p class="note" style="margin-top:8px;">Accredito previsto: <strong>${fmtDate(r.accredito)}</strong>. ${r.stimata ? (r.srcKey ? `Stima: paga oraria ordinaria ${fmtEuro(r.pagaOraria)} €/h (base/giorno di ${r.srcKey} ÷ ${HOURS_SETTINGS.oreOrdinarieMax} h) × ${r.oreTred} ore.` : 'Nessun mese dell\'anno da cui stimarla.') + ' Inserisci l\'importo vero in Parametri mensili → Tredicesima quando arriva la busta.' : 'Importo inserito a mano.'}</p>`;
 }
 function renderDashboardHoursTable(){
   const el = document.getElementById('dashboardHoursTable');
@@ -4466,7 +4471,7 @@ async function downloadHoursExcel(){
   headerRow(wsTred, 2, tredHeaders);
   tredicesimaYears().forEach((y,i)=>{
     const t = computeTredicesima(y);
-    [y, t.accredito, t.stimata?'Stima':'Reale', t.lordo, t.aliqIvs, t.ivs, t.irpef, t.netto, t.stimata ? t.mesi.join(', ') : 'importo reale'].forEach((v,ci)=>{
+    [y, t.accredito, t.stimata?'Stima':'Reale', t.lordo, t.aliqIvs, t.ivs, t.irpef, t.netto, t.stimata ? (t.srcKey ? `${t.pagaOraria.toFixed(4)} €/h × ${t.oreTred} h` : '') : 'importo reale'].forEach((v,ci)=>{
       const c = wsTred.getCell(3+i, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
     });
   });
