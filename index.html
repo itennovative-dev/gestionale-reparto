@@ -603,8 +603,13 @@
     </div>
     <div class="card">
       <h2><span class="n">2</span>Mesi inseriti</h2>
-      <p class="note">Correggi direttamente nelle celle: si salva da solo. Se inserisci una timbratura in un mese che non c'è ancora, il mese viene creato in automatico. A dicembre compare la <strong>13ª</strong>: se la lasci vuota viene stimata sulla media della retribuzione ordinaria degli ultimi mesi dell'anno.</p>
+      <p class="note">Correggi direttamente nelle celle: si salva da solo. Se inserisci una timbratura in un mese che non c'è ancora, il mese viene creato in automatico.</p>
       <div class="table-scroll"><table id="monthlyParamsTable"></table></div>
+    </div>
+    <div class="card">
+      <h2><span class="n">3</span>Tredicesima</h2>
+      <p class="note">Mensilità a parte, con il suo accredito (giorno impostabile in Impostazioni generali). Un rigo per anno, compare da solo. Se lasci vuota la 13ª lorda viene stimata come media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno; quando arriva la busta vera scrivi l'importo. IRPEF all'aliquota marginale, senza detrazioni.</p>
+      <div class="table-scroll"><table id="tredicesimeTable"></table></div>
     </div>
   </div>
 </div>
@@ -3786,7 +3791,7 @@ async function downloadTurnoExcel(){
 }
 
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
-let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39};
+let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39, giornoPagaStipendio:6, giornoPagaTredicesima:15};
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
 let MONTHLY_PARAMS = {}; // "YYYY-MM" -> {tipo,tariffa,giorni,baseGiorno,ivs,etichettaPremio,premio,conguaglio,rettifica,rimborso730,stimaStraord}
 
@@ -3794,6 +3799,16 @@ async function loadHoursData(){
   try{ const r = await storageGet('hours-settings'); if(r) HOURS_SETTINGS = Object.assign(HOURS_SETTINGS, JSON.parse(r.value)); }catch(e){}
   try{ const r = await storageGet('daily-hours'); DAILY_HOURS = r ? JSON.parse(r.value) : {}; }catch(e){ DAILY_HOURS = {}; }
   try{ const r = await storageGet('monthly-params'); MONTHLY_PARAMS = r ? JSON.parse(r.value) : {}; }catch(e){ MONTHLY_PARAMS = {}; }
+  try{ const r = await storageGet('tredicesime'); TREDICESIME = r ? JSON.parse(r.value) : {}; }catch(e){ TREDICESIME = {}; }
+  // la 13ª era un campo del mese di dicembre: la sposto nella sua voce annuale
+  let moved = false;
+  Object.entries(MONTHLY_PARAMS).forEach(([k,p])=>{
+    if(!('tredicesima' in p)) return;
+    if(p.tredicesima !== '' && p.tredicesima != null && !(TREDICESIME[k.slice(0,4)]||{}).lordo)
+      TREDICESIME[k.slice(0,4)] = Object.assign({lordo:'', ivs:''}, TREDICESIME[k.slice(0,4)]||{}, {lordo:p.tredicesima});
+    delete p.tredicesima; moved = true;
+  });
+  if(moved){ saveMonthlyParamsData(); saveTredicesimeData(); }
   await loadHoursGoals();
   renderHoursSettingsForm();
 }
@@ -3810,6 +3825,8 @@ const HOURS_SETTINGS_FIELDS = [
   ['irpefSoglia','IRPEF - soglia scaglione (€)'],
   ['irpefAliquota','IRPEF - aliquota scaglione'],
   ['irpefQuotaFissa','IRPEF - quota fissa (€)'],
+  ['giornoPagaStipendio','Giorno di accredito stipendio (del mese dopo)'],
+  ['giornoPagaTredicesima','Giorno di accredito 13ª (a dicembre)'],
 ];
 function renderHoursSettingsForm(){
   const el = document.getElementById('hoursSettingsGrid');
@@ -3874,45 +3891,76 @@ function computeMonthSummary(monthKey, opts){
   const oreStraord = override != null ? override : (hasData ? sumDailyForMonth(monthKey,'straord') : (Number(p.stimaStraord)||0));
   const importoStraord = override != null ? override*(Number(p.tariffa)||0) : (hasData ? sumDailyForMonth(monthKey,'importoStraord') : (Number(p.stimaStraord)||0)*(Number(p.tariffa)||0));
   const ordinarieEuro = giorni * (Number(p.baseGiorno)||0);
-  const competenzeMese = ordinarieEuro + importoStraord + (Number(p.premio)||0);
+  const totaleCompetenze = ordinarieEuro + importoStraord + (Number(p.premio)||0);
   const buoniPasto = HOURS_SETTINGS.buoniPastoTariffa * HOURS_SETTINGS.buoniPastoNumero;
-  const aliqIvs = Number(p.ivs)||0;
-  const ivsMese = competenzeMese * aliqIvs;
-  const imponibileIrpef = competenzeMese - ivsMese;
+  const ivs = totaleCompetenze * (Number(p.ivs)||0);
+  const imponibileIrpef = totaleCompetenze - ivs;
   const rettificaVal = (p.rettifica !== '' && p.rettifica != null) ? Number(p.rettifica) : null;
   const baseIrpef = rettificaVal != null ? rettificaVal : imponibileIrpef;
-  const irpefMese = (baseIrpef - HOURS_SETTINGS.irpefSoglia) * HOURS_SETTINGS.irpefAliquota + HOURS_SETTINGS.irpefQuotaFissa + (Number(p.conguaglio)||0);
-  // 13ª (solo dicembre): IVS con la stessa aliquota del mese, IRPEF all'aliquota marginale (niente detrazioni), niente CRAL/addizionale in più
-  const tred = tredicesimaFor(monthKey, p);
-  const tredLordo = tred ? tred.lordo : 0;
-  const ivsTred = tredLordo * aliqIvs;
-  const irpefTred = (tredLordo - ivsTred) * HOURS_SETTINGS.irpefAliquota;
-  const totaleCompetenze = competenzeMese + tredLordo;
-  const ivs = ivsMese + ivsTred;
-  const irpef = irpefMese + irpefTred;
+  const irpef = (baseIrpef - HOURS_SETTINGS.irpefSoglia) * HOURS_SETTINGS.irpefAliquota + HOURS_SETTINGS.irpefQuotaFissa + (Number(p.conguaglio)||0);
   const cral = HOURS_SETTINGS.cral;
   const addReg = HOURS_SETTINGS.addRegionale;
   const totaleTrattenute = ivs + irpef + cral + addReg;
   const nettoMese = totaleCompetenze - totaleTrattenute;
   const rimb730Val = (p.rimborso730 !== '' && p.rimborso730 != null) ? Number(p.rimborso730) : 0;
   const nettoEffettivo = nettoMese + rimb730Val;
-  const nettoTred = tredLordo - ivsTred - irpefTred;
-  return {hasData, oreOrdinarie, oreStraord, importoStraord, ordinarieEuro, totaleCompetenze, buoniPasto, ivs, imponibileIrpef, irpef, cral, addReg, totaleTrattenute, nettoMese, nettoEffettivo,
-          tred, tredLordo, ivsTred, irpefTred, nettoTred};
+  return {hasData, oreOrdinarie, oreStraord, importoStraord, ordinarieEuro, totaleCompetenze, buoniPasto, ivs, imponibileIrpef, irpef, cral, addReg, totaleTrattenute, nettoMese, nettoEffettivo};
 }
-// 13ª mensilità: valore inserito a mano nel mese di dicembre, altrimenti stima = media della retribuzione ordinaria
-// (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno già inseriti (preferendo quelli "Reale").
-function tredicesimaFor(monthKey, p){
-  if(!monthKey || monthKey.slice(5)!=='12') return null;
-  const manual = (p && p.tredicesima !== '' && p.tredicesima != null && !isNaN(Number(p.tredicesima))) ? Number(p.tredicesima) : null;
-  if(manual != null) return {lordo:manual, stimata:false, mesi:[]};
-  const y = monthKey.slice(0,4);
-  const keys = Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(0,4)===y && k<monthKey).sort();
+
+/* ---------- 13ª mensilità: voce a parte, un rigo per anno, accreditata il 15 dicembre (giorno configurabile) ---------- */
+let TREDICESIME = {}; // "YYYY" -> {lordo:'' (vuoto = stima), ivs:'' (vuoto = aliquota dell'ultimo mese dell'anno)}
+async function saveTredicesimeData(){ try{ await storageSet('tredicesime', JSON.stringify(TREDICESIME)); }catch(e){} }
+function tredicesimaYears(){
+  const ys = new Set(Object.keys(MONTHLY_PARAMS).map(k=>k.slice(0,4)));
+  Object.keys(TREDICESIME).forEach(y=>ys.add(y));
+  return [...ys].sort();
+}
+// Stima: media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) degli ultimi 6 mesi dell'anno, preferendo quelli "Reale".
+// IVS con l'aliquota dell'ultimo mese dell'anno, IRPEF all'aliquota marginale senza detrazioni, niente CRAL/addizionale.
+function computeTredicesima(year){
+  year = String(year);
+  const t = TREDICESIME[year] || {};
+  const keys = Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(0,4)===year).sort();
   const reali = keys.filter(k=>MONTHLY_PARAMS[k].tipo==='Reale');
   const mesi = (reali.length ? reali : keys).slice(-6);
-  if(!mesi.length) return {lordo:0, stimata:true, mesi:[]};
-  const tot = mesi.reduce((s,k)=>s + (Number(MONTHLY_PARAMS[k].giorni)||0)*(Number(MONTHLY_PARAMS[k].baseGiorno)||0), 0);
-  return {lordo: tot/mesi.length, stimata:true, mesi};
+  const media = mesi.length ? mesi.reduce((s,k)=>s + (Number(MONTHLY_PARAMS[k].giorni)||0)*(Number(MONTHLY_PARAMS[k].baseGiorno)||0), 0)/mesi.length : 0;
+  const manual = (t.lordo !== '' && t.lordo != null && !isNaN(Number(t.lordo))) ? Number(t.lordo) : null;
+  const lordo = manual != null ? manual : media;
+  const ivsAuto = keys.length ? (Number(MONTHLY_PARAMS[keys[keys.length-1]].ivs)||0) : 0;
+  const aliqIvs = (t.ivs !== '' && t.ivs != null && !isNaN(Number(t.ivs))) ? Number(t.ivs) : ivsAuto;
+  const ivs = lordo * aliqIvs;
+  const irpef = (lordo - ivs) * HOURS_SETTINGS.irpefAliquota;
+  const netto = lordo - ivs - irpef;
+  const accredito = `${year}-12-${String(HOURS_SETTINGS.giornoPagaTredicesima||15).padStart(2,'0')}`;
+  return {year, lordo, stimata: manual == null, mesi, media, aliqIvs, ivsAuto, ivs, irpef, netto, accredito};
+}
+// Data di accredito dello stipendio di un mese: il giorno X del mese successivo
+function accreditoStipendio(monthKey){
+  return `${nextMonthKey(monthKey)}-${String(HOURS_SETTINGS.giornoPagaStipendio||6).padStart(2,'0')}`;
+}
+function editTredicesima(year, field, value){
+  TREDICESIME[year] = Object.assign({lordo:'', ivs:''}, TREDICESIME[year]||{}, {[field]: value});
+  saveTredicesimeData();
+  renderTredicesimeTable();
+  renderCedolino();
+  renderDashboardHoursTable();
+}
+function renderTredicesimeTable(){
+  const el = document.getElementById('tredicesimeTable');
+  if(!el) return;
+  const years = tredicesimaYears().reverse();
+  if(!years.length){ el.innerHTML = '<tr><td class="empty">Compare da sola appena c\'è almeno un mese dell\'anno.</td></tr>'; return; }
+  let html = '<thead><tr><th>Anno</th><th>Accredito</th><th>13ª lorda €</th><th>Aliquota IVS</th><th>IVS</th><th>IRPEF</th><th>Netto</th><th>Base della stima</th></tr></thead><tbody>';
+  years.forEach(y=>{
+    const r = computeTredicesima(y);
+    const t = TREDICESIME[y] || {};
+    html += `<tr><td><strong>${y}</strong></td><td style="white-space:nowrap;">${fmtDate(r.accredito)}</td>
+      <td><input type="number" step="0.01" value="${t.lordo!=null?t.lordo:''}" placeholder="stima ${fmtEuro(r.media)}" style="width:120px; min-width:120px; padding:5px 6px;" onchange="editTredicesima('${y}','lordo',this.value)"></td>
+      <td><input type="number" step="0.0001" value="${t.ivs!=null?t.ivs:''}" placeholder="${r.ivsAuto}" style="width:90px; min-width:90px; padding:5px 6px;" onchange="editTredicesima('${y}','ivs',this.value)"></td>
+      <td>${fmtEuro(r.ivs)}</td><td>${fmtEuro(r.irpef)}</td><td><strong>${fmtEuro(r.netto)}</strong>${r.stimata?' <span class="note">(stima)</span>':''}</td>
+      <td class="note" style="margin:0;">${r.stimata ? (r.mesi.length ? `media di ${r.mesi.join(', ')}` : 'nessun mese da cui stimarla') : 'importo inserito a mano'}</td></tr>`;
+  });
+  el.innerHTML = html + '</tbody>';
 }
 function fmtEuro(v){ return (Math.round(v*100)/100).toLocaleString('it-IT',{minimumFractionDigits:2, maximumFractionDigits:2}); }
 function fmtHours(v){ return (Math.round(v*100)/100).toLocaleString('it-IT'); }
@@ -3948,9 +3996,19 @@ function populateMonthFilterSelectors(){
     if(!sel) return;
     const prev = sel.value;
     const opts = ['<option value="">Tutti</option>'].concat(months.map(m=>`<option value="${m}">${m}</option>`));
-    sel.innerHTML = (id==='dhFilterMonth' ? opts : opts.slice(1)).join('');
-    if(months.includes(prev)) sel.value = prev;
-    else if(id==='cedolinoMonth' && months.length) sel.value = months[months.length-1];
+    let html, values = months;
+    if(id==='dhFilterMonth') html = opts.join('');
+    else {
+      // nel cedolino la 13ª è una voce a parte, messa in ordine di accredito (dopo novembre, prima di dicembre)
+      const items = months.filter(m=>MONTHLY_PARAMS[m]).map(m=>({v:m, label:m, d:accreditoStipendio(m)}))
+        .concat(tredicesimaYears().map(y=>({v:y+'-13', label:'13ª '+y, d:computeTredicesima(y).accredito})))
+        .sort((a,b)=>a.d.localeCompare(b.d));
+      values = items.map(i=>i.v);
+      html = items.map(i=>`<option value="${i.v}">${i.label}</option>`).join('');
+    }
+    sel.innerHTML = html;
+    if(values.includes(prev)) sel.value = prev;
+    else if(id==='cedolinoMonth' && values.length) sel.value = values[values.length-1];
   });
 }
 function renderDailyHoursTable(){
@@ -4004,7 +4062,7 @@ function buildMonthParams(monthKey){
   const src = sourceMonthFor(monthKey);
   const sp = src ? MONTHLY_PARAMS[src] : {};
   const p = {tipo: monthKey < todayStr().slice(0,7) ? 'Reale' : 'Stima', giorni: workingDaysInMonth(monthKey),
-             etichettaPremio:'', premio:'', conguaglio:'', rettifica:'', rimborso730:'', tredicesima:''};
+             etichettaPremio:'', premio:'', conguaglio:'', rettifica:'', rimborso730:''};
   MONTH_COPY_FIELDS.forEach(f=>p[f] = sp[f] != null ? sp[f] : '');
   return {params:p, src};
 }
@@ -4024,7 +4082,7 @@ function renderNewMonthPreview(){
   const {params:p, src} = buildMonthParams(key);
   if(!src){ el.innerHTML = `Primo mese: verrà creato con ${p.giorni} giorni lavorativi; tariffa, base/giorno e IVS li inserisci nella tabella.`; return; }
   el.innerHTML = `Verrà creato con: <strong>${p.giorni}</strong> giorni lavorativi · tariffa <strong>${p.tariffa||'—'}</strong> €/h · base/giorno <strong>${p.baseGiorno||'—'}</strong> € · IVS <strong>${p.ivs||'—'}</strong> · stima straord. <strong>${p.stimaStraord||0}</strong> h <span style="opacity:.75;">(ripresi da ${src})</span>`
-    + (key.slice(5)==='12' ? ` · <strong>13ª</strong> stimata in automatico` : '');
+;
 }
 function quickAddMonth(){
   const inp = document.getElementById('mpNewMonthKey');
@@ -4048,7 +4106,6 @@ const MONTH_TABLE_FIELDS = [
   ['conguaglio','Conguaglio IRPEF €','number','0.01',85],
   ['rettifica','Rettifica imp. IRPEF €','number','0.01',90],
   ['rimborso730','Rimb. 730 €','number','0.01',80],
-  ['tredicesima','13ª lorda €','number','0.01',95],
 ];
 function editMonthlyParamsField(key, field, value){
   if(!MONTHLY_PARAMS[key]) return;
@@ -4058,14 +4115,7 @@ function editMonthlyParamsField(key, field, value){
   const s = computeMonthSummary(key);
   const cell = document.getElementById('mpNet_'+key);
   if(cell && s) cell.innerHTML = `<strong>${fmtEuro(s.nettoEffettivo)}</strong>`;
-  const tc = document.getElementById('mpTred_'+key);
-  if(tc && s && s.tred) tc.placeholder = 'stima ' + fmtEuro(s.tred.lordo);
-  // la 13ª dipende dai mesi precedenti: aggiorna anche i dicembre successivi
-  Object.keys(MONTHLY_PARAMS).filter(k=>k.slice(5)==='12' && k>key).forEach(k=>{
-    const sd = computeMonthSummary(k);
-    const c1 = document.getElementById('mpNet_'+k); if(c1) c1.innerHTML = `<strong>${fmtEuro(sd.nettoEffettivo)}</strong>`;
-    const c2 = document.getElementById('mpTred_'+k); if(c2 && sd.tred) c2.placeholder = 'stima ' + fmtEuro(sd.tred.lordo);
-  });
+  renderTredicesimeTable(); // la stima della 13ª dipende dai mesi
   renderCedolino();
   renderDashboardHoursTable();
 }
@@ -4078,6 +4128,7 @@ function deleteMonthlyParams(key){
 function renderMonthlyParamsTable(){
   const el = document.getElementById('monthlyParamsTable');
   renderNewMonthPreview();
+  renderTredicesimeTable();
   if(!el) return;
   const keys = Object.keys(MONTHLY_PARAMS).sort().reverse();
   if(keys.length===0){ el.innerHTML = '<tr><td class="empty">Nessun mese inserito.</td></tr>'; return; }
@@ -4086,13 +4137,11 @@ function renderMonthlyParamsTable(){
   keys.forEach(k=>{
     const p = MONTHLY_PARAMS[k];
     const s = computeMonthSummary(k);
-    const isDec = k.slice(5)==='12';
     html += `<tr><td style="white-space:nowrap;"><strong>${k}</strong>${s&&s.hasData?'<div class="note" style="margin:0;">da timbrature</div>':''}</td>
       <td><select ${cellStyle(82)} onchange="editMonthlyParamsField('${k}','tipo',this.value)">${['Reale','Stima'].map(t=>`<option${(p.tipo||'')===t?' selected':''}>${t}</option>`).join('')}</select></td>`;
     MONTH_TABLE_FIELDS.forEach(([f,,type,step,w])=>{
-      if(f==='tredicesima' && !isDec){ html += '<td style="color:var(--sub);">—</td>'; return; }
       const val = p[f] != null ? String(p[f]).replace(/"/g,'&quot;') : '';
-      const ph = f==='tredicesima' && s && s.tred ? ` id="mpTred_${k}" placeholder="stima ${fmtEuro(s.tred.lordo)}"` : '';
+      const ph = '';
       html += `<td><input type="${type}"${step?` step="${step}"`:''} value="${val}"${ph} ${cellStyle(w)} onchange="editMonthlyParamsField('${k}','${f}',this.value)"></td>`;
     });
     html += `<td id="mpNet_${k}" style="white-space:nowrap;"><strong>${s?fmtEuro(s.nettoEffettivo):''}</strong></td>
@@ -4105,6 +4154,7 @@ function renderCedolino(){
   const el = document.getElementById('cedolinoView');
   if(!el) return;
   const key = document.getElementById('cedolinoMonth').value;
+  if(key && key.slice(5)==='13'){ renderCedolinoTredicesima(el, key.slice(0,4)); return; }
   const s = key ? computeMonthSummary(key) : null;
   if(!s){ el.innerHTML = '<p class="empty">Seleziona un mese con parametri inseriti.</p>'; return; }
   const p = MONTHLY_PARAMS[key];
@@ -4115,7 +4165,6 @@ function renderCedolino(){
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Ordinarie</div><div style="flex:1; text-align:right;">${fmtEuro(s.ordinarieEuro)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Straordinario (${fmtHours(s.oreStraord)} h)</div><div style="flex:1; text-align:right;">${fmtEuro(s.importoStraord)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">${p.etichettaPremio||'Premio'}</div><div style="flex:1; text-align:right;">${fmtEuro(Number(p.premio)||0)} €</div></div>
-        ${s.tred ? `<div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">13ª mensilità${s.tred.stimata?' (stima)':''}</div><div style="flex:1; text-align:right;">${fmtEuro(s.tredLordo)} €</div></div>` : ''}
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">Buoni pasto (non in netto)</div><div style="flex:1; text-align:right;">${fmtEuro(s.buoniPasto)} €</div></div>
         <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;"><strong>Totale competenze</strong></div><div style="flex:1; text-align:right;"><strong>${fmtEuro(s.totaleCompetenze)} €</strong></div></div>
       </div>
@@ -4133,24 +4182,43 @@ function renderCedolino(){
       <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">+ Rimb.730 = NETTO EFFETTIVO</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(s.nettoEffettivo)} €</div></div>
     </div>
     <p class="note" style="margin-top:8px;">Ore ordinarie: ${fmtHours(s.oreOrdinarie)} — Dato ${s.hasData?'calcolato dalle timbrature del mese':'stimato (nessuna timbratura ancora inserita per questo mese)'}.</p>
-    ${s.tred ? `<p class="note" style="margin-top:4px;"><strong>13ª:</strong> ${s.tred.stimata
-        ? (s.tred.mesi.length ? `stimata come media della retribuzione ordinaria (giorni × base/giorno, senza straordinari e premi) di ${s.tred.mesi.join(', ')}` : 'nessun mese precedente dell\'anno da cui stimarla: inseriscila a mano in Parametri mensili')
-        : 'importo inserito a mano'}. Trattenute sulla 13ª incluse sopra: IVS ${fmtEuro(s.ivsTred)} € + IRPEF ${fmtEuro(s.irpefTred)} € (aliquota marginale, senza detrazioni) → netto 13ª circa <strong>${fmtEuro(s.nettoTred)} €</strong>.</p>` : ''}
+    <p class="note" style="margin-top:4px;">Accredito previsto: <strong>${fmtDate(accreditoStipendio(key))}</strong>.</p>
   `;
+}
+function renderCedolinoTredicesima(el, year){
+  const r = computeTredicesima(year);
+  const row = (l,v,b) => `<div class="stat-bar-row"><div class="stat-bar-label" style="width:200px;">${b?'<strong>'+l+'</strong>':l}</div><div style="flex:1; text-align:right;">${b?'<strong>'+fmtEuro(v)+' €</strong>':fmtEuro(v)+' €'}</div></div>`;
+  el.innerHTML = `
+    <div class="settings-grid">
+      <div><h3 class="panel-subtitle">Competenze</h3>${row('13ª mensilità'+(r.stimata?' (stima)':''), r.lordo, true)}</div>
+      <div><h3 class="panel-subtitle">Trattenute</h3>${row('IVS ('+r.aliqIvs+')', r.ivs)}${row('IRPEF (aliquota marginale)', r.irpef)}${row('Totale trattenute', r.ivs+r.irpef, true)}</div>
+    </div>
+    <div class="range-sep">
+      <div class="stat-bar-row"><div class="stat-bar-label" style="width:200px; font-size:14px;">NETTO 13ª</div><div style="flex:1; text-align:right; font-size:15px; font-weight:700; color:var(--ok);">${fmtEuro(r.netto)} €</div></div>
+    </div>
+    <p class="note" style="margin-top:8px;">Accredito previsto: <strong>${fmtDate(r.accredito)}</strong>. ${r.stimata ? (r.mesi.length ? `Stima: media della retribuzione ordinaria di ${r.mesi.join(', ')}.` : 'Nessun mese dell\'anno da cui stimarla.') + ' Inserisci l\'importo vero in Parametri mensili → Tredicesima quando arriva la busta.' : 'Importo inserito a mano.'}</p>`;
 }
 function renderDashboardHoursTable(){
   const el = document.getElementById('dashboardHoursTable');
   if(!el) return;
   const keys = Object.keys(MONTHLY_PARAMS).sort();
   if(keys.length===0){ el.innerHTML = '<tr><td class="empty">Nessun mese inserito.</td></tr>'; return; }
-  let html = '<thead><tr><th>Mese</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>13ª</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto effettivo</th><th>Netto cumulato</th></tr></thead><tbody>';
+  // righe in ordine di accredito: stipendi (il giorno X del mese dopo) e 13ª (a dicembre) come voci separate
+  const rows = keys.map(k=>({k, d:accreditoStipendio(k), s:computeMonthSummary(k)}))
+    .concat(tredicesimaYears().map(y=>({y, d:computeTredicesima(y).accredito, t:computeTredicesima(y)})))
+    .sort((a,b)=>a.d.localeCompare(b.d));
+  let html = '<thead><tr><th>Voce</th><th>Accredito</th><th>Tipo</th><th>Ore ord.</th><th>Ore straord.</th><th>Importo straord.</th><th>Totale competenze</th><th>Totale trattenute</th><th>Netto effettivo</th><th>Netto cumulato</th></tr></thead><tbody>';
   let cumulato = 0;
-  keys.forEach(k=>{
-    const p = MONTHLY_PARAMS[k];
-    const s = computeMonthSummary(k);
+  rows.forEach(r=>{
+    if(r.t){
+      cumulato += r.t.netto;
+      html += `<tr style="background:var(--paper);"><td><strong>13ª ${r.y}</strong></td><td style="white-space:nowrap;">${fmtDate(r.d)}</td><td>${r.t.stimata?'Stima':'Reale'}</td><td></td><td></td><td></td>
+        <td>${fmtEuro(r.t.lordo)}</td><td>${fmtEuro(r.t.ivs+r.t.irpef)}</td><td><strong>${fmtEuro(r.t.netto)}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
+      return;
+    }
+    const s = r.s, p = MONTHLY_PARAMS[r.k];
     cumulato += s.nettoEffettivo;
-    html += `<tr><td><strong>${k}</strong></td><td>${p.tipo||''}</td><td>${fmtHours(s.oreOrdinarie)}</td><td>${fmtHours(s.oreStraord)}</td><td>${fmtEuro(s.importoStraord)}</td>
-      <td>${s.tred ? fmtEuro(s.tredLordo) + (s.tred.stimata?' <span class="note">(stima)</span>':'') : ''}</td>
+    html += `<tr><td><strong>${r.k}</strong></td><td style="white-space:nowrap;">${fmtDate(r.d)}</td><td>${p.tipo||''}</td><td>${fmtHours(s.oreOrdinarie)}</td><td>${fmtHours(s.oreStraord)}</td><td>${fmtEuro(s.importoStraord)}</td>
       <td>${fmtEuro(s.totaleCompetenze)}</td><td>${fmtEuro(s.totaleTrattenute)}</td><td><strong>${fmtEuro(s.nettoEffettivo)}</strong></td><td>${fmtEuro(cumulato)}</td></tr>`;
   });
   html += '</tbody>';
@@ -4180,8 +4248,8 @@ function goalParamsFor(monthKey){
   if(!keys.length) return {params:null, borrowed:null};
   const prev = keys.filter(k=>k<monthKey);
   const src = prev.length ? prev[prev.length-1] : keys[0];
-  // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio; la 13ª di dicembre torna stimata)
-  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:'', tredicesima:''});
+  // Copia i parametri "strutturali" e azzera le voci una tantum (conguaglio, rettifica, 730, premio)
+  const p = Object.assign({}, MONTHLY_PARAMS[src], {conguaglio:'', rettifica:'', rimborso730:'', premio:''});
   p.giorni = workingDaysInMonth(monthKey);
   return {params:p, borrowed:src};
 }
@@ -4377,7 +4445,7 @@ async function downloadHoursExcel(){
   for(let c=2;c<=10;c++) wsDaily.getColumn(c).width = 11;
 
   const wsMonth = wb.addWorksheet('Parametri mensili');
-  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','13ª lorda','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo'];
+  const monthHeaders = ['Mese','Tipo','Tariffa oraria','Giorni lav.','Base/giorno','Aliquota IVS','Premio','Ore ord.','Ore straord.','Importo straord.','Tot. competenze','Tot. trattenute','Netto mese','Netto effettivo'];
   titleRow(wsMonth, monthHeaders.length, 'PARAMETRI MENSILI');
   headerRow(wsMonth, 2, monthHeaders);
   Object.keys(MONTHLY_PARAMS).sort().forEach((k,i)=>{
@@ -4385,12 +4453,24 @@ async function downloadHoursExcel(){
     const s = computeMonthSummary(k);
     const r = 3+i;
     [k, p.tipo||'', Number(p.tariffa)||0, Number(p.giorni)||0, Number(p.baseGiorno)||0, Number(p.ivs)||0, Number(p.premio)||0,
-     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.tredLordo, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo].forEach((v,ci)=>{
+     s.oreOrdinarie, s.oreStraord, s.importoStraord, s.totaleCompetenze, s.totaleTrattenute, s.nettoMese, s.nettoEffettivo].forEach((v,ci)=>{
       const c = wsMonth.getCell(r, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
     });
   });
   wsMonth.getColumn(1).width = 10;
   for(let c=2;c<=monthHeaders.length;c++) wsMonth.getColumn(c).width = 13;
+
+  const wsTred = wb.addWorksheet('Tredicesima');
+  const tredHeaders = ['Anno','Accredito','Tipo','13ª lorda','Aliquota IVS','IVS','IRPEF','Netto','Base della stima'];
+  titleRow(wsTred, tredHeaders.length, 'TREDICESIMA');
+  headerRow(wsTred, 2, tredHeaders);
+  tredicesimaYears().forEach((y,i)=>{
+    const t = computeTredicesima(y);
+    [y, t.accredito, t.stimata?'Stima':'Reale', t.lordo, t.aliqIvs, t.ivs, t.irpef, t.netto, t.stimata ? t.mesi.join(', ') : 'importo reale'].forEach((v,ci)=>{
+      const c = wsTred.getCell(3+i, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border;
+    });
+  });
+  wsTred.getColumn(1).width = 8; for(let c=2;c<=8;c++) wsTred.getColumn(c).width = 13; wsTred.getColumn(9).width = 40;
 
   const buffer = await wb.xlsx.writeBuffer();
   const mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
