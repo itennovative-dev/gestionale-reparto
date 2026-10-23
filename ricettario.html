@@ -1407,6 +1407,7 @@ $('importFile').addEventListener('change', e=>{
 $('job').addEventListener('input', e=>{ if(e.target.name==='mach'){ setMachine(e.target.value); return; } if(e.target.id!=='jobCode') OV={}; render(); });
 $('job').addEventListener('change', render);
 $('out').addEventListener('change', e=>{
+  if(ACCESS_KNOWN && !CAN_EDIT) return;
   const k2 = e.target.dataset && e.target.dataset.ov2;
   if(k2){
     const v = parseFloat(String(e.target.value).replace(',','.')), r = LAST;
@@ -1431,6 +1432,7 @@ $('out').addEventListener('change', e=>{
   setTimeout(()=>{ const f = document.activeElement && document.activeElement.id; render(); if(f && $(f)) $(f).focus(); },0);
 });
 $('out').addEventListener('click', e=>{
+  if(ACCESS_KNOWN && !CAN_EDIT) return;
   const b = e.target.closest('[data-rst]'); if(b){ delete OV[b.dataset.rst]; render(); return; }
   if(e.target.id==='resetOv'){ OV={}; render(); }
 });
@@ -1523,6 +1525,7 @@ function renderDiag(){
     <div class="actions"><button type="button" id="diagApply">Applica alla ricetta</button><span class="toast" id="diagToast"></span></div>
     <p class="hint">Una correzione alla volta: fai la prova, poi salva la ricetta in archivio con l'esito.</p>`;
   $('diagApply').onclick = () => {
+    if(ACCESS_KNOWN && !CAN_EDIT) return;
     for(const [k,v] of Object.entries(P.ov)){ if(v===null) delete OV[k]; else OV[k] = v; }
     render();
     const t = $('diagToast'); if(t){ t.textContent = 'Correzioni applicate: sono evidenziate in blu nella ricetta.'; setTimeout(()=>{ if($('diagToast')) $('diagToast').textContent=''; }, 3500); }
@@ -1802,10 +1805,18 @@ $('archList').addEventListener('click', async e => {
 let ACCESS_KNOWN = false; // i blocchi partono solo dopo aver verificato i permessi
 function lockReadOnly(){
   if(!ACCESS_KNOWN || CAN_EDIT) return;
+  // taratura, limiti, materiali, storico interventi
   document.querySelectorAll('#calib input, #calib select').forEach(el=>{ el.disabled = true; });
-  document.querySelectorAll('#calib .logform, #calib [data-logdel], #calib label[for=importFile], #resetCfg, #resetMats, #savePanel, #archList [data-del]').forEach(el=>el.classList.add('ro-hidden'));
+  // valori della ricetta (correzioni manuali) e scelta della lama: si leggono, non si cambiano
+  document.querySelectorAll('#out input.ov, #out select[data-ov]').forEach(el=>{ el.disabled = true; el.readOnly = true; });
+  document.querySelectorAll('#calib .logform, #calib [data-logdel], #calib label[for=importFile], #resetCfg, #resetMats, #savePanel, #archList [data-del], #out [data-rst], #resetOv, #diagApply')
+    .forEach(el=>el.classList.add('ro-hidden'));
+  const ob = document.querySelector('#out .ovbar > span');
+  if(ob && !ob.dataset.ro){ ob.dataset.ro = '1'; ob.textContent = 'Valori calcolati dalla taratura degli impianti. In sola consultazione non si modificano.'; }
+  const dh = document.querySelector('#diagOut .hint');
+  if(dh && !dh.dataset.ro){ dh.dataset.ro = '1'; dh.textContent = 'Correzioni consigliate da riportare in macchina: in sola consultazione non si applicano alla ricetta.'; }
 }
-new MutationObserver(lockReadOnly).observe(document.getElementById('calib'), {childList:true, subtree:true});
+new MutationObserver(lockReadOnly).observe(document.body, {childList:true, subtree:true});
 (async () => {
   const acc = await window.RICETTARIO_ACCESS;
   if(!acc){ renderArchive(); return; }
