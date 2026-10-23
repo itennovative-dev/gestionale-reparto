@@ -407,7 +407,7 @@
         <button class="menu-tile" data-sec="impianti" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
         <button class="menu-tile" data-sec="manutenzione" onclick="showPage('panel-maintenance')"><svg class="ico"><use href="#i-wrench"/></svg><span>Manutenzione impianti</span></button>
         <button class="menu-tile" data-sec="fermi" onclick="showPage('panel-downtime')"><svg class="ico"><use href="#i-alert"/></svg><span>Registro fermi macchina</span></button>
-        <a class="menu-tile" data-sec="ricettario" href="ricettario.html"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
+        <button class="menu-tile" data-sec="ricettario" onclick="showPage('panel-ricettario')"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></button>
       </div>
     </div>
 
@@ -1283,6 +1283,11 @@
       </div>
 
   </div>
+</div>
+
+<div class="panel-section" id="panel-ricettario" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <iframe id="ricettarioFrame" title="Ricettario taglierine" style="display:block; width:100%; border:0; min-height:70vh; background:var(--paper);"></iframe>
 </div>
 
 <div class="panel-section" id="panel-users" style="display:none;">
@@ -6885,7 +6890,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account','panel-ricettario'];
 function showPage(id){
   if(!pageAllowed(id)){ toast('Non hai accesso a questa sezione'); id = 'page-home'; }
   updateReadOnlyBar(id);
@@ -6922,6 +6927,7 @@ function showPage(id){
   if(id==='panel-skills') renderSkillsPage();
   if(id==='panel-downtime') renderDowntimePage();
   if(id==='panel-users') renderUsersPage();
+  if(id==='panel-ricettario') openRicettario();
   if(id==='panel-account') renderAccountPage();
   if(id==='panel-hours'){ const n = document.getElementById('hoursSetupNote'); if(n) n.style.display = (CLOUD_ENABLED && !CURRENT_USER.admin && !HOURS_SETTINGS_SAVED) ? '' : 'none'; }
 }
@@ -6944,7 +6950,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · ricettario nel gestionale';
+const APP_VERSION = '2026-10-23 · ricettario integrato nel gestionale';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7032,7 +7038,7 @@ const PAGE_SECTION = {
   'panel-teamturni':'coperture', 'panel-email':'coperture', 'panel-weeks':'coperture',
   'panel-planner':'planner', 'panel-calendar':'calendario', 'panel-roster':'operatori', 'panel-plants':'impianti',
   'panel-clothing':'indumenti', 'panel-skills':'competenze', 'panel-maintenance':'manutenzione', 'panel-downtime':'fermi',
-  'panel-production':'produzione', 'panel-opstats':'opstats', 'panel-stats':'assenze'
+  'panel-production':'produzione', 'panel-opstats':'opstats', 'panel-stats':'assenze', 'panel-ricettario':'ricettario'
 };
 function pageSection(id){ return PAGE_SECTION[id] || (id.indexOf('panel-hours')===0 ? 'personale' : null); }
 function pageAllowed(id){
@@ -7133,6 +7139,24 @@ function applyPermissionsUI(){
   });
   const lbl = document.getElementById('accountFooterLabel');
   if(lbl && CURRENT_USER.email) lbl.textContent = (CURRENT_USER.admin ? 'Il mio account' : CURRENT_USER.nome) + ' · esci';
+}
+
+/* ============================= RICETTARIO TAGLIERINE =============================
+   Il ricettario è un programma a sé (ricettario.html, con login e permessi del gestionale) mostrato dentro questa pagina:
+   si carica la prima volta che si apre e l'altezza segue il contenuto, così si scorre come le altre pagine. */
+function openRicettario(){
+  const frame = document.getElementById('ricettarioFrame');
+  if(!frame || frame.dataset.loaded) return;
+  frame.dataset.loaded = '1';
+  frame.addEventListener('load', ()=>{
+    try{
+      const doc = frame.contentDocument;
+      const fit = ()=>{ frame.style.height = Math.max(doc.body.scrollHeight, doc.body.offsetHeight) + 'px'; };
+      new ResizeObserver(fit).observe(doc.body);
+      fit();
+    }catch(e){ frame.style.height = '85vh'; }
+  });
+  frame.src = 'ricettario.html';
 }
 
 /* ============================= IL MIO ACCOUNT ============================= */
@@ -7356,6 +7380,7 @@ function renderStorageMode(user){
       if(await uploadLocalDataToCloud(true)) return;
     }
     if(!started){ started = true; await startApp(); APP_READY = true; }
+    if(location.hash==='#ricettario'){ history.replaceState(null, '', location.pathname); showPage('panel-ricettario'); }
   });
 })();
 </script>

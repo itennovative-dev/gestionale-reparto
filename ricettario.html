@@ -3,48 +3,29 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Ricettario taglio</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 :root{
-  --bg:#EDF0EF; --surface:#FFFFFF; --surface-2:#F5F7F6; --ink:#15201F; --ink-2:#4B5A58; --ink-3:#77837F;
-  --line:#D3DAD8; --line-2:#E3E8E6;
-  --accent:#1D5C8A; --accent-soft:#E3EDF5; --accent-ink:#FFFFFF;
-  --shaft-a:#1D5C8A; --shaft-b:#5E8FB5; --trim:#C9D1CE;
-  --ok:#2F7D4F; --ok-soft:#E4F2E9; --warn:#9A6212; --warn-soft:#FBF0DC; --crit:#B42318; --crit-soft:#FBE6E3;
-  --f-display:"IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
-  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    color-scheme:dark;
-    --bg:#0F1416; --surface:#161D20; --surface-2:#1B2427; --ink:#E4EAE9; --ink-2:#A3B0AE; --ink-3:#7A8885;
-    --line:#2C383B; --line-2:#232E31;
-    --accent:#7FB3DD; --accent-soft:#1B2C3A; --accent-ink:#0F1416;
-    --shaft-a:#5F9CCB; --shaft-b:#3B6A8F; --trim:#3A4649;
-    --ok:#6CC08F; --ok-soft:#16281E; --warn:#E3AE5C; --warn-soft:#2B2213; --crit:#F08A7E; --crit-soft:#2E1715;
-  }
-}
-:root[data-theme="dark"]{
-  color-scheme:dark;
-  --bg:#0F1416; --surface:#161D20; --surface-2:#1B2427; --ink:#E4EAE9; --ink-2:#A3B0AE; --ink-3:#7A8885;
-  --line:#2C383B; --line-2:#232E31;
-  --accent:#7FB3DD; --accent-soft:#1B2C3A; --accent-ink:#0F1416;
-  --shaft-a:#5F9CCB; --shaft-b:#3B6A8F; --trim:#3A4649;
-  --ok:#6CC08F; --ok-soft:#16281E; --warn:#E3AE5C; --warn-soft:#2B2213; --crit:#F08A7E; --crit-soft:#2E1715;
+  /* stessi colori e caratteri del gestionale (solo tema chiaro, come il gestionale) */
+  color-scheme:light;
+  --bg:#faf9f6; --surface:#FFFFFF; --surface-2:#f6f5f2; --ink:#26251f; --ink-2:#6b685f; --ink-3:#8c887d;
+  --line:#eae7e0; --line-2:#f0eee9;
+  --accent:#2b2a27; --accent-soft:#f6f1e6; --accent-ink:#FFFFFF;
+  --shaft-a:#2b2a27; --shaft-b:#a68a5b; --trim:#d9d4c8;
+  --ok:#5f7d64; --ok-soft:#eef3ee; --warn:#9a6a2b; --warn-soft:#f6f1e6; --crit:#ab5b53; --crit-soft:#f7efec;
+  --f-display:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-body:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
 .wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:16px;border-bottom:2px solid var(--ink);margin-bottom:20px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:20px}
 .eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
-h1{font-family:var(--f-display);font-weight:700;font-size:clamp(28px,4.4vw,40px);line-height:1.05;margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
+h1{font-family:var(--f-display);font-weight:600;font-size:clamp(22px,3vw,28px);line-height:1.05;margin:4px 0 0;letter-spacing:-.01em;text-wrap:balance}
 .top p{margin:0;max-width:52ch;color:var(--ink-2);font-size:14px}
 .layout{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:920px){.layout{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--surface);border:1px solid var(--line);border-radius:6px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 2px rgba(38,37,31,.04),0 4px 14px rgba(38,37,31,.05)}
 .panel-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line)}
 h2{font-family:var(--f-display);font-weight:600;font-size:18px;margin:0;letter-spacing:.01em}
 h3{font-family:var(--f-display);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin:0;color:var(--ink-2)}
@@ -181,7 +162,9 @@ button.danger{color:var(--crit);border-color:var(--crit)}
 .a-act{display:flex;gap:6px}
 .a-note{grid-column:1 / -1;font-size:13px;color:var(--ink-2)}
 @media (max-width:640px){.archlist li{grid-template-columns:minmax(0,1fr) auto}.a-date,.a-mach{display:none}.a-act{grid-column:1 / -1}}
-/* collegamento al gestionale */
+/* dentro il gestionale */
+html,body{background:var(--bg)}
+.wrap{padding-block:18px 40px}
 #gate{position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px}
 #gate .panel{max-width:440px;width:100%;padding:24px;display:grid;gap:10px}
 #gate a, .gbar a{color:var(--accent);font-weight:600;text-decoration:none}
@@ -193,8 +176,7 @@ table.diag{min-width:0}
 table.diag td.n{font-family:var(--f-mono);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 </style>
 
-<div id="gate"><div class="panel"><h2>Ricettario taglio</h2><p class="note" id="gateMsg">Verifica dell'accesso…</p><p id="gateLink" hidden><a href="./">Vai al gestionale per accedere →</a></p></div></div>
-<div class="gbar"><a href="./">← Gestionale reparto</a><span><span id="gUser"></span> <span id="gRo" class="ro-pill" hidden>Sola consultazione</span></span></div>
+<div id="gate"><div class="panel"><h2>Ricettario taglio</h2><p class="note" id="gateMsg">Verifica dell'accesso…</p><p id="gateLink" hidden><a href="./" target="_top">Vai al gestionale per accedere →</a></p></div></div>
 <script>
 /* Accesso: stesso login e stessi permessi del gestionale (sezione "ricettario").
    I dati stanno nel database del gestionale in sezioni/ricettario/dati: config__taratura, config__limiti, ricette__<id>. */
@@ -233,6 +215,8 @@ function makeRicettarioDb(fs){
     }
   };
 }
+// Il ricettario si usa dentro il gestionale (pagina "Ricettario taglierine"): aperto da solo, rimanda lì.
+if(window.top === window) location.replace('./#ricettario');
 window.RICETTARIO_ACCESS = new Promise(resolve => {
   const fail = msg => { document.getElementById('gateMsg').textContent = msg; document.getElementById('gateLink').hidden = false; resolve(null); };
   if(!window.firebase){ fail('Impossibile collegarsi al database: controlla la connessione e ricarica la pagina.'); return; }
@@ -240,7 +224,7 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
   const fs = firebase.firestore();
   let decided = false;
   firebase.auth().onAuthStateChanged(async user => {
-    if(decided){ if(!user) location.replace('./'); return; }
+    if(decided) return; // l'uscita la gestisce il gestionale
     decided = true;
     if(!user) return fail('Per usare il ricettario accedi prima al gestionale, con il tuo account.');
     const email = String(user.email || '').toLowerCase();
@@ -256,8 +240,6 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
       }
     }catch(e){ return fail("Impossibile verificare l'accesso: " + (e.message || e)); }
     document.getElementById('gate').remove();
-    document.getElementById('gUser').textContent = nome;
-    document.getElementById('gRo').hidden = canEdit;
     resolve({db: makeRicettarioDb(fs), canEdit});
   });
 });
