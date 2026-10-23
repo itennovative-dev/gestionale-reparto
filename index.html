@@ -740,17 +740,18 @@
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Registro fermi macchina</h2>
     <p class="note">Segna ogni fermo o rallentamento importante: impianto, causa e minuti persi. Il grafico di Pareto mostra quali cause pesano di più, cioè dove conviene intervenire per primo (e con quali numeri presentarsi da fornitori e manutenzione).</p>
-    <p class="note"><strong>Linea Eutrolog:</strong> allestisce le bobine di 100, 116, 118, 115 e 119. Un suo fermo si registra una volta sola sulla linea e viene contato in automatico su tutti e 5 gli impianti (1 h di linea ferma = 5 h di fermo impianti).</p>
+    <p class="note"><strong>Linea Eutrolog:</strong> allestisce le bobine di 100, 116, 118, 115 e 119. Un suo fermo si registra una volta sola sulla linea e viene contato in automatico su ogni impianto collegato (1 h di linea ferma con 5 impianti collegati = 5 h di fermo impianti). Togli la spunta agli impianti che in quel momento lavoravano fuori linea (lavoro non gestibile dall'Eutrolog): per loro il fermo non conta.</p>
     <div class="card">
       <h2><span class="n">1</span>Nuovo fermo</h2>
       <div class="roster-add-grid">
         <div style="max-width:160px;"><label>Data</label><input type="date" id="dtNewDate"></div>
-        <div style="max-width:170px;"><label>Impianto</label><select id="dtNewPlant"></select></div>
+        <div style="max-width:170px;"><label>Impianto</label><select id="dtNewPlant" onchange="toggleEutrologBox()"></select></div>
         <div style="max-width:110px;"><label>Turno</label><select id="dtNewTurno"><option value="">—</option><option value="1">1°</option><option value="2">2°</option><option value="3">3°</option><option value="C">C</option></select></div>
         <div><label>Causa</label><select id="dtNewCause"></select></div>
         <div style="max-width:120px;"><label>Minuti persi</label><input type="number" min="1" step="5" id="dtNewMin"></div>
         <div><label>Note</label><input type="text" id="dtNewNote" placeholder="facoltativo"></div>
       </div>
+      <div id="dtEutBox" style="display:none; margin-top:10px;"><label>Impianti collegati alla linea durante il fermo</label><div id="dtEutPlants" style="display:flex; flex-wrap:wrap; gap:14px; margin-top:4px;"></div><p class="note" style="margin-top:4px;">Togli la spunta agli impianti che lavoravano fuori dalla gestione Eutrolog: non si sono fermati.</p></div>
       <div class="btn-row"><button class="btn-primary" onclick="addDowntime()">+ Registra fermo</button></div>
     </div>
     <div class="card">
@@ -4091,11 +4092,13 @@ let DOWNTIME_CAUSES = DOWNTIME_DEFAULT_CAUSES.slice();
 // Linea Eutrolog: allestimento automatico delle bobine di questi impianti. Se si ferma, si fermano tutti.
 const EUTROLOG = 'EUTROLOG';
 const EUTROLOG_PLANTS = ['100','116','118','115','119'];
-// Ogni fermo della linea Eutrolog diventa un fermo (stessi minuti) su ciascun impianto collegato.
+// Impianti realmente collegati alla linea durante quel fermo (registrazioni vecchie senza dato = tutti).
+function eutAffected(r){ return Array.isArray(r.affected) ? EUTROLOG_PLANTS.filter(p=>r.affected.includes(p)) : EUTROLOG_PLANTS.slice(); }
+// Ogni fermo della linea Eutrolog diventa un fermo (stessi minuti) su ciascun impianto collegato in quel momento.
 function expandDowntime(rows){
   const out = [];
   rows.forEach(r=>{
-    if(r.plant===EUTROLOG) EUTROLOG_PLANTS.forEach(p=>out.push(Object.assign({}, r, {plant:p, viaEutrolog:true, parentId:r.id})));
+    if(r.plant===EUTROLOG) eutAffected(r).forEach(p=>out.push(Object.assign({}, r, {plant:p, viaEutrolog:true, parentId:r.id})));
     else out.push(r);
   });
   return out;
@@ -4114,6 +4117,9 @@ function fillDowntimeSelects(){
   if(plantSel){ const v = plantSel.value; plantSel.innerHTML = plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); if(plants.includes(v)) plantSel.value = v; }
   if(filterSel){ const v = filterSel.value; filterSel.innerHTML = '<option value="">Tutti</option>' + plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); filterSel.value = v || ''; }
   if(causeSel){ const v = causeSel.value; causeSel.innerHTML = DOWNTIME_CAUSES.map(c=>`<option>${escHtml(c)}</option>`).join(''); if(DOWNTIME_CAUSES.includes(v)) causeSel.value = v; }
+  const eb = document.getElementById('dtEutPlants');
+  if(eb && !eb.children.length) eb.innerHTML = EUTROLOG_PLANTS.map(p=>`<label style="display:flex; align-items:center; gap:5px; white-space:nowrap;"><input type="checkbox" class="dtEutChk" value="${p}" checked style="width:auto;"> ${plantLabel(p)}</label>`).join('');
+  toggleEutrologBox();
   const d = document.getElementById('dtNewDate'); if(d && !d.value) d.value = todayStr();
   const from = document.getElementById('dtFrom'), to = document.getElementById('dtTo');
   if(from && !from.value) from.value = shiftDate(todayStr(), -90);
@@ -4124,15 +4130,36 @@ function addDowntime(){
   const minutes = Number(document.getElementById('dtNewMin').value);
   if(!date){ toast('Inserisci la data'); return; }
   if(!(minutes>0)){ toast('Inserisci i minuti persi'); return; }
+  const plant = document.getElementById('dtNewPlant').value;
+  let affected;
+  if(plant===EUTROLOG){
+    affected = [...document.querySelectorAll('.dtEutChk')].filter(c=>c.checked).map(c=>c.value);
+    if(!affected.length){ toast('Spunta almeno un impianto collegato alla linea'); return; }
+  }
   DOWNTIME_LOG.push({
     id: Date.now().toString(36)+Math.random().toString(36).slice(2,6), date,
-    plant: document.getElementById('dtNewPlant').value,
+    plant,
     turno: document.getElementById('dtNewTurno').value,
     cause: document.getElementById('dtNewCause').value,
     minutes, note: document.getElementById('dtNewNote').value.trim(),
+    ...(affected ? {affected} : {}),
   });
   document.getElementById('dtNewMin').value = ''; document.getElementById('dtNewNote').value = '';
+  document.querySelectorAll('.dtEutChk').forEach(c=>c.checked = true);
   saveDowntime(); renderDowntimePage(); toast('Fermo registrato');
+}
+function toggleEutrologBox(){
+  const sel = document.getElementById('dtNewPlant'), box = document.getElementById('dtEutBox');
+  if(sel && box) box.style.display = sel.value===EUTROLOG ? '' : 'none';
+}
+// Dall'elenco: aggiunge/toglie un impianto da un fermo Eutrolog già registrato
+function toggleEutPlant(id, plant){
+  const r = DOWNTIME_LOG.find(d=>d.id===id); if(!r) return;
+  const cur = eutAffected(r);
+  const next = cur.includes(plant) ? cur.filter(p=>p!==plant) : cur.concat(plant);
+  if(!next.length){ toast('Deve restare almeno un impianto'); return; }
+  r.affected = EUTROLOG_PLANTS.filter(p=>next.includes(p));
+  saveDowntime(); renderDowntimePage();
 }
 function deleteDowntime(id){
   if(!confirm('Eliminare questo fermo?')) return;
@@ -4165,7 +4192,7 @@ function filteredDowntime(raw){
   if(incl) rows = rows.concat((MAINTENANCE_LOG||[]).filter(m=>Number(m.downtimeHours)>0).map(m=>({
     id:'m'+m.id, date:m.date, plant:m.plant, turno:'', cause:'Manutenzione: '+(m.type||'intervento'), minutes:Number(m.downtimeHours)*60, note:m.description||'', src:'manutenzione'})));
   rows = rows.filter(d=>d.date>=from && d.date<=to);
-  if(raw) return rows.filter(d=>!plant || d.plant===plant || (d.plant===EUTROLOG && EUTROLOG_PLANTS.includes(plant))).sort((a,b)=>b.date.localeCompare(a.date));
+  if(raw) return rows.filter(d=>!plant || d.plant===plant || (d.plant===EUTROLOG && eutAffected(d).includes(plant))).sort((a,b)=>b.date.localeCompare(a.date));
   return expandDowntime(rows).filter(d=>!plant || (plant===EUTROLOG ? d.viaEutrolog : d.plant===plant)).sort((a,b)=>b.date.localeCompare(a.date));
 }
 function paretoOf(rows, keyFn){
@@ -4176,6 +4203,13 @@ function paretoOf(rows, keyFn){
   return Object.entries(tot).sort((a,b)=>b[1]-a[1]).map(([k,m])=>{ cum += m; return {key:k, minutes:m, count:cnt[k], pct: sum? m/sum*100 : 0, cumPct: sum? cum/sum*100 : 0}; });
 }
 function fmtMin(m){ const h = Math.floor(m/60), mm = Math.round(m%60); return h ? `${h} h ${String(mm).padStart(2,'0')}′` : `${mm}′`; }
+function eutListDetail(r){
+  const aff = eutAffected(r);
+  const chips = EUTROLOG_PLANTS.map(p=>{ const on = aff.includes(p);
+    const btn = `<button class="btn-ghost" style="padding:1px 7px; font-size:11px; ${on?'':'text-decoration:line-through; opacity:.45;'}" title="${on?'Fermo per la linea — clic se lavorava fuori linea':'Fuori linea — clic se era collegato'}" onclick="toggleEutPlant('${r.id}','${p}')">${escHtml(plantLabel(p))}</button>`;
+    return r.src==='registro' ? btn : (on?escHtml(plantLabel(p)):''); }).join(' ');
+  return `<div class="note" style="margin-top:3px;">→ ${chips}<br>${aff.length} impianti fermi · totale ${fmtMin(r.minutes*aff.length)}</div>`;
+}
 function renderDowntimePage(){
   fillDowntimeSelects();
   const an = document.getElementById('downtimeAnalysis');
@@ -4236,7 +4270,7 @@ function renderDowntimePage(){
   }
   if(list){
     list.innerHTML = rawRows.length ? '<thead><tr><th>Data</th><th>Impianto</th><th>Turno</th><th>Causa</th><th>Tempo</th><th>Note</th><th></th></tr></thead><tbody>'
-      + rawRows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td class="plant">${escHtml(plantLabel(r.plant))}</td><td>${r.turno?turnoLabel(r.turno):''}</td><td>${escHtml(r.cause)}</td><td>${fmtMin(r.minutes)}${r.plant===EUTROLOG?`<div class="note">→ ${EUTROLOG_PLANTS.join(', ')} fermi · totale ${fmtMin(r.minutes*EUTROLOG_PLANTS.length)}</div>`:''}</td><td>${escHtml(r.note||'')}</td>
+      + rawRows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td class="plant">${escHtml(plantLabel(r.plant))}</td><td>${r.turno?turnoLabel(r.turno):''}</td><td>${escHtml(r.cause)}</td><td>${fmtMin(r.minutes)}${r.plant===EUTROLOG?eutListDetail(r):''}</td><td>${escHtml(r.note||'')}</td>
         <td>${r.src==='registro'?`<button class="btn-danger" onclick="deleteDowntime('${r.id}')">rimuovi</button>`:'<span class="note">da manutenzione</span>'}</td></tr>`).join('') + '</tbody>'
       : '<tr><td class="empty">Nessun fermo nel periodo.</td></tr>';
   }
@@ -6661,7 +6695,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · fermi linea Eutrolog';
+const APP_VERSION = '2026-10-23 · fermi Eutrolog con impianti fuori linea';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){

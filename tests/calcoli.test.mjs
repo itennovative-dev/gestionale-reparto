@@ -190,6 +190,9 @@ const P = {tipo:'Reale', tariffa:'14.2', giorni:'21', baseGiorno:'113.6', ivs:'0
   eq('Eutrolog: gli altri fermi restano invariati', e.filter(r=>!r.viaEutrolog).map(r=>[r.plant,r.minutes]), [['110',30]]);
   const p = run(`paretoOf(expandDowntime([{id:'x',plant:'EUTROLOG',cause:'G',minutes:60}]), r=>r.plant)`);
   eq('Eutrolog: nel Pareto per impianto ogni impianto ha 60 minuti', p.map(x=>x.minutes), [60,60,60,60,60]);
+  const f = run(`expandDowntime([{id:'z',plant:'EUTROLOG',cause:'G',minutes:60,affected:['100','116','118','119']}])`);
+  eq('Eutrolog: impianto fuori linea (115) escluso', f.map(r=>r.plant), ['100','116','118','119']);
+  eq('Eutrolog: 1 h di linea con 4 impianti collegati = 4 h', f.reduce((s,r)=>s+r.minutes,0), 240);
 }
 
 console.log(`\n${pass} test superati, ${fail} falliti`);
