@@ -22,10 +22,10 @@ jobs:
       - name: Test dei calcoli (se fallisce, il sito non viene aggiornato)
         run: node tests/calcoli.test.mjs
 
-      - name: Prepara la cartella del sito (solo index.html, nessun documento)
+      - name: Prepara la cartella del sito (solo le pagine, nessun documento)
         run: |
           mkdir -p public
-          cp index.html public/
+          cp index.html ricettario.html public/
 
       - name: Credenziali Firebase
         env:

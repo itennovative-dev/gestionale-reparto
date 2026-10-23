@@ -36,6 +36,7 @@ service cloud.firestore {
 
     // Operatori, impianti e turni delle squadre servono a tutti per calcolare i turni (calendario, situazione di oggi).
     // Le statistiche assenze leggono i dati delle coperture.
+    // Il ricettario (ricettario.html) tiene i suoi dati in sezioni/ricettario.
     function puoLeggere(sezione) {
       return admin() || (attivo() && (
         sezione in ['operatori', 'impianti', 'turni']
@@ -43,12 +44,13 @@ service cloud.firestore {
         || (sezione == 'coperture' && vede('assenze'))
       ));
     }
+    // Scrive chi ha "Può modificare" su quella sezione (i permessi li assegna solo l'amministratore).
     // I turni delle squadre si modificano dalle impostazioni delle coperture.
+    // Così una sezione nuova del gestionale non richiede di cambiare queste regole.
     function puoScrivere(sezione) {
       return admin() || (attivo() && sezione != 'altro' && (
         (sezione == 'turni' && modifica('coperture'))
-        || (sezione != 'turni' && sezione in ['coperture', 'planner', 'operatori', 'impianti', 'indumenti', 'competenze',
-                                              'manutenzione', 'fermi', 'produzione', 'opstats'] && modifica(sezione))
+        || (sezione != 'turni' && modifica(sezione))
       ));
     }
 

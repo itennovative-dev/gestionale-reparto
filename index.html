@@ -407,7 +407,7 @@
         <button class="menu-tile" data-sec="impianti" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
         <button class="menu-tile" data-sec="manutenzione" onclick="showPage('panel-maintenance')"><svg class="ico"><use href="#i-wrench"/></svg><span>Manutenzione impianti</span></button>
         <button class="menu-tile" data-sec="fermi" onclick="showPage('panel-downtime')"><svg class="ico"><use href="#i-alert"/></svg><span>Registro fermi macchina</span></button>
-        <a class="menu-tile" data-admin href="https://claude.ai/artifact/SMzgoU2WjsCHRqmnU5sMNa" target="_blank" rel="noopener" title="Si apre su Claude, visibile solo al proprietario"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
+        <a class="menu-tile" data-sec="ricettario" href="ricettario.html"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
       </div>
     </div>
 
@@ -1617,6 +1617,7 @@ const PERM_SECTIONS = [
   {id:'competenze',   label:'Matrice competenze',            kind:'full'},
   {id:'manutenzione', label:'Manutenzione impianti',         kind:'full'},
   {id:'fermi',        label:'Registro fermi macchina',       kind:'full'},
+  {id:'ricettario',   label:'Ricettario taglierine',         kind:'full', hint:'modificare = salvare in archivio e tarare gli impianti'},
   {id:'produzione',   label:'Statistiche produzione',        kind:'full', hint:'modificare = importare i file'},
   {id:'opstats',      label:'Statistiche turni e operatori', kind:'full', hint:'modificare = importare i file'},
   {id:'assenze',      label:'Statistiche assenze',           kind:'view'},
@@ -6943,7 +6944,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · sola consultazione senza inserimento';
+const APP_VERSION = '2026-10-23 · ricettario nel gestionale';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7011,6 +7012,7 @@ async function doLogout(force){
   try{ await firebase.auth().signOut(); }catch(e){}
   // cancella la copia locale dei dati: su un PC condiviso il prossimo utente non deve trovarla
   try{ await cloudDb.terminate(); await cloudDb.clearPersistence(); }catch(e){}
+  try{ ['ricettario-taglio-v5','ricettario-limiti'].forEach(k=>localStorage.removeItem(k)); }catch(e){}
   location.reload();
 }
 async function sendOwnPasswordReset(){

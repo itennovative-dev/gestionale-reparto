@@ -2,6 +2,7 @@
 *
 !.gitignore
 !index.html
+!ricettario.html
 !firebase.json
 !.firebaserc
 !firestore.rules
