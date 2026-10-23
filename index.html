@@ -72,6 +72,33 @@
   .login-box input{width:100%; padding:9px 10px; border:1px solid var(--line); border-radius:8px; font-size:14px; font-family:inherit;}
   .login-box button{width:100%; margin-top:18px; padding:10px; border:none; border-radius:8px; font-size:14px; cursor:pointer;}
   .login-error{color:var(--danger); font-size:12.5px; margin-top:12px; min-height:1em;}
+  .login-box button.link-btn{background:none; color:var(--steel); margin-top:8px; padding:4px; font-size:12px; text-decoration:underline;}
+  /* Utenti e permessi */
+  .readonly-bar{display:none; position:fixed; top:10px; right:12px; z-index:9000; background:var(--t1-bg); color:#6e5530; border:1px solid #e3d6bb; border-radius:999px; padding:6px 14px; font-size:12px; box-shadow:var(--shadow); max-width:calc(100% - 24px);}
+  .readonly-bar.show{display:block;}
+  .perm-note{background:var(--t1-bg); border:1px solid #e3d6bb; color:#5d4827; border-radius:10px; padding:10px 14px; font-size:12.5px; margin:10px 0 4px; line-height:1.45;}
+  .user-new-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px 16px; align-items:end;}
+  .user-new-grid label{display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--steel);}
+  .user-new-grid input, .user-new-grid select{width:100%;}
+  .user-new-grid input[type=password]{padding:8px 10px; border:1px solid var(--line); border-radius:8px; font-size:13px; font-family:inherit; background:#fff;}
+  .user-card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 18px; margin-bottom:14px; box-shadow:var(--shadow);}
+  .user-card.off{opacity:.72;}
+  .user-head{display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between;}
+  .user-name{font-weight:600; font-size:14.5px;}
+  .user-email{font-size:12px; color:var(--steel);}
+  .user-state{font-size:10.5px; font-weight:700; border-radius:5px; padding:3px 8px; margin-left:6px; vertical-align:2px;}
+  .user-state.on{background:var(--ok-bg); color:var(--ok);}
+  .user-state.off{background:var(--danger-bg); color:var(--danger);}
+  .user-actions{display:flex; flex-wrap:wrap; gap:6px;}
+  .user-actions button{font-size:11.5px; padding:5px 10px;}
+  .user-presets{display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:12px 0 4px; font-size:12px; color:var(--steel);}
+  .user-presets button{font-size:11.5px; padding:4px 9px;}
+  .perm-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:6px 18px; margin-top:8px;}
+  .perm-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); font-size:12.5px;}
+  .perm-row select{max-width:170px; font-size:12px;}
+  .perm-row select.lvl-none{color:var(--sub);}
+  .perm-row select.lvl-view{color:#3e5c6c;}
+  .perm-row select.lvl-edit{color:var(--ok); font-weight:600;}
   .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:8px; font-size:12.5px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:50;}
   .toast.show{opacity:1;}
   select.sub-select{max-width:220px;}
@@ -356,43 +383,45 @@
     <div class="menu-group">
       <h2>Oggi</h2>
       <div class="menu-grid">
-        <button class="menu-tile" onclick="showPage('page-coperture')"><svg class="ico"><use href="#i-shifts"/></svg><span>Coperture turni</span></button>
-        <button class="menu-tile" onclick="showPage('panel-planner')"><svg class="ico"><use href="#i-planner"/></svg><span>Planner settimanale</span></button>
-        <button class="menu-tile" onclick="showPage('panel-calendar')"><svg class="ico"><use href="#i-calendar"/></svg><span>Calendario mensile</span></button>
+        <button class="menu-tile" data-sec="coperture" onclick="showPage('page-coperture')"><svg class="ico"><use href="#i-shifts"/></svg><span>Coperture turni</span></button>
+        <button class="menu-tile" data-sec="planner" onclick="showPage('panel-planner')"><svg class="ico"><use href="#i-planner"/></svg><span>Planner settimanale</span></button>
+        <button class="menu-tile" data-sec="calendario" onclick="showPage('panel-calendar')"><svg class="ico"><use href="#i-calendar"/></svg><span>Calendario mensile</span></button>
       </div>
     </div>
 
     <div class="menu-group">
       <h2>Persone</h2>
       <div class="menu-grid">
-        <button class="menu-tile" onclick="showPage('panel-roster')"><svg class="ico"><use href="#i-users"/></svg><span>Operatori e sostituti</span></button>
-        <button class="menu-tile" onclick="showPage('panel-clothing')"><svg class="ico"><use href="#i-shirt"/></svg><span>Indumenti operatori</span></button>
-        <button class="menu-tile" onclick="showPage('panel-skills')"><svg class="ico"><use href="#i-grid"/></svg><span>Matrice competenze</span></button>
+        <button class="menu-tile" data-sec="operatori" onclick="showPage('panel-roster')"><svg class="ico"><use href="#i-users"/></svg><span>Operatori e sostituti</span></button>
+        <button class="menu-tile" data-sec="indumenti" onclick="showPage('panel-clothing')"><svg class="ico"><use href="#i-shirt"/></svg><span>Indumenti operatori</span></button>
+        <button class="menu-tile" data-sec="competenze" onclick="showPage('panel-skills')"><svg class="ico"><use href="#i-grid"/></svg><span>Matrice competenze</span></button>
       </div>
     </div>
 
     <div class="menu-group">
       <h2>Impianti</h2>
       <div class="menu-grid">
-        <button class="menu-tile" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
-        <button class="menu-tile" onclick="showPage('panel-maintenance')"><svg class="ico"><use href="#i-wrench"/></svg><span>Manutenzione impianti</span></button>
-        <button class="menu-tile" onclick="showPage('panel-downtime')"><svg class="ico"><use href="#i-alert"/></svg><span>Registro fermi macchina</span></button>
-        <a class="menu-tile" href="https://claude.ai/artifact/SMzgoU2WjsCHRqmnU5sMNa" target="_blank" rel="noopener" title="Si apre su Claude, visibile solo al proprietario"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
+        <button class="menu-tile" data-sec="impianti" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
+        <button class="menu-tile" data-sec="manutenzione" onclick="showPage('panel-maintenance')"><svg class="ico"><use href="#i-wrench"/></svg><span>Manutenzione impianti</span></button>
+        <button class="menu-tile" data-sec="fermi" onclick="showPage('panel-downtime')"><svg class="ico"><use href="#i-alert"/></svg><span>Registro fermi macchina</span></button>
+        <a class="menu-tile" data-admin href="https://claude.ai/artifact/SMzgoU2WjsCHRqmnU5sMNa" target="_blank" rel="noopener" title="Si apre su Claude, visibile solo al proprietario"><svg class="ico"><use href="#i-recipe"/></svg><span>Ricettario taglierine</span></a>
       </div>
     </div>
 
     <div class="menu-group">
       <h2>Analisi</h2>
       <div class="menu-grid">
-        <button class="menu-tile" onclick="showPage('panel-production')"><svg class="ico"><use href="#i-trend"/></svg><span>Statistiche produzione</span></button>
-        <button class="menu-tile" onclick="showPage('panel-opstats')"><svg class="ico"><use href="#i-bars"/></svg><span>Statistiche turni e operatori</span></button>
-        <button class="menu-tile" onclick="showPage('panel-stats')"><svg class="ico"><use href="#i-userx"/></svg><span>Statistiche assenze</span></button>
+        <button class="menu-tile" data-sec="produzione" onclick="showPage('panel-production')"><svg class="ico"><use href="#i-trend"/></svg><span>Statistiche produzione</span></button>
+        <button class="menu-tile" data-sec="opstats" onclick="showPage('panel-opstats')"><svg class="ico"><use href="#i-bars"/></svg><span>Statistiche turni e operatori</span></button>
+        <button class="menu-tile" data-sec="assenze" onclick="showPage('panel-stats')"><svg class="ico"><use href="#i-userx"/></svg><span>Statistiche assenze</span></button>
       </div>
     </div>
 
     <div class="home-footer">
-      <button class="footer-link" onclick="showPage('panel-backup')"><svg class="ico-sm"><use href="#i-db"/></svg>Backup e sincronizzazione</button>
-      <button class="footer-link" onclick="showPage('panel-hours')"><svg class="ico-sm"><use href="#i-clock"/></svg>Area personale · Conteggio ore</button>
+      <button class="footer-link" data-sec="personale" onclick="showPage('panel-hours')"><svg class="ico-sm"><use href="#i-clock"/></svg>Area personale · Conteggio ore</button>
+      <button class="footer-link" data-admin onclick="showPage('panel-users')"><svg class="ico-sm"><use href="#i-users"/></svg>Utenti e permessi</button>
+      <button class="footer-link" data-admin onclick="showPage('panel-backup')"><svg class="ico-sm"><use href="#i-db"/></svg>Backup e sincronizzazione</button>
+      <button class="footer-link" onclick="showPage('panel-account')"><svg class="ico-sm"><use href="#i-sliders-sm"/></svg><span id="accountFooterLabel">Il mio account</span></button>
     </div>
     <p class="note" style="grid-column:1 / -1; text-align:center; margin-top:6px;">Versione sito: <span id="appVersion"></span></p>
 
@@ -548,6 +577,7 @@
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Conteggio ore</h2>
+    <div class="perm-note" id="hoursSetupNote" style="display:none;">È la tua area personale: i dati che inserisci qui li vedi solo tu. Prima di tutto apri <strong>Impostazioni generali</strong> e <strong>Parametri mensili</strong> e inserisci i valori della tua busta paga: quelli di partenza sono solo di esempio.</div>
     <p class="note">Timbrature giornaliere → ore ordinarie/straordinarie → cedolino mensile (competenze, trattenute, netto). Tutto calcolato automaticamente come nel foglio Excel originale.</p>
 
     <div class="menu-grid" style="margin:18px 0 26px;">
@@ -783,7 +813,7 @@
   <div class="page-body" style="max-width:1300px;">
     <h2><span class="n">•</span>Statistiche turni, operatori e impianti</h2>
     <p class="note">Per caricare nuovi file "operatore × macchina" o "turni operatori", usa la pagina <strong>Importa dati statistiche</strong> — riconosce da sola il tipo di file, insieme a quelli di produzione.</p>
-    <div class="btn-row">
+    <div class="btn-row" data-sec-edit="opstats">
       <button class="btn-ghost" onclick="showPage('panel-import')"><svg class="ico-sm"><use href="#i-upload"/></svg>Importa dati statistiche</button>
     </div>
 
@@ -858,6 +888,7 @@
   <div class="page-body" style="max-width:900px;">
     <h2><span class="n">•</span>Importa dati statistiche</h2>
 
+    <div data-sec-edit="produzione">
     <h3 class="panel-subtitle">Statistiche produzione</h3>
     <p class="note">Scegli il pulsante della fase giusta: il file caricato viene assegnato a quella fase a prescindere dal suo nome. Ricaricando un file già importato, i dati si aggiornano senza perdere gli anni già presenti.</p>
     <div class="btn-row">
@@ -865,10 +896,13 @@
       <label class="btn-primary" style="cursor:pointer;"><svg class="ico-sm"><use href="#i-upload"/></svg>Importa dati TOTALE<input type="file" accept=".xlsx" multiple style="display:none;" onchange="importProductionFilesForced(event,'TOTALE')"></label>
     </div>
 
+    </div>
+    <div data-sec-edit="opstats">
     <h3 class="panel-subtitle" style="margin-top:24px;">Turni, operatori e impianti</h3>
     <p class="note">Carica qui i file "operatore × macchina" e "turni operatori" (anche quelli per squadra, es. <em>2026_squadra_a.xlsx</em>: se il foglio non riporta la squadra, la prendo dal nome del file) — anche insieme, anche di anni diversi. L'anno si prende dall'intestazione o, se manca, dal nome del file.</p>
     <div class="btn-row">
       <input type="file" accept=".xlsx" multiple onchange="importOperatorFiles(event)">
+    </div>
     </div>
 
     <div id="importResultsList" style="margin-top:14px;"></div>
@@ -884,7 +918,7 @@
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Statistiche produzione</h2>
     <p class="note">Per caricare nuovi file, usa la pagina <strong>Importa dati statistiche</strong> — riconosce da sola il tipo di file, insieme a quelli di turni/operatori.</p>
-    <div class="btn-row">
+    <div class="btn-row" data-sec-edit="produzione">
       <button class="btn-ghost" onclick="showPage('panel-import')"><svg class="ico-sm"><use href="#i-upload"/></svg>Importa dati statistiche</button>
     </div>
 
@@ -1248,6 +1282,59 @@
   </div>
 </div>
 
+<div class="panel-section" id="panel-users" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:1000px;">
+    <h2><span class="n">•</span>Utenti e permessi</h2>
+    <p class="note">Qui decidi chi può accedere al gestionale e, sezione per sezione, se può solo consultarla o anche modificarla. Le modifiche valgono subito: il database rifiuta letture e salvataggi non permessi, anche a chi provasse ad aggirare l'interfaccia. L'<strong>Area personale · Conteggio ore</strong> è privata: ognuno vede solo i propri dati (neanche l'amministratore vede quelli degli altri).</p>
+    <p class="note">Operatori, impianti e turni delle squadre vengono sempre letti dal gestionale perché servono a calcolare i turni (calendario, situazione di oggi): il permesso decide se l'utente vede la pagina e se può modificarli. <strong>Statistiche assenze</strong> mostra i dati delle coperture anche senza la pagina Coperture.</p>
+
+    <div class="card" style="margin-top:18px;">
+      <h3 class="panel-subtitle" style="margin-top:0;">Nuovo utente</h3>
+      <div class="user-new-grid">
+        <label>Nome<input type="text" id="newUserName" placeholder="es. Mario Rossi"></label>
+        <label>Email<input type="email" id="newUserEmail" placeholder="nome@esempio.it" autocomplete="off"></label>
+        <label>Password iniziale<input type="text" id="newUserPassword" placeholder="almeno 6 caratteri" autocomplete="off"></label>
+        <label>Permessi di partenza<select id="newUserPreset">
+          <option value="view">Tutto in sola consultazione</option>
+          <option value="none">Nessuna sezione</option>
+          <option value="edit">Tutto modificabile</option>
+        </select></label>
+      </div>
+      <p class="note">Comunica tu la password alla persona: al primo accesso potrà cambiarla da <em>Il mio account</em>. L'area personale del Conteggio ore viene attivata subito.</p>
+      <div class="btn-row"><button class="btn-primary" id="newUserBtn" onclick="createAppUser()">Crea utente</button></div>
+    </div>
+
+    <h3 class="panel-subtitle" style="margin-top:26px;">Utenti abilitati</h3>
+    <div id="usersList"><p class="note">Caricamento…</p></div>
+  </div>
+</div>
+
+<div class="panel-section" id="panel-account" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:640px;">
+    <h2><span class="n">•</span>Il mio account</h2>
+    <p class="note" id="accountInfo"></p>
+    <div class="card" style="margin-top:16px;">
+      <h3 class="panel-subtitle" style="margin-top:0;">Cambia password</h3>
+      <form class="user-new-grid" onsubmit="event.preventDefault(); changeOwnPassword();">
+        <input type="email" id="accountEmailHidden" autocomplete="username" style="display:none;">
+        <label>Password attuale<input type="password" id="pwdCurrent" autocomplete="current-password"></label>
+        <label>Nuova password<input type="password" id="pwdNew" autocomplete="new-password" placeholder="almeno 6 caratteri"></label>
+        <label>Ripeti nuova password<input type="password" id="pwdNew2" autocomplete="new-password"></label>
+        <div><button type="submit" class="btn-primary" id="pwdBtn">Salva nuova password</button></div>
+      </form>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h3 class="panel-subtitle" style="margin-top:0;">Esci</h3>
+      <p class="note">Su un PC usato anche da altri esci sempre a fine utilizzo: all'uscita viene cancellata anche la copia dei dati salvata in questo browser.</p>
+      <div class="btn-row"><button class="btn-ghost" onclick="doLogout()">Esci dal gestionale</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="readonly-bar" id="readOnlyBar">Sola consultazione · le modifiche in questa pagina non vengono salvate</div>
+
 <div class="login-overlay" id="loginOverlay">
   <form class="login-box" onsubmit="event.preventDefault(); doLogin();">
     <h1>Reparto Taglio</h1>
@@ -1257,6 +1344,7 @@
     <label for="loginPassword">Password</label>
     <input type="password" id="loginPassword" autocomplete="current-password" required>
     <button type="submit" class="btn-primary" id="loginBtn">Accedi</button>
+    <button type="button" class="link-btn" onclick="sendOwnPasswordReset()">Password dimenticata?</button>
     <div class="login-error" id="loginError"></div>
   </form>
 </div>
@@ -1499,7 +1587,7 @@ const FIREBASE_CONFIG = {
   messagingSenderId: "963083540400",
   appId: "1:963083540400:web:c0c3c7841569d269a72875"
 };
-const CLOUD_COLLECTION = 'dati';
+const CLOUD_COLLECTION = 'dati'; // vecchia collezione unica (prima di utenti e permessi): resta come copia di sola lettura
 const CLOUD_MAX_VALUE = 900000; // limite Firestore: ~1 MB per documento
 const LS_PREFIX = 'coperture-turni:';
 const CLOUD_ENABLED = !!(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId && window.firebase);
@@ -1507,11 +1595,91 @@ const CLOUD_CACHE = new Map();
 let cloudDb = null;
 let cloudPendingWrites = 0;
 
+/* ============================= UTENTI E PERMESSI =============================
+   Ogni dato appartiene a una sezione e nel database sta in  sezioni/{sezione}/dati/{chiave}.
+   I dati del Conteggio ore sono personali e stanno in  personale/{uid}/dati/{chiave}: li vede solo il proprietario.
+   I permessi di ogni utente stanno in  utenti/{email}  e li decide solo l'amministratore (pagina "Utenti e permessi").
+   Le stesse regole sono scritte in firestore.rules: è il database a rifiutare letture e scritture non permesse,
+   l'interfaccia si limita a nascondere ciò che non serve. Se cambi le sezioni qui, aggiorna anche firestore.rules. */
+const ADMIN_EMAIL = 'vilardogiovanni@gmail.com';
+// Sezioni come le vede l'amministratore nella pagina dei permessi.
+// kind: 'full' = Non vede / Solo consultazione / Può modificare · 'view' = Non vede / Vede · 'personal' = Disattivata / Attiva
+const PERM_SECTIONS = [
+  {id:'coperture',    label:'Coperture turni',               kind:'full', hint:'assenze, proposte e impostazioni coperture'},
+  {id:'planner',      label:'Planner settimanale',           kind:'full'},
+  {id:'calendario',   label:'Calendario mensile',            kind:'view'},
+  {id:'operatori',    label:'Operatori e sostituti',         kind:'full'},
+  {id:'impianti',     label:'Impianti',                      kind:'full'},
+  {id:'indumenti',    label:'Indumenti operatori',           kind:'full'},
+  {id:'competenze',   label:'Matrice competenze',            kind:'full'},
+  {id:'manutenzione', label:'Manutenzione impianti',         kind:'full'},
+  {id:'fermi',        label:'Registro fermi macchina',       kind:'full'},
+  {id:'produzione',   label:'Statistiche produzione',        kind:'full', hint:'modificare = importare i file'},
+  {id:'opstats',      label:'Statistiche turni e operatori', kind:'full', hint:'modificare = importare i file'},
+  {id:'assenze',      label:'Statistiche assenze',           kind:'view'},
+  {id:'personale',    label:'Area personale · Conteggio ore', kind:'personal', hint:'dati privati di ciascuno'},
+];
+// Chiavi dei dati → sezione del database (le chiavi che finiscono con ":" valgono come prefisso)
+const PERSONAL_KEYS = ['daily-hours','hours-extra','hours-goals','hours-settings','monthly-params','tredicesime'];
+const KEY_SECTION_RULES = [
+  ['absences:','coperture'], ['proposal:','coperture'], ['manualfill:','coperture'], ['known-weeks','coperture'],
+  ['sub-capacities','coperture'], ['fermo-order','coperture'], ['recipients-email','coperture'], ['nightshift-history','coperture'],
+  ['teamturni:','turni'], ['team-rotation','turni'], ['turni-speciali','turni'],
+  ['planner:','planner'],
+  ['roster-employees','operatori'], ['roster-substitutes','operatori'], ['schedule-official','operatori'],
+  ['roster-plants','impianti'],
+  ['clothing-sizes','indumenti'], ['skills-matrix','competenze'],
+  ['maintenance-plan','manutenzione'], ['maintenance-log','manutenzione'],
+  ['downtime-log','fermi'], ['downtime-causes','fermi'],
+  ['production-stats','produzione'], ['operator-records','opstats'],
+];
+const STORAGE_SECTIONS = ['coperture','turni','planner','operatori','impianti','indumenti','competenze','manutenzione','fermi','produzione','opstats','altro'];
+const ALWAYS_READABLE = ['operatori','impianti','turni']; // servono a tutti per calcolare i turni
+function storageSectionOf(key){
+  if(PERSONAL_KEYS.includes(key)) return 'personale';
+  for(const [p, sec] of KEY_SECTION_RULES){
+    if(p.endsWith(':') ? key.indexOf(p)===0 : key===p) return sec;
+  }
+  return 'altro'; // dati non previsti: solo amministratore
+}
+
+// Utente collegato. Senza database online (solo browser) tutto è permesso.
+let CURRENT_USER = {uid:null, email:'', nome:'', admin:true, permessi:{}};
+function permLevel(sec){
+  if(CURRENT_USER.admin) return 'edit';
+  const l = (CURRENT_USER.permessi||{})[sec];
+  return (l==='view' || l==='edit') ? l : 'none';
+}
+function canView(sec){ return permLevel(sec)!=='none'; }
+function canEdit(sec){ return permLevel(sec)==='edit'; }
+function canReadStorage(s){
+  if(CURRENT_USER.admin) return true;
+  if(s==='personale') return canView('personale');
+  if(ALWAYS_READABLE.includes(s)) return true;
+  if(s==='coperture') return canView('coperture') || canView('assenze');
+  if(s==='altro') return false;
+  return canView(s);
+}
+function canWriteStorage(s){
+  if(CURRENT_USER.admin) return true;
+  if(s==='personale') return canView('personale');
+  if(s==='turni') return canEdit('coperture');
+  if(s==='altro') return false;
+  return canEdit(s);
+}
+
 function cloudDocId(key){ return encodeURIComponent(key); }
+function cloudDocRef(key){
+  const s = storageSectionOf(key);
+  if(s==='personale') return cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati').doc(cloudDocId(key));
+  return cloudDb.collection('sezioni').doc(s).collection('dati').doc(cloudDocId(key));
+}
 async function cloudLoadAll(){
-  const snap = await cloudDb.collection(CLOUD_COLLECTION).get();
+  const cols = STORAGE_SECTIONS.filter(canReadStorage).map(s=>cloudDb.collection('sezioni').doc(s).collection('dati'));
+  if(canReadStorage('personale')) cols.push(cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati'));
+  const snaps = await Promise.all(cols.map(c=>c.get()));
   CLOUD_CACHE.clear();
-  snap.forEach(doc=>{ const d = doc.data(); if(d && typeof d.k==='string') CLOUD_CACHE.set(d.k, d.v); });
+  snaps.forEach(snap=>snap.forEach(doc=>{ const d = doc.data(); if(d && typeof d.k==='string') CLOUD_CACHE.set(d.k, d.v); }));
 }
 function cloudWrite(key, value){
   if(value.length > CLOUD_MAX_VALUE){
@@ -1519,19 +1687,77 @@ function cloudWrite(key, value){
     return;
   }
   cloudPendingWrites++;
-  const user = firebase.auth().currentUser;
-  cloudDb.collection(CLOUD_COLLECTION).doc(cloudDocId(key)).set({
+  cloudDocRef(key).set({
     k: key, v: value,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    updatedBy: user ? user.email : ''
+    updatedBy: CURRENT_USER.email || ''
   }).catch(e=>{
     console.error('Salvataggio online non riuscito', key, e);
-    toast('⚠ Salvataggio online non riuscito: ricarica la pagina e riprova');
+    toast(e && e.code==='permission-denied' ? '⚠ Non hai il permesso di modificare questi dati' : '⚠ Salvataggio online non riuscito: ricarica la pagina e riprova');
   }).finally(()=>{ cloudPendingWrites--; });
 }
 window.addEventListener('beforeunload', e=>{
   if(cloudPendingWrites>0){ e.preventDefault(); e.returnValue=''; }
 });
+
+/* Una sola volta: sposta i dati dalla vecchia collezione unica "dati" alle sezioni (e i dati del Conteggio ore
+   nell'area personale dell'amministratore). La vecchia collezione resta intatta come copia di sicurezza,
+   leggibile solo dall'amministratore e non più modificabile. */
+async function migrateLegacyDataIfNeeded(){
+  const metaRef = cloudDb.collection('sistema').doc('migrazione-sezioni');
+  const meta = await metaRef.get();
+  if(meta.exists) return;
+  document.getElementById('loginStatus').textContent = 'Riorganizzo i dati per utenti e permessi (solo la prima volta)…';
+  const snap = await cloudDb.collection(CLOUD_COLLECTION).get();
+  const docs = [];
+  snap.forEach(d=>{ const x = d.data(); if(x && typeof x.k==='string' && typeof x.v==='string') docs.push(x); });
+  let batch = cloudDb.batch(), ops = 0, bytes = 0;
+  for(const x of docs){
+    const size = x.v.length*2 + x.k.length + 300;
+    if(ops && (ops>=400 || bytes+size > 6000000)){ await batch.commit(); batch = cloudDb.batch(); ops = 0; bytes = 0; }
+    batch.set(cloudDocRef(x.k), {k:x.k, v:x.v, updatedAt: x.updatedAt || firebase.firestore.FieldValue.serverTimestamp(), updatedBy: x.updatedBy || ''});
+    ops++; bytes += size;
+  }
+  if(ops) await batch.commit();
+  await metaRef.set({fatta: firebase.firestore.FieldValue.serverTimestamp(), documenti: docs.length, da: CURRENT_USER.email});
+}
+
+async function loadCurrentUser(user){
+  const email = String(user.email||'').toLowerCase();
+  if(email===ADMIN_EMAIL){
+    CURRENT_USER = {uid:user.uid, email, nome:'Amministratore', admin:true, permessi:{}};
+    return;
+  }
+  const doc = await cloudDb.collection('utenti').doc(email).get();
+  const d = doc.exists ? doc.data() : null;
+  if(!d || d.attivo!==true){ const err = new Error('Account non abilitato'); err.code = 'not-enabled'; throw err; }
+  CURRENT_USER = {uid:user.uid, email, nome:d.nome||email, admin:false, permessi:d.permessi||{}};
+}
+// Se l'amministratore cambia i permessi mentre l'utente ha il gestionale aperto
+let profileWatchUnsub = null;
+function watchOwnProfile(){
+  if(CURRENT_USER.admin || profileWatchUnsub) return;
+  const start = JSON.stringify(CURRENT_USER.permessi||{});
+  profileWatchUnsub = cloudDb.collection('utenti').doc(CURRENT_USER.email).onSnapshot(doc=>{
+    const d = doc.exists ? doc.data() : null;
+    if(!d || d.attivo!==true){ toast('Il tuo accesso è stato disattivato'); setTimeout(()=>doLogout(true), 1500); return; }
+    if(JSON.stringify(d.permessi||{})!==start && !document.getElementById('permChangedBar')){
+      const bar = document.createElement('div');
+      bar.id = 'permChangedBar';
+      bar.style.cssText = 'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;background:var(--ink,#152233);color:#fff;padding:10px 16px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.25);font-size:14px;display:flex;gap:12px;align-items:center;max-width:calc(100% - 32px);';
+      bar.innerHTML = '<span>I tuoi permessi sono stati aggiornati</span><button class="btn-primary" style="padding:6px 12px;">Aggiorna</button>';
+      bar.querySelector('button').onclick = ()=>location.reload();
+      document.body.appendChild(bar);
+    }
+  }, ()=>{});
+}
+
+let APP_READY = false, lastReadOnlyToast = 0;
+function notifyReadOnly(){
+  if(!APP_READY || Date.now()-lastReadOnlyToast < 8000) return;
+  lastReadOnlyToast = Date.now();
+  toast('Sola consultazione: non hai il permesso di modificare questi dati');
+}
 
 async function storageGet(key){
   if(CLOUD_ENABLED) return CLOUD_CACHE.has(key) ? {key, value:CLOUD_CACHE.get(key)} : null;
@@ -1542,6 +1768,8 @@ async function storageGet(key){
 }
 async function storageSet(key, value){
   if(CLOUD_ENABLED){
+    if(CLOUD_CACHE.get(key)===value) return {key, value}; // niente di cambiato: nessun salvataggio
+    if(!canWriteStorage(storageSectionOf(key))){ notifyReadOnly(); return null; }
     CLOUD_CACHE.set(key, value);
     cloudWrite(key, value);
     return {key, value};
@@ -2291,8 +2519,11 @@ async function renderHomeBanner(){
   const cTasks = card('', 'panel-planner', 'Impegni di oggi', tasksOpen,
     tasks.length ? (tasksOpen ? `da fare su ${tasks.length}` : 'tutti completati') : 'nessun impegno in agenda', taskItems);
 
+  const cards = (canView('coperture') ? cAbs+cOpen : '') + (canView('coperture')||canView('manutenzione') ? cFermi : '')
+    + (canView('manutenzione') ? cMaint : '') + (canView('planner') ? cTasks : '');
+  el.style.display = cards ? '' : 'none';
   el.innerHTML = `<div class="today-head"><h2>Situazione di oggi</h2><span>Settimana ${week.split('-W')[1]} · ${dateLong}</span></div>
-    <div class="today-grid">${cAbs}${cOpen}${cFermi}${cMaint}${cTasks}</div>`;
+    <div class="today-grid">${cards}</div>`;
 }
 
 /* Torna alla pagina precedente (usato dalle pagine raggiungibili da più punti, es. Importa dati). */
@@ -4306,11 +4537,12 @@ async function downloadDowntimeExcel(){
 
 /* ============================= CONTEGGIO ORE (timbrature -> cedolino mensile) ============================= */
 let HOURS_SETTINGS = {oreOrdinarieMax:8, cral:5, addRegionale:114.41, buoniPastoTariffa:7.04, buoniPastoNumero:28, irpefSoglia:2153.85, irpefAliquota:0.33, irpefQuotaFissa:495.39, giornoPagaStipendio:6, giornoPagaTredicesima:15, oreTredicesima:173};
+let HOURS_SETTINGS_SAVED = false;
 let DAILY_HOURS = {}; // "YYYY-MM-DD" -> {e1,u1,e2,u2,manuale,ferie}
 let MONTHLY_PARAMS = {}; // "YYYY-MM" -> {tipo,tariffa,giorni,baseGiorno,ivs,etichettaPremio,premio,conguaglio,rettifica,rimborso730,stimaStraord}
 
 async function loadHoursData(){
-  try{ const r = await storageGet('hours-settings'); if(r) HOURS_SETTINGS = Object.assign(HOURS_SETTINGS, JSON.parse(r.value)); }catch(e){}
+  try{ const r = await storageGet('hours-settings'); HOURS_SETTINGS_SAVED = !!r; if(r) HOURS_SETTINGS = Object.assign(HOURS_SETTINGS, JSON.parse(r.value)); }catch(e){}
   try{ const r = await storageGet('daily-hours'); DAILY_HOURS = r ? JSON.parse(r.value) : {}; }catch(e){ DAILY_HOURS = {}; }
   try{ const r = await storageGet('monthly-params'); MONTHLY_PARAMS = r ? JSON.parse(r.value) : {}; }catch(e){ MONTHLY_PARAMS = {}; }
   try{ const r = await storageGet('tredicesime'); TREDICESIME = r ? JSON.parse(r.value) : {}; }catch(e){ TREDICESIME = {}; }
@@ -6641,8 +6873,10 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account'];
 function showPage(id){
+  if(!pageAllowed(id)){ toast('Non hai accesso a questa sezione'); id = 'page-home'; }
+  updateReadOnlyBar(id);
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
   ALL_APP_PAGES.forEach(p=>{
@@ -6675,6 +6909,9 @@ function showPage(id){
   if(id==='panel-hours-import') renderHoursImportPreview();
   if(id==='panel-skills') renderSkillsPage();
   if(id==='panel-downtime') renderDowntimePage();
+  if(id==='panel-users') renderUsersPage();
+  if(id==='panel-account') renderAccountPage();
+  if(id==='panel-hours'){ const n = document.getElementById('hoursSetupNote'); if(n) n.style.display = (CLOUD_ENABLED && !CURRENT_USER.admin && !HOURS_SETTINGS_SAVED) ? '' : 'none'; }
 }
 function showProposalPanel(hasData){
   document.getElementById('proposalEmpty').style.display = hasData ? 'none' : 'block';
@@ -6695,7 +6932,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · fermi Eutrolog con impianti fuori linea';
+const APP_VERSION = '2026-10-23 · utenti e permessi';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -6755,11 +6992,228 @@ async function doLogin(){
     showLogin(e.code==='auth/network-request-failed' ? 'Nessuna connessione a internet' : 'Email o password errate', true);
   }
 }
-async function doLogout(){
-  if(cloudPendingWrites>0 && !confirm('Ci sono salvataggi ancora in corso. Uscire comunque?')) return;
-  await firebase.auth().signOut();
+let LOGGING_OUT = false;
+async function doLogout(force){
+  if(!force && cloudPendingWrites>0 && !confirm('Ci sono salvataggi ancora in corso. Uscire comunque?')) return;
+  LOGGING_OUT = true;
+  try{ if(profileWatchUnsub) profileWatchUnsub(); }catch(e){}
+  try{ await firebase.auth().signOut(); }catch(e){}
+  // cancella la copia locale dei dati: su un PC condiviso il prossimo utente non deve trovarla
+  try{ await cloudDb.terminate(); await cloudDb.clearPersistence(); }catch(e){}
   location.reload();
 }
+async function sendOwnPasswordReset(){
+  const email = document.getElementById('loginEmail').value.trim();
+  if(!email){ showLogin('Scrivi la tua email nel campo qui sopra, poi premi di nuovo "Password dimenticata?"', true); return; }
+  try{
+    await firebase.auth().sendPasswordResetEmail(email);
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginStatus').textContent = 'Se l\'email è registrata, ti è arrivato un messaggio per scegliere una nuova password (controlla anche lo spam).';
+  }catch(e){
+    showLogin(e.code==='auth/invalid-email' ? 'Email non valida' : 'Invio non riuscito: riprova tra poco', true);
+  }
+}
+/* ============================= PERMESSI NELL'INTERFACCIA ============================= */
+const PAGE_SECTION = {
+  'page-coperture':'coperture', 'panel-coperture-settings':'coperture', 'panel-capacity':'coperture', 'panel-fermo':'coperture',
+  'panel-teamturni':'coperture', 'panel-email':'coperture', 'panel-weeks':'coperture',
+  'panel-planner':'planner', 'panel-calendar':'calendario', 'panel-roster':'operatori', 'panel-plants':'impianti',
+  'panel-clothing':'indumenti', 'panel-skills':'competenze', 'panel-maintenance':'manutenzione', 'panel-downtime':'fermi',
+  'panel-production':'produzione', 'panel-opstats':'opstats', 'panel-stats':'assenze'
+};
+function pageSection(id){ return PAGE_SECTION[id] || (id.indexOf('panel-hours')===0 ? 'personale' : null); }
+function pageAllowed(id){
+  if(id==='panel-backup' || id==='panel-users') return CURRENT_USER.admin;
+  if(id==='panel-import') return canEdit('produzione') || canEdit('opstats');
+  const s = pageSection(id);
+  return s ? canView(s) : true;
+}
+function updateReadOnlyBar(id){
+  const bar = document.getElementById('readOnlyBar');
+  if(!bar) return;
+  const s = pageSection(id);
+  const def = PERM_SECTIONS.find(x=>x.id===s);
+  bar.classList.toggle('show', !!(def && def.kind==='full' && canView(s) && !canEdit(s)));
+}
+function applyPermissionsUI(){
+  document.querySelectorAll('[data-sec]').forEach(el=>{ el.style.display = canView(el.dataset.sec) ? '' : 'none'; });
+  document.querySelectorAll('[data-sec-edit]').forEach(el=>{ el.style.display = canEdit(el.dataset.secEdit) ? '' : 'none'; });
+  document.querySelectorAll('[data-admin]').forEach(el=>{ el.style.display = CURRENT_USER.admin ? '' : 'none'; });
+  document.querySelectorAll('#page-home .menu-group').forEach(g=>{
+    const any = [...g.querySelectorAll('.menu-tile')].some(t=>t.style.display!=='none');
+    g.style.display = any ? '' : 'none';
+  });
+  const lbl = document.getElementById('accountFooterLabel');
+  if(lbl && CURRENT_USER.email) lbl.textContent = (CURRENT_USER.admin ? 'Il mio account' : CURRENT_USER.nome) + ' · esci';
+}
+
+/* ============================= IL MIO ACCOUNT ============================= */
+function renderAccountPage(){
+  const info = document.getElementById('accountInfo');
+  if(!CLOUD_ENABLED){ info.textContent = 'Database online non configurato: nessun account.'; return; }
+  info.innerHTML = `Accesso come <strong>${escHtml(CURRENT_USER.email)}</strong>` + (CURRENT_USER.admin ? ' · amministratore' : (CURRENT_USER.nome && CURRENT_USER.nome!==CURRENT_USER.email ? ' · '+escHtml(CURRENT_USER.nome) : ''));
+  document.getElementById('accountEmailHidden').value = CURRENT_USER.email;
+  ['pwdCurrent','pwdNew','pwdNew2'].forEach(id=>document.getElementById(id).value='');
+}
+async function changeOwnPassword(){
+  const cur = document.getElementById('pwdCurrent').value;
+  const n1 = document.getElementById('pwdNew').value, n2 = document.getElementById('pwdNew2').value;
+  if(!cur){ toast('Scrivi la password attuale'); return; }
+  if(n1.length<6){ toast('La nuova password deve avere almeno 6 caratteri'); return; }
+  if(n1!==n2){ toast('Le due nuove password non coincidono'); return; }
+  const btn = document.getElementById('pwdBtn'); btn.disabled = true;
+  try{
+    const user = firebase.auth().currentUser;
+    await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, cur));
+    await user.updatePassword(n1);
+    ['pwdCurrent','pwdNew','pwdNew2'].forEach(id=>document.getElementById(id).value='');
+    toast('Password cambiata');
+  }catch(e){
+    const c = e && e.code;
+    toast(c==='auth/wrong-password' || c==='auth/invalid-credential' || c==='auth/invalid-login-credentials' ? 'La password attuale non è corretta'
+      : c==='auth/weak-password' ? 'Password troppo debole' : c==='auth/too-many-requests' ? 'Troppi tentativi: riprova tra qualche minuto'
+      : 'Cambio password non riuscito: '+(e.message||c));
+  }finally{ btn.disabled = false; }
+}
+
+/* ============================= UTENTI E PERMESSI (solo amministratore) ============================= */
+let APP_USERS = [];
+const PERM_OPTIONS = {
+  full:     [['none','Non vede'],['view','Solo consultazione'],['edit','Può modificare']],
+  view:     [['none','Non vede'],['view','Vede']],
+  personal: [['none','Disattivata'],['edit','Attiva']]
+};
+function presetPermissions(level){
+  const out = {};
+  PERM_SECTIONS.forEach(sec=>{
+    if(sec.kind==='personal') out[sec.id] = 'edit';
+    else if(level==='none') out[sec.id] = 'none';
+    else if(sec.kind==='view') out[sec.id] = 'view';
+    else out[sec.id] = level;
+  });
+  return out;
+}
+async function renderUsersPage(){
+  const box = document.getElementById('usersList');
+  if(!CURRENT_USER.admin || !CLOUD_ENABLED){ box.innerHTML = '<p class="note">Disponibile solo con il database online, per l\'amministratore.</p>'; return; }
+  try{
+    const snap = await cloudDb.collection('utenti').get();
+    APP_USERS = [];
+    snap.forEach(d=>APP_USERS.push(Object.assign({id:d.id}, d.data())));
+    APP_USERS.sort((a,b)=>String(a.nome||a.id).localeCompare(String(b.nome||b.id), 'it'));
+  }catch(e){
+    box.innerHTML = `<p class="note">Impossibile leggere l'elenco utenti: ${escHtml(e.message||e)}. Le regole del database sono state pubblicate?</p>`;
+    return;
+  }
+  if(!APP_USERS.length){ box.innerHTML = '<p class="note">Nessun altro utente: per ora accedi solo tu. Crea il primo qui sopra.</p>'; return; }
+  box.innerHTML = APP_USERS.map(u=>{
+    const id = escHtml(escJs(u.id));
+    const p = u.permessi || {};
+    const rows = PERM_SECTIONS.map(sec=>{
+      const cur = p[sec.id] || 'none';
+      const opts = PERM_OPTIONS[sec.kind].map(([v,l])=>`<option value="${v}" ${v===cur?'selected':''}>${l}</option>`).join('');
+      return `<div class="perm-row"><span>${escHtml(sec.label)}${sec.hint?`<br><span class="user-email">${escHtml(sec.hint)}</span>`:''}</span>
+        <select class="lvl-${cur}" onchange="setUserPermission('${id}','${sec.id}',this)">${opts}</select></div>`;
+    }).join('');
+    return `<div class="user-card ${u.attivo?'':'off'}">
+      <div class="user-head">
+        <div><span class="user-name">${escHtml(u.nome||u.id)}</span><span class="user-state ${u.attivo?'on':'off'}">${u.attivo?'ATTIVO':'DISATTIVATO'}</span><br><span class="user-email">${escHtml(u.id)}</span></div>
+        <div class="user-actions">
+          <button class="btn-ghost" onclick="renameAppUser('${id}')">Rinomina</button>
+          <button class="btn-ghost" onclick="sendUserPasswordReset('${id}')">Email cambio password</button>
+          <button class="btn-ghost" onclick="toggleAppUser('${id}')">${u.attivo?'Disattiva':'Riattiva'}</button>
+          <button class="btn-danger" onclick="removeAppUser('${id}')">Elimina</button>
+        </div>
+      </div>
+      <div class="user-presets">Imposta tutto:
+        <button class="btn-ghost" onclick="applyUserPreset('${id}','none')">Non vede nulla</button>
+        <button class="btn-ghost" onclick="applyUserPreset('${id}','view')">Solo consultazione</button>
+        <button class="btn-ghost" onclick="applyUserPreset('${id}','edit')">Può modificare tutto</button>
+      </div>
+      <div class="perm-grid">${rows}</div>
+    </div>`;
+  }).join('');
+}
+async function updateAppUser(id, changes, okMsg){
+  try{
+    await cloudDb.collection('utenti').doc(id).update(Object.assign({aggiornatoIl: firebase.firestore.FieldValue.serverTimestamp()}, changes));
+    if(okMsg) toast(okMsg);
+    return true;
+  }catch(e){ toast('Salvataggio non riuscito: '+(e.message||e.code)); return false; }
+}
+async function setUserPermission(id, sec, sel){
+  const v = sel.value;
+  sel.className = 'lvl-'+v;
+  if(await updateAppUser(id, {['permessi.'+sec]: v}, 'Permesso aggiornato')){
+    const u = APP_USERS.find(x=>x.id===id); if(u){ u.permessi = u.permessi||{}; u.permessi[sec] = v; }
+  }else renderUsersPage();
+}
+async function applyUserPreset(id, level){
+  const u = APP_USERS.find(x=>x.id===id);
+  const labels = {none:'non vedere nessuna sezione', view:'vedere tutto in sola consultazione', edit:'poter modificare tutto'};
+  if(!confirm(`Impostare ${u ? (u.nome||u.id) : id} per ${labels[level]}? (L'area personale resta attiva.)`)) return;
+  if(await updateAppUser(id, {permessi: presetPermissions(level)}, 'Permessi aggiornati')) renderUsersPage();
+}
+async function toggleAppUser(id){
+  const u = APP_USERS.find(x=>x.id===id); if(!u) return;
+  if(u.attivo && !confirm(`Disattivare ${u.nome||u.id}? Non potrà più accedere finché non lo riattivi (i suoi dati personali restano).`)) return;
+  if(await updateAppUser(id, {attivo: !u.attivo}, u.attivo ? 'Utente disattivato' : 'Utente riattivato')) renderUsersPage();
+}
+async function renameAppUser(id){
+  const u = APP_USERS.find(x=>x.id===id); if(!u) return;
+  const nome = prompt('Nome da mostrare per '+id, u.nome||'');
+  if(nome===null || !nome.trim()) return;
+  if(await updateAppUser(id, {nome: nome.trim()}, 'Nome aggiornato')) renderUsersPage();
+}
+async function removeAppUser(id){
+  const u = APP_USERS.find(x=>x.id===id); if(!u) return;
+  if(!confirm(`Eliminare ${u.nome||u.id} dall'elenco degli utenti? Perderà subito ogni accesso al gestionale.\n\nL'account di accesso (email e password) resta registrato ma non serve più a nulla: se un giorno lo ricrei con la stessa email, ti verrà chiesto di riabilitarlo.`)) return;
+  try{ await cloudDb.collection('utenti').doc(id).delete(); toast('Utente eliminato'); renderUsersPage(); }
+  catch(e){ toast('Eliminazione non riuscita: '+(e.message||e.code)); }
+}
+async function sendUserPasswordReset(id){
+  if(!confirm(`Inviare a ${id} un'email con il link per scegliere una nuova password?`)) return;
+  try{ await firebase.auth().sendPasswordResetEmail(id); toast('Email inviata (se non arriva, controllare lo spam)'); }
+  catch(e){ toast('Invio non riuscito: '+(e.message||e.code)); }
+}
+async function createAppUser(){
+  const nome = document.getElementById('newUserName').value.trim();
+  const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
+  const pwd = document.getElementById('newUserPassword').value;
+  const preset = document.getElementById('newUserPreset').value;
+  if(!nome){ toast('Scrivi il nome'); return; }
+  if(!/^[^\s@\/]+@[^\s@\/]+\.[^\s@\/]+$/.test(email)){ toast('Email non valida'); return; }
+  if(email===ADMIN_EMAIL){ toast('Questo è già l\'account amministratore'); return; }
+  if(APP_USERS.some(u=>u.id===email)){ toast('Questo utente esiste già: modificane i permessi qui sotto'); return; }
+  if(pwd.length<6){ toast('La password iniziale deve avere almeno 6 caratteri'); return; }
+  const btn = document.getElementById('newUserBtn'); btn.disabled = true;
+  try{
+    // l'account si crea con una seconda istanza di Firebase, così l'amministratore resta collegato
+    const app2 = firebase.apps.find(a=>a.name==='creazione-utenti') || firebase.initializeApp(FIREBASE_CONFIG, 'creazione-utenti');
+    try{ await app2.auth().setPersistence(firebase.auth.Auth.Persistence.NONE); }catch(e){}
+    try{
+      await app2.auth().createUserWithEmailAndPassword(email, pwd);
+      await app2.auth().signOut();
+    }catch(e){
+      if(e.code==='auth/email-already-in-use'){
+        if(!confirm(`Esiste già un account con l'email ${email} (creato in passato).\nAbilitarlo comunque? Userà la password che ha già: se non la ricorda, dopo puoi inviargli l'email per cambiarla.`)) return;
+      }else if(e.code==='auth/weak-password'){ toast('Password troppo debole'); return; }
+      else if(e.code==='auth/invalid-email'){ toast('Email non valida'); return; }
+      else if(e.code==='auth/operation-not-allowed'){ toast('Nella console Firebase va attivato l\'accesso con email e password'); return; }
+      else throw e;
+    }
+    await cloudDb.collection('utenti').doc(email).set({
+      email, nome, attivo:true, permessi: presetPermissions(preset),
+      creatoIl: firebase.firestore.FieldValue.serverTimestamp(), aggiornatoIl: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    ['newUserName','newUserEmail','newUserPassword'].forEach(id=>document.getElementById(id).value='');
+    toast('Utente creato: comunicagli email e password');
+    renderUsersPage();
+  }catch(e){
+    toast('Creazione non riuscita: '+(e.message||e.code));
+  }finally{ btn.disabled = false; }
+}
+
 function renderStorageMode(user){
   const note = document.getElementById('storageModeNote');
   if(CLOUD_ENABLED){
@@ -6772,7 +7226,7 @@ function renderStorageMode(user){
 }
 
 (function boot(){
-  if(!CLOUD_ENABLED){ renderStorageMode(null); startApp(); return; }
+  if(!CLOUD_ENABLED){ renderStorageMode(null); startApp().then(()=>{ APP_READY = true; }); return; }
   firebase.initializeApp(FIREBASE_CONFIG);
   cloudDb = firebase.firestore();
   // Copia locale del database: l'app si apre anche senza rete e i salvataggi offline partono al ritorno della connessione.
@@ -6782,25 +7236,33 @@ function renderStorageMode(user){
   document.getElementById('loginBtn').disabled = true;
   firebase.auth().onAuthStateChanged(async user=>{
     if(!user){
+      if(LOGGING_OUT) return;
       if(started){ location.reload(); return; }
       showLogin('Accedi per caricare i dati dal database online.');
       return;
     }
     document.getElementById('loginStatus').textContent = 'Caricamento dati…';
     try{
+      await loadCurrentUser(user);
+      if(CURRENT_USER.admin) await migrateLegacyDataIfNeeded();
+      document.getElementById('loginStatus').textContent = 'Caricamento dati…';
       await cloudLoadAll();
     }catch(e){
       console.error(e);
+      LOGGING_OUT = true;
       await firebase.auth().signOut();
-      showLogin(e.code==='permission-denied' ? 'Questo account non è autorizzato ad accedere ai dati' : 'Impossibile leggere il database: '+(e.message||e), true);
+      LOGGING_OUT = false;
+      showLogin(e.code==='not-enabled' || e.code==='permission-denied' ? 'Questo account non è abilitato: chiedi all\'amministratore' : 'Impossibile leggere il database: '+(e.message||e), true);
       return;
     }
     document.getElementById('loginOverlay').classList.remove('show');
     renderStorageMode(user);
-    if(CLOUD_CACHE.size===0 && localStorageEntries().length>0){
+    applyPermissionsUI();
+    watchOwnProfile();
+    if(CURRENT_USER.admin && CLOUD_CACHE.size===0 && localStorageEntries().length>0){
       if(await uploadLocalDataToCloud(true)) return;
     }
-    if(!started){ started = true; await startApp(); }
+    if(!started){ started = true; await startApp(); APP_READY = true; }
   });
 })();
 </script>

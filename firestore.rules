@@ -1,27 +1,91 @@
 rules_version = '2';
 
-// Accesso ai dati del gestionale: solo gli account elencati qui.
-// Per dare accesso a un'altra persona: aggiungi la sua email alla lista e fai il push.
+// Regole di accesso del Gestionale Reparto.
+// - L'amministratore (email qui sotto) vede e modifica tutto e decide i permessi degli altri dalla pagina "Utenti e permessi".
+// - Gli altri utenti accedono solo se hanno un documento in utenti/{email} con attivo == true;
+//   per ogni sezione il permesso è 'none' (non vede), 'view' (solo consultazione) o 'edit' (può modificare).
+// - L'area personale (Conteggio ore) sta in personale/{uid}: la legge e la scrive solo il suo proprietario.
+// Le sezioni corrispondono a quelle scritte in index.html (PERM_SECTIONS / KEY_SECTION_RULES): se cambiano lì, aggiornale anche qui.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function autorizzato() {
-      return request.auth != null
-        && request.auth.token.email.lower() in [
-          'vilardogiovanni@gmail.com'
-        ];
+    function loggato() {
+      return request.auth != null && request.auth.token.email is string;
+    }
+    function emailUtente() {
+      return request.auth.token.email.lower();
+    }
+    function admin() {
+      return loggato() && emailUtente() == 'vilardogiovanni@gmail.com';
+    }
+    function percorsoProfilo() {
+      return /databases/$(database)/documents/utenti/$(emailUtente());
+    }
+    function attivo() {
+      return loggato() && exists(percorsoProfilo()) && get(percorsoProfilo()).data.attivo == true;
+    }
+    function livello(sezione) {
+      return get(percorsoProfilo()).data.get('permessi', {}).get(sezione, 'none');
+    }
+    function vede(sezione) {
+      return livello(sezione) in ['view', 'edit'];
+    }
+    function modifica(sezione) {
+      return livello(sezione) == 'edit';
     }
 
-    // Dati del gestionale (un documento per chiave)
+    // Operatori, impianti e turni delle squadre servono a tutti per calcolare i turni (calendario, situazione di oggi).
+    // Le statistiche assenze leggono i dati delle coperture.
+    function puoLeggere(sezione) {
+      return admin() || (attivo() && (
+        sezione in ['operatori', 'impianti', 'turni']
+        || (sezione != 'altro' && vede(sezione))
+        || (sezione == 'coperture' && vede('assenze'))
+      ));
+    }
+    // I turni delle squadre si modificano dalle impostazioni delle coperture.
+    function puoScrivere(sezione) {
+      return admin() || (attivo() && sezione != 'altro' && (
+        (sezione == 'turni' && modifica('coperture'))
+        || (sezione != 'turni' && sezione in ['coperture', 'planner', 'operatori', 'impianti', 'indumenti', 'competenze',
+                                              'manutenzione', 'fermi', 'produzione', 'opstats'] && modifica(sezione))
+      ));
+    }
+
+    // Dati del gestionale, divisi per sezione
+    match /sezioni/{sezione}/dati/{id} {
+      allow read: if puoLeggere(sezione);
+      allow write: if puoScrivere(sezione);
+    }
+
+    // Area personale (Conteggio ore): solo il proprietario, e solo se l'area gli è stata attivata
+    match /personale/{uid}/dati/{id} {
+      allow read, write: if loggato() && request.auth.uid == uid && (admin() || (attivo() && vede('personale')));
+    }
+
+    // Utenti e permessi: ognuno legge solo il proprio profilo, solo l'amministratore li modifica
+    match /utenti/{email} {
+      allow read: if admin() || (loggato() && emailUtente() == email);
+      allow write: if admin();
+    }
+
+    // Informazioni di servizio (es. riorganizzazione dei dati già fatta)
+    match /sistema/{id} {
+      allow read: if admin() || attivo();
+      allow write: if admin();
+    }
+
+    // Vecchia collezione unica, prima di utenti e permessi: copia di sicurezza, solo lettura per l'amministratore
     match /dati/{id} {
-      allow read, write: if autorizzato();
+      allow read: if admin();
+      allow write: if false;
     }
 
     // Documenti caricati in passato (manuali/modelli): la sezione è stata tolta dal sito, restano protetti
     match /documenti/{id} {
-      allow read, write: if autorizzato();
+      allow read, write: if admin();
       match /parti/{parte} {
-        allow read, write: if autorizzato();
+        allow read, write: if admin();
       }
     }
 
