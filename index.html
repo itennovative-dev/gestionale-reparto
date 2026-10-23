@@ -1668,13 +1668,23 @@ function canWriteStorage(s){
   return canEdit(s);
 }
 
+// Modalità di riserva: se nel database ci sono ancora le regole vecchie (nuove non pubblicate), l'amministratore
+// continua a lavorare sulla vecchia collezione unica "dati", esattamente come prima.
+let LEGACY_MODE = false;
 function cloudDocId(key){ return encodeURIComponent(key); }
 function cloudDocRef(key){
+  if(LEGACY_MODE) return cloudDb.collection(CLOUD_COLLECTION).doc(cloudDocId(key));
   const s = storageSectionOf(key);
   if(s==='personale') return cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati').doc(cloudDocId(key));
   return cloudDb.collection('sezioni').doc(s).collection('dati').doc(cloudDocId(key));
 }
 async function cloudLoadAll(){
+  if(LEGACY_MODE){
+    const snap = await cloudDb.collection(CLOUD_COLLECTION).get();
+    CLOUD_CACHE.clear();
+    snap.forEach(doc=>{ const d = doc.data(); if(d && typeof d.k==='string') CLOUD_CACHE.set(d.k, d.v); });
+    return;
+  }
   const cols = STORAGE_SECTIONS.filter(canReadStorage).map(s=>cloudDb.collection('sezioni').doc(s).collection('dati'));
   if(canReadStorage('personale')) cols.push(cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati'));
   const snaps = await Promise.all(cols.map(c=>c.get()));
@@ -7096,6 +7106,7 @@ function presetPermissions(level){
 async function renderUsersPage(){
   const box = document.getElementById('usersList');
   if(!CURRENT_USER.admin || !CLOUD_ENABLED){ box.innerHTML = '<p class="note">Disponibile solo con il database online, per l\'amministratore.</p>'; return; }
+  if(LEGACY_MODE){ box.innerHTML = '<div class="perm-note"><strong>Manca un ultimo passaggio:</strong> nel database ci sono ancora le regole di accesso vecchie. Finché non vengono pubblicate quelle nuove (file <em>firestore.rules</em> del repository) il gestionale funziona come prima, solo per te, e qui non si possono creare utenti. Appena pubblicate, al prossimo accesso i dati vengono riorganizzati da soli.</div>'; document.getElementById('newUserBtn').disabled = true; return; }
   try{
     const snap = await cloudDb.collection('utenti').get();
     APP_USERS = [];
@@ -7244,7 +7255,10 @@ function renderStorageMode(user){
     document.getElementById('loginStatus').textContent = 'Caricamento dati…';
     try{
       await loadCurrentUser(user);
-      if(CURRENT_USER.admin) await migrateLegacyDataIfNeeded();
+      if(CURRENT_USER.admin){
+        try{ await migrateLegacyDataIfNeeded(); }
+        catch(e){ if(e && e.code==='permission-denied'){ LEGACY_MODE = true; console.warn('Regole del database non ancora aggiornate: uso la collezione "dati"'); } else throw e; }
+      }
       document.getElementById('loginStatus').textContent = 'Caricamento dati…';
       await cloudLoadAll();
     }catch(e){
