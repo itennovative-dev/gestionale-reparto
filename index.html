@@ -76,6 +76,9 @@
   /* Utenti e permessi */
   .readonly-bar{display:none; position:fixed; top:10px; right:12px; z-index:9000; background:var(--t1-bg); color:#6e5530; border:1px solid #e3d6bb; border-radius:999px; padding:6px 14px; font-size:12px; box-shadow:var(--shadow); max-width:calc(100% - 24px);}
   .readonly-bar.show{display:block;}
+  .ro-hidden{display:none !important;}
+  input.ro-locked, select.ro-locked, textarea.ro-locked{background:#f6f5f2; color:var(--ink); opacity:1; cursor:default; -webkit-text-fill-color:var(--ink);}
+  select.ro-locked{appearance:none; -webkit-appearance:none; background-image:none;}
   .perm-note{background:var(--t1-bg); border:1px solid #e3d6bb; color:#5d4827; border-radius:10px; padding:10px 14px; font-size:12.5px; margin:10px 0 4px; line-height:1.45;}
   .user-new-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px 16px; align-items:end;}
   .user-new-grid label{display:flex; flex-direction:column; gap:5px; font-size:12px; color:var(--steel);}
@@ -471,7 +474,7 @@
 
     <div class="card col-card">
       <h2><span class="n">1</span>Assenze della settimana</h2>
-      <p class="note">Puoi inserire anche gli operatori sostituti: risulteranno indisponibili per fare sostituzioni nei giorni indicati.</p>
+      <p class="note" data-sec-edit="coperture">Puoi inserire anche gli operatori sostituti: risulteranno indisponibili per fare sostituzioni nei giorni indicati.</p>
       <div class="table-scroll">
       <table>
         <thead><tr><th>Operatore</th><th>Data</th><th>Turno</th><th>Motivo</th><th>Impianto</th><th></th></tr></thead>
@@ -496,9 +499,9 @@
       <div class="btn-row">
         <button class="btn-primary" onclick="addAbsence()">+ Aggiungi singolo giorno</button>
       </div>
-      <p class="note">Il turno si autocompila dal turnario ufficiale se disponibile (puoi comunque correggerlo).</p>
+      <p class="note" data-sec-edit="coperture">Il turno si autocompila dal turnario ufficiale se disponibile (puoi comunque correggerlo).</p>
 
-      <div class="range-sep">
+      <div class="range-sep" data-sec-edit="coperture">
         <strong style="font-size:12.5px; color:var(--steel);">Assenza su più giorni (da data a data)</strong>
         <div class="row-add">
           <div><label>Operatore</label><select id="rangeName"></select></div>
@@ -771,7 +774,7 @@
     <h2><span class="n">•</span>Registro fermi macchina</h2>
     <p class="note">Segna ogni fermo o rallentamento importante: impianto, causa e minuti persi. Il grafico di Pareto mostra quali cause pesano di più, cioè dove conviene intervenire per primo (e con quali numeri presentarsi da fornitori e manutenzione).</p>
     <p class="note"><strong>Linea Eutrolog:</strong> allestisce le bobine di 100, 116, 118, 115 e 119. Un suo fermo si registra una volta sola sulla linea e viene contato in automatico su ogni impianto collegato (1 h di linea ferma con 5 impianti collegati = 5 h di fermo impianti). Togli la spunta agli impianti che in quel momento lavoravano fuori linea (lavoro non gestibile dall'Eutrolog): per loro il fermo non conta.</p>
-    <div class="card">
+    <div class="card" data-sec-edit="fermi">
       <h2><span class="n">1</span>Nuovo fermo</h2>
       <div class="roster-add-grid">
         <div style="max-width:160px;"><label>Data</label><input type="date" id="dtNewDate"></div>
@@ -1333,7 +1336,7 @@
   </div>
 </div>
 
-<div class="readonly-bar" id="readOnlyBar">Sola consultazione · le modifiche in questa pagina non vengono salvate</div>
+<div class="readonly-bar" id="readOnlyBar">Sola consultazione</div>
 
 <div class="login-overlay" id="loginOverlay">
   <form class="login-box" onsubmit="event.preventDefault(); doLogin();">
@@ -1762,12 +1765,10 @@ function watchOwnProfile(){
   }, ()=>{});
 }
 
-let APP_READY = false, lastReadOnlyToast = 0;
-function notifyReadOnly(){
-  if(!APP_READY || Date.now()-lastReadOnlyToast < 8000) return;
-  lastReadOnlyToast = Date.now();
-  toast('Sola consultazione: non hai il permesso di modificare questi dati');
-}
+let APP_READY = false;
+// Salvataggio non permesso: i comandi di modifica sono già nascosti/bloccati (applyEditLocks), quindi qui arrivano
+// solo i salvataggi automatici delle pagine (es. elenco settimane): si scartano in silenzio, senza avvisi.
+function notifyReadOnly(){}
 
 async function storageGet(key){
   if(CLOUD_ENABLED) return CLOUD_CACHE.has(key) ? {key, value:CLOUD_CACHE.get(key)} : null;
@@ -6942,7 +6943,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · utenti e permessi';
+const APP_VERSION = '2026-10-23 · sola consultazione senza inserimento';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7040,11 +7041,86 @@ function pageAllowed(id){
 }
 function updateReadOnlyBar(id){
   const bar = document.getElementById('readOnlyBar');
-  if(!bar) return;
-  const s = pageSection(id);
-  const def = PERM_SECTIONS.find(x=>x.id===s);
-  bar.classList.toggle('show', !!(def && def.kind==='full' && canView(s) && !canEdit(s)));
+  if(bar) bar.classList.toggle('show', isReadOnlyPage(id));
 }
+/* Sola consultazione: chi non ha il permesso di modifica non deve proprio poter inserire dati.
+   REGOLA: ogni nuova funzione che salva dati di una sezione va aggiunta qui sotto, nella sezione giusta.
+   - Ovunque nella pagina (anche nella situazione di oggi): i pulsanti che chiamano una di queste funzioni spariscono,
+     i campi che le chiamano vengono bloccati (si legge il valore ma non si cambia).
+   - Nelle pagine in sola consultazione: si bloccano anche i campi di inserimento senza funzione propria e spariscono
+     i moduli "aggiungi" (.row-add, .roster-add-grid, .planner-add). Restano attivi filtri, navigazione tra le
+     settimane, Excel, stampa e condivisione (funzioni render…/navigate…/jump…/switch…/show…/download… ecc.).
+   - Un campo da lasciare sempre attivo in sola consultazione si segna con data-ro-ok.
+   Il database rifiuta comunque i salvataggi non permessi: questo serve a non far nemmeno provare. */
+const EDIT_FUNCTIONS = {
+  coperture: ['addAbsence','addAbsenceRange','editAbsence','removeAbsence','generateProposal','acceptAndSummarize','saveProposal',
+              'resetAndRecalcAll','setManualFill','setTeamTurno','updateCapacity','saveCapacitiesAndRecalc','moveFermoPlant',
+              'saveFermoOrderAndRecalc','saveRecipients','resetHistory','updateTeamRotation','saveTeamRotation',
+              'addFixedShift1','removeFixedShift1','addShiftPair','removeShiftPair'],
+  planner:   ['togglePlannerTask','addPlannerTask','deletePlannerTask'],
+  operatori: ['addEmployee','editEmployee','deleteEmployee','cancelEditEmployee','addSubstitute','editSubstitute','deleteSubstitute','cancelEditSubstitute'],
+  impianti:  ['addPlant','deletePlant'],
+  indumenti: ['setClothingSize'],
+  competenze:['setSkill'],
+  manutenzione:['addMaintenancePlanItem','deleteMaintenancePlanItem','toggleMaintenanceStatus','setMaintenanceEvery','addMaintenanceLogEntry','deleteMaintenanceLogEntry'],
+  fermi:     ['addDowntime','deleteDowntime','addDowntimeCause','removeDowntimeCause','moveDowntimeCause','toggleEutrologBox','toggleEutPlant'],
+  produzione:['importProductionFilesForced','mergeProductionPhase','deleteProductionPhase'],
+  opstats:   ['importOperatorFiles']
+};
+const EDIT_FN_REGEX = Object.entries(EDIT_FUNCTIONS).map(([sec, fns])=>[sec, new RegExp('\\b(' + fns.join('|') + ')\\s*\\(')]);
+const VIEW_FN_REGEX = /\b(render\w*|navigate\w*|jump\w*|switch\w*|show\w*|hide\w*|populate\w*|download\w*|export\w*|print\w*|share\w*|onProdFaseChange|loadGoalForm|openMailDraft|goBack)\s*\(/;
+const RO_FORM_CONTAINERS = '.row-add, .roster-add-grid, .planner-add';
+function inlineHandlers(el){ return (el.getAttribute('onclick')||'') + ';' + (el.getAttribute('onchange')||'') + ';' + (el.getAttribute('oninput')||''); }
+function editSectionOfHandler(text){
+  for(const [sec, re] of EDIT_FN_REGEX) if(re.test(text)) return sec;
+  return null;
+}
+function lockElement(el){
+  if(el.classList.contains('ro-locked')) return;
+  el.classList.add('ro-locked');
+  // campi: restano visibili (si legge il valore) ma non si possono cambiare · pulsanti e caricamento file: spariscono
+  if(/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) && el.type!=='file') el.disabled = true;
+  else el.classList.add('ro-hidden');
+}
+function isReadOnlyPage(id){
+  const sec = pageSection(id);
+  const def = PERM_SECTIONS.find(x=>x.id===sec);
+  return !!(def && def.kind==='full' && canView(sec) && !canEdit(sec));
+}
+function applyEditLocks(){
+  if(CURRENT_USER.admin) return;
+  document.querySelectorAll('[onclick],[onchange],[oninput]').forEach(el=>{
+    const sec = editSectionOfHandler(inlineHandlers(el));
+    if(sec && !canEdit(sec)) lockElement(el);
+  });
+  ALL_APP_PAGES.filter(isReadOnlyPage).forEach(id=>{
+    const page = document.getElementById(id);
+    if(!page) return;
+    page.querySelectorAll('input, select, textarea').forEach(el=>{
+      if(el.hasAttribute('data-ro-ok') || el.classList.contains('ro-locked')) return;
+      const h = inlineHandlers(el);
+      if(VIEW_FN_REGEX.test(h) && !editSectionOfHandler(h)) return;
+      lockElement(el);
+    });
+    page.querySelectorAll(RO_FORM_CONTAINERS).forEach(c=>{
+      const usable = [...c.querySelectorAll('input, select, textarea, button')].some(x=>!x.classList.contains('ro-locked'));
+      if(!usable) c.classList.add('ro-hidden');
+    });
+  });
+}
+let editLockObserver = null, editLockQueued = false;
+function startEditLocks(){
+  if(CURRENT_USER.admin || editLockObserver) return;
+  applyEditLocks();
+  // le pagine si ridisegnano spesso (cambio settimana, filtri…): riapplico i blocchi a ogni ridisegno
+  editLockObserver = new MutationObserver(()=>{
+    if(editLockQueued) return;
+    editLockQueued = true;
+    requestAnimationFrame(()=>{ editLockQueued = false; applyEditLocks(); });
+  });
+  editLockObserver.observe(document.body, {childList:true, subtree:true});
+}
+
 function applyPermissionsUI(){
   document.querySelectorAll('[data-sec]').forEach(el=>{ el.style.display = canView(el.dataset.sec) ? '' : 'none'; });
   document.querySelectorAll('[data-sec-edit]').forEach(el=>{ el.style.display = canEdit(el.dataset.secEdit) ? '' : 'none'; });
@@ -7272,6 +7348,7 @@ function renderStorageMode(user){
     document.getElementById('loginOverlay').classList.remove('show');
     renderStorageMode(user);
     applyPermissionsUI();
+    startEditLocks();
     watchOwnProfile();
     if(CURRENT_USER.admin && CLOUD_CACHE.size===0 && localStorageEntries().length>0){
       if(await uploadLocalDataToCloud(true)) return;
