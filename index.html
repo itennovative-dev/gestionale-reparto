@@ -740,11 +740,12 @@
   <div class="page-body" style="max-width:1200px;">
     <h2><span class="n">•</span>Registro fermi macchina</h2>
     <p class="note">Segna ogni fermo o rallentamento importante: impianto, causa e minuti persi. Il grafico di Pareto mostra quali cause pesano di più, cioè dove conviene intervenire per primo (e con quali numeri presentarsi da fornitori e manutenzione).</p>
+    <p class="note"><strong>Linea Eutrolog:</strong> allestisce le bobine di 100, 116, 118, 115 e 119. Un suo fermo si registra una volta sola sulla linea e viene contato in automatico su tutti e 5 gli impianti (1 h di linea ferma = 5 h di fermo impianti).</p>
     <div class="card">
       <h2><span class="n">1</span>Nuovo fermo</h2>
       <div class="roster-add-grid">
         <div style="max-width:160px;"><label>Data</label><input type="date" id="dtNewDate"></div>
-        <div style="max-width:130px;"><label>Impianto</label><select id="dtNewPlant"></select></div>
+        <div style="max-width:170px;"><label>Impianto</label><select id="dtNewPlant"></select></div>
         <div style="max-width:110px;"><label>Turno</label><select id="dtNewTurno"><option value="">—</option><option value="1">1°</option><option value="2">2°</option><option value="3">3°</option><option value="C">C</option></select></div>
         <div><label>Causa</label><select id="dtNewCause"></select></div>
         <div style="max-width:120px;"><label>Minuti persi</label><input type="number" min="1" step="5" id="dtNewMin"></div>
@@ -757,7 +758,7 @@
       <div class="roster-add-grid">
         <div style="max-width:170px;"><label>Dal</label><input type="date" id="dtFrom" onchange="renderDowntimePage()"></div>
         <div style="max-width:170px;"><label>Al</label><input type="date" id="dtTo" onchange="renderDowntimePage()"></div>
-        <div style="max-width:150px;"><label>Impianto</label><select id="dtFilterPlant" onchange="renderDowntimePage()"></select></div>
+        <div style="max-width:170px;"><label>Impianto</label><select id="dtFilterPlant" onchange="renderDowntimePage()"></select></div>
         <div style="max-width:300px;"><label style="display:flex; align-items:center; gap:6px; white-space:nowrap;"><input type="checkbox" id="dtIncludeMaint" style="width:auto;" onchange="renderDowntimePage()"> Includi i fermi dello storico manutenzioni</label></div>
         <div class="btn-row" style="margin:0;"><button class="btn-ghost" onclick="downloadDowntimeExcel()">⬇ Scarica Excel</button></div>
       </div>
@@ -1983,7 +1984,7 @@ function renderMaintenancePanel(){
   renderMaintenanceLogList();
 }
 
-function plantLabelOf(p){ return p==='TA' ? 'Taglio anime' : p; }
+function plantLabelOf(p){ return p==='TA' ? 'Taglio anime' : p==='EUTROLOG' ? 'Linea Eutrolog' : p; }
 function groupMaintenanceLog(sortMode){
   const items = MAINTENANCE_LOG.slice();
   if(sortMode==='plant'){
@@ -4087,6 +4088,18 @@ async function downloadSkillsExcel(){
 let DOWNTIME_LOG = []; // {id, date, plant, turno, cause, minutes, note}
 const DOWNTIME_DEFAULT_CAUSES = ['Guasto meccanico','Guasto elettrico / elettronico','Guida nastro / allineamento','Cambio lavoro / attrezzaggio','Problemi materiale (bobina, film)','Mancanza materiale','Mancanza operatore','Manutenzione programmata','Pulizia','Attesa qualità / campionatura','Altro'];
 let DOWNTIME_CAUSES = DOWNTIME_DEFAULT_CAUSES.slice();
+// Linea Eutrolog: allestimento automatico delle bobine di questi impianti. Se si ferma, si fermano tutti.
+const EUTROLOG = 'EUTROLOG';
+const EUTROLOG_PLANTS = ['100','116','118','115','119'];
+// Ogni fermo della linea Eutrolog diventa un fermo (stessi minuti) su ciascun impianto collegato.
+function expandDowntime(rows){
+  const out = [];
+  rows.forEach(r=>{
+    if(r.plant===EUTROLOG) EUTROLOG_PLANTS.forEach(p=>out.push(Object.assign({}, r, {plant:p, viaEutrolog:true, parentId:r.id})));
+    else out.push(r);
+  });
+  return out;
+}
 async function loadDowntime(){
   try{ const r = await storageGet('downtime-log'); DOWNTIME_LOG = r ? JSON.parse(r.value) : []; }catch(e){ DOWNTIME_LOG = []; }
   try{ const r = await storageGet('downtime-causes'); if(r){ const c = JSON.parse(r.value); if(Array.isArray(c) && c.length) DOWNTIME_CAUSES = c; } }catch(e){}
@@ -4097,7 +4110,7 @@ function fillDowntimeSelects(){
   const plantSel = document.getElementById('dtNewPlant');
   const filterSel = document.getElementById('dtFilterPlant');
   const causeSel = document.getElementById('dtNewCause');
-  const plants = skillPlants();
+  const plants = skillPlants().concat([EUTROLOG]);
   if(plantSel){ const v = plantSel.value; plantSel.innerHTML = plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); if(plants.includes(v)) plantSel.value = v; }
   if(filterSel){ const v = filterSel.value; filterSel.innerHTML = '<option value="">Tutti</option>' + plants.map(p=>`<option value="${p}">${plantLabel(p)}</option>`).join(''); filterSel.value = v || ''; }
   if(causeSel){ const v = causeSel.value; causeSel.innerHTML = DOWNTIME_CAUSES.map(c=>`<option>${escHtml(c)}</option>`).join(''); if(DOWNTIME_CAUSES.includes(v)) causeSel.value = v; }
@@ -4141,8 +4154,9 @@ function moveDowntimeCause(i, delta){
   [DOWNTIME_CAUSES[i], DOWNTIME_CAUSES[j]] = [DOWNTIME_CAUSES[j], DOWNTIME_CAUSES[i]];
   saveDowntimeCauses(); renderDowntimePage();
 }
-// Fermi filtrati, eventualmente con quelli dello storico manutenzioni (ore -> minuti, causa "Manutenzione: tipo")
-function filteredDowntime(){
+// Fermi filtrati, eventualmente con quelli dello storico manutenzioni (ore -> minuti, causa "Manutenzione: tipo").
+// raw=true: le registrazioni così come inserite (per l'elenco); altrimenti i fermi Eutrolog sono ribaltati sui 5 impianti (per analisi ed Excel).
+function filteredDowntime(raw){
   const from = (document.getElementById('dtFrom')||{}).value || '0000-01-01';
   const to = (document.getElementById('dtTo')||{}).value || '9999-12-31';
   const plant = (document.getElementById('dtFilterPlant')||{}).value || '';
@@ -4150,7 +4164,9 @@ function filteredDowntime(){
   let rows = DOWNTIME_LOG.map(d=>Object.assign({src:'registro'}, d));
   if(incl) rows = rows.concat((MAINTENANCE_LOG||[]).filter(m=>Number(m.downtimeHours)>0).map(m=>({
     id:'m'+m.id, date:m.date, plant:m.plant, turno:'', cause:'Manutenzione: '+(m.type||'intervento'), minutes:Number(m.downtimeHours)*60, note:m.description||'', src:'manutenzione'})));
-  return rows.filter(d=>d.date>=from && d.date<=to && (!plant || d.plant===plant)).sort((a,b)=>b.date.localeCompare(a.date));
+  rows = rows.filter(d=>d.date>=from && d.date<=to);
+  if(raw) return rows.filter(d=>!plant || d.plant===plant || (d.plant===EUTROLOG && EUTROLOG_PLANTS.includes(plant))).sort((a,b)=>b.date.localeCompare(a.date));
+  return expandDowntime(rows).filter(d=>!plant || (plant===EUTROLOG ? d.viaEutrolog : d.plant===plant)).sort((a,b)=>b.date.localeCompare(a.date));
 }
 function paretoOf(rows, keyFn){
   const tot = {}; const cnt = {};
@@ -4167,7 +4183,12 @@ function renderDowntimePage(){
   const causesEl = document.getElementById('downtimeCauses');
   if(!an) return;
   const rows = filteredDowntime();
+  const rawRows = filteredDowntime(true);
   const totMin = rows.reduce((s,r)=>s+Number(r.minutes||0),0);
+  const eutRows = rows.filter(r=>r.viaEutrolog);
+  const eutLine = rawRows.filter(r=>r.plant===EUTROLOG);
+  const eutLineMin = eutLine.reduce((s,r)=>s+Number(r.minutes||0),0);
+  const eutImpMin = eutRows.reduce((s,r)=>s+Number(r.minutes||0),0);
   if(!rows.length){ an.innerHTML = '<p class="empty">Nessun fermo nel periodo selezionato.</p>'; }
   else {
     const byCause = paretoOf(rows, r=>r.cause||'—');
@@ -4200,6 +4221,7 @@ function renderDowntimePage(){
         ${kpi('Tempo perso', fmtMin(totMin), rows.length+' fermi nel periodo')}
         ${kpi('Prima causa', fmtMin(byCause[0].minutes), escHtml(byCause[0].key)+' · '+byCause[0].pct.toFixed(0)+'%')}
         ${kpi('Impianto più fermo', fmtMin(byPlant[0].minutes), 'impianto '+escHtml(plantLabel(byPlant[0].key))+' · '+byPlant[0].pct.toFixed(0)+'%')}
+        ${eutLine.length ? kpi('Linea Eutrolog', fmtMin(eutImpMin), `di fermo impianti da ${eutLine.length} ${eutLine.length===1?'fermo':'fermi'} linea (${fmtMin(eutLineMin)}) · ${(totMin? eutImpMin/totMin*100 : 0).toFixed(0)}% del totale`) : ''}
       </div>
       <h3 class="panel-subtitle">Pareto delle cause</h3>
       <p class="note">${vitalCount} ${vitalCount===1?'causa fa':'cause fanno'} circa l'80% del tempo perso (barre scure): è lì che conviene intervenire. La linea rossa è la percentuale cumulata.</p>
@@ -4213,8 +4235,8 @@ function renderDowntimePage(){
       </div>`;
   }
   if(list){
-    list.innerHTML = rows.length ? '<thead><tr><th>Data</th><th>Impianto</th><th>Turno</th><th>Causa</th><th>Tempo</th><th>Note</th><th></th></tr></thead><tbody>'
-      + rows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td class="plant">${escHtml(plantLabel(r.plant))}</td><td>${r.turno?turnoLabel(r.turno):''}</td><td>${escHtml(r.cause)}</td><td>${fmtMin(r.minutes)}</td><td>${escHtml(r.note||'')}</td>
+    list.innerHTML = rawRows.length ? '<thead><tr><th>Data</th><th>Impianto</th><th>Turno</th><th>Causa</th><th>Tempo</th><th>Note</th><th></th></tr></thead><tbody>'
+      + rawRows.map(r=>`<tr><td>${fmtDate(r.date)}</td><td class="plant">${escHtml(plantLabel(r.plant))}</td><td>${r.turno?turnoLabel(r.turno):''}</td><td>${escHtml(r.cause)}</td><td>${fmtMin(r.minutes)}${r.plant===EUTROLOG?`<div class="note">→ ${EUTROLOG_PLANTS.join(', ')} fermi · totale ${fmtMin(r.minutes*EUTROLOG_PLANTS.length)}</div>`:''}</td><td>${escHtml(r.note||'')}</td>
         <td>${r.src==='registro'?`<button class="btn-danger" onclick="deleteDowntime('${r.id}')">rimuovi</button>`:'<span class="note">da manutenzione</span>'}</td></tr>`).join('') + '</tbody>'
       : '<tr><td class="empty">Nessun fermo nel periodo.</td></tr>';
   }
@@ -4234,7 +4256,7 @@ async function downloadDowntimeExcel(){
   const put = (ws, r, vals) => vals.forEach((v,ci)=>{ const c = ws.getCell(r, ci+1); c.value = v; c.font = {name:'Calibri', size:10}; c.border = border; });
   const ws1 = wb.addWorksheet('Fermi');
   head(ws1, ['Data','Impianto','Turno','Causa','Minuti','Note','Origine']);
-  rows.forEach((r,i)=>put(ws1, i+2, [r.date, plantLabel(r.plant), r.turno||'', r.cause, Number(r.minutes), r.note||'', r.src]));
+  rows.forEach((r,i)=>put(ws1, i+2, [r.date, plantLabel(r.plant), r.turno||'', r.cause, Number(r.minutes), r.note||'', r.viaEutrolog ? 'linea Eutrolog' : r.src]));
   [12,11,7,34,9,40,13].forEach((w,i)=>ws1.getColumn(i+1).width = w);
   const ws2 = wb.addWorksheet('Pareto cause');
   head(ws2, ['Causa','Fermi','Minuti','Ore','%','% cumulata']);
@@ -6155,7 +6177,7 @@ async function loadFermoOrder(){
   }catch(e){}
   renderFermoOrderSettings();
 }
-function plantLabel(p){ return p==='TA' ? 'Taglio anime' : p; }
+function plantLabel(p){ return p==='TA' ? 'Taglio anime' : p==='EUTROLOG' ? 'Linea Eutrolog' : p; }
 function renderFermoOrderSettings(){
   const el = document.getElementById('fermoOrderSettings');
   el.innerHTML = FERMO_ORDER.map((p,i)=>`
@@ -6639,7 +6661,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-22 · competenze, fermi, ferie, IRPEF, TFR, import v12';
+const APP_VERSION = '2026-10-23 · fermi linea Eutrolog';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){

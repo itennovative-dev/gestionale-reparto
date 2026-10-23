@@ -182,5 +182,15 @@ const P = {tipo:'Reale', tariffa:'14.2', giorni:'21', baseGiorno:'113.6', ivs:'0
   eq('Pareto: % cumulata seconda causa', p[1].cumPct, 195/200*100);
 }
 
+// ---------- Linea Eutrolog: 1 h di linea ferma = 1 h su ciascuno dei 5 impianti ----------
+{
+  const e = run(`expandDowntime([{id:'x',plant:'EUTROLOG',cause:'Guasto meccanico',minutes:60},{id:'y',plant:'110',cause:'Pulizia',minutes:30}])`);
+  eq('Eutrolog: impianti fermati', e.filter(r=>r.viaEutrolog).map(r=>r.plant), ['100','116','118','115','119']);
+  eq('Eutrolog: 1 h di linea = 5 h di fermo impianti', e.filter(r=>r.viaEutrolog).reduce((s,r)=>s+r.minutes,0), 300);
+  eq('Eutrolog: gli altri fermi restano invariati', e.filter(r=>!r.viaEutrolog).map(r=>[r.plant,r.minutes]), [['110',30]]);
+  const p = run(`paretoOf(expandDowntime([{id:'x',plant:'EUTROLOG',cause:'G',minutes:60}]), r=>r.plant)`);
+  eq('Eutrolog: nel Pareto per impianto ogni impianto ha 60 minuti', p.map(x=>x.minutes), [60,60,60,60,60]);
+}
+
 console.log(`\n${pass} test superati, ${fail} falliti`);
 process.exit(fail ? 1 : 0);
