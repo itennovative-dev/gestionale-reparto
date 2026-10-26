@@ -174,6 +174,44 @@ html,body{background:var(--bg)}
 /* diagnosi */
 table.diag{min-width:0}
 table.diag td.n{font-family:var(--f-mono);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+/* lavori laser (115 SEI · 116 Lang): ricette validate, rilevazioni dei lotti, storico */
+.lz-banner{border-color:var(--shaft-b);background:#fbf6ec}
+.lz-st{border-color:var(--shaft-b)}
+.lz-st .st-h{background:#fbf6ec;border-radius:6px 6px 0 0}
+.stato{font-family:var(--f-mono);font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;border-radius:3px;white-space:nowrap}
+.stato.s-validata{background:var(--ok-soft);color:var(--ok)}
+.stato.s-prova{background:var(--warn-soft);color:var(--warn)}
+.lzlist{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:4px}
+.lzlist > li{padding:10px 12px;border-bottom:1px solid var(--line-2);display:grid;gap:8px}
+.lzlist > li:last-child{border-bottom:0}
+.lz-head{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between}
+.lz-abs{display:flex;flex-wrap:wrap;gap:6px}
+.lz-ab{font-family:var(--f-mono);font-size:12px;padding:3px 8px;border-radius:3px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.lz-detail{display:grid;gap:14px;padding:12px;background:var(--surface-2);border-radius:6px}
+.lz-card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px;display:grid;gap:10px}
+.lz-card h3{color:var(--ink)}
+.lz-meta{font-size:13px;color:var(--ink-2)}
+.lz-vals{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;font-size:13px}
+.lz-vals span{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line-2);padding:3px 0}
+.lz-vals b{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+table.ril{min-width:0;font-size:13px}
+table.ril td,table.ril th{padding:5px 7px;white-space:nowrap}
+table.ril td.n{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+table.ril tr.ref td{background:var(--accent-soft);font-weight:600}
+table.ril td.diff{background:var(--warn-soft);color:var(--warn);font-weight:600}
+table.ril tr.bad td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
+.esito.e-dif{background:var(--crit-soft);color:var(--crit);border-color:transparent}
+.rilgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.rilgrid input{font-size:14px;padding:7px 8px}
+.checks{display:flex;flex-wrap:wrap;gap:8px 18px}
+.motivo{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:end}
+@media (max-width:640px){.motivo{grid-template-columns:minmax(0,1fr)}}
+.hist{list-style:none;margin:0;padding:0;font-size:13px}
+.hist li{padding:6px 0;border-bottom:1px solid var(--line-2)}
+.hist li:last-child{border-bottom:0}
+.hist .d{font-family:var(--f-mono);font-size:12px;color:var(--ink-3)}
+details.sub > summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--ink-2)}
+textarea.lz{width:100%;font:inherit;font-size:14px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:8px 10px;min-height:44px}
 </style>
 
 <div id="gate"><div class="panel"><h2>Ricettario taglio</h2><p class="note" id="gateMsg">Verifica dell'accesso…</p><p id="gateLink" hidden><a href="./" target="_top">Vai al gestionale per accedere →</a></p></div></div>
@@ -189,8 +227,10 @@ const FIREBASE_CONFIG = {
   appId: "1:963083540400:web:c0c3c7841569d269a72875"
 };
 const ADMIN_EMAIL = 'vilardogiovanni@gmail.com';
-function makeRicettarioDb(fs){
-  const col = fs.collection('sezioni').doc('ricettario').collection('dati');
+// Le rilevazioni dei lotti laser stanno in sezioni/rilevazioni/dati (permesso a parte: "Rilevazioni lotti laser"),
+// così un operatore può registrarle anche se il ricettario per lui è in sola consultazione.
+function makeRicettarioDb(fs, sezione){
+  const col = fs.collection('sezioni').doc(sezione || 'ricettario').collection('dati');
   const idOf = path => String(path).replace('/', '__');
   const clean = v => JSON.parse(JSON.stringify(v)); // Firestore non accetta valori undefined
   return {
@@ -228,19 +268,20 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
     decided = true;
     if(!user) return fail('Per usare il ricettario accedi prima al gestionale, con il tuo account.');
     const email = String(user.email || '').toLowerCase();
-    let canEdit = false, nome = email;
+    let canEdit = false, nome = email, ril = 'none';
     try{
-      if(email === ADMIN_EMAIL) canEdit = true;
+      if(email === ADMIN_EMAIL){ canEdit = true; ril = 'edit'; }
       else {
         const d = await fs.collection('utenti').doc(email).get();
         const p = d.exists ? d.data() : null;
         const lvl = p && p.attivo === true ? ((p.permessi || {}).ricettario || 'none') : 'none';
         if(lvl !== 'view' && lvl !== 'edit') return fail("Il tuo account non ha accesso al ricettario: chiedi all'amministratore.");
         canEdit = lvl === 'edit'; nome = p.nome || email;
+        const r = (p.permessi || {}).rilevazioni; ril = (r === 'view' || r === 'edit') ? r : 'none';
       }
     }catch(e){ return fail("Impossibile verificare l'accesso: " + (e.message || e)); }
     document.getElementById('gate').remove();
-    resolve({db: makeRicettarioDb(fs), canEdit});
+    resolve({db: makeRicettarioDb(fs), canEdit, nome, ril, rilDb: ril !== 'none' ? makeRicettarioDb(fs, 'rilevazioni') : null});
   });
 });
 </script>
@@ -333,6 +374,9 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
           <span class="toast" id="saveToast"></span>
         </div>
       </section>
+
+      <section class="panel" id="rilPanel" hidden></section>
+      <details class="panel" id="lzSavePanel" hidden style="margin-top:0"></details>
     </div>
   </div>
 
@@ -346,6 +390,19 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
       <p class="note" id="archState">Caricamento archivio…</p>
       <ul class="archlist" id="archList"></ul>
       <p class="hint">Archivio, taratura e limiti degli impianti sono visibili solo a chi ha accesso al ricettario nel gestionale.</p>
+    </div>
+  </section>
+
+  <section class="panel arch" id="laser">
+    <div class="panel-h"><h2>Lavori laser</h2><span class="eyebrow" id="lzCount">115 SEI · 116 Lang</span></div>
+    <div class="panel-b">
+      <p class="note">Per gli articoli con incisione laser la ricetta non si calcola: si salva quella provata e si valida. I parametri del laser restano sul pannello della macchina, qui c'è il numero del programma da richiamare. Ogni articolo ha una ricetta per impianto: su un impianto dove non è validato il ricettario lo segnala.</p>
+      <div class="archbar">
+        <input type="text" id="lzQ" placeholder="Cerca per codice articolo o struttura" aria-label="Cerca negli articoli laser">
+        <select id="lzMach" aria-label="Filtra per impianto"><option value="">Tutti gli impianti laser</option><option value="115">Impianto 115 · SEI</option><option value="116">Impianto 116 · Lang</option></select>
+      </div>
+      <p class="note" id="lzState">Caricamento articoli laser…</p>
+      <ul class="lzlist" id="lzList"></ul>
     </div>
   </section>
 
@@ -461,6 +518,67 @@ const CFG_GROUPS = [
     ['cpStart','Contropressione iniziale (bar)'],['cpChar','Caratteristica contropressione (%)']], 'tb610']
 ];
 const KNIVES = ['Rasoio in aria','Rasoio su rullo scanalato','Lame circolari a forbice (shear)'];
+
+/* ============================= LASER: CALCOLI PURI =============================
+   Funzioni senza legami con la pagina: le controlla tests/ricettario-laser.test.mjs (se fallisce, il sito non si aggiorna). */
+const LASER_UNITS = {'115':'SEI Laser', '116':'Lang Laser'};          // laser in linea tra svolgitore e gruppo di taglio
+const LZ_TIPI = {scoring:'Scoring (longitudinale)', trasversale:'Incisione trasversale'};
+const LZ_STATI = {prova:'in prova', validata:'validata'};
+// Parametri di avvolgimento della ricetta laser, nelle unità del pannello LAEM TR 415: [chiave, nome, unità, decimali]
+const LZ_KEYS = [
+  ['unw','Svolgitore · Tensione Set','',1], ['rewA','Albero A · Set','N/cm',2], ['rewB','Albero B · Set','N/cm',2],
+  ['taper','Taper','%',0], ['rollA','Rullatura A','N',0], ['rollB','Rullatura B','N',0],
+  ['rollVel','Rullatura Vel%','%',0], ['rollDiam','Rullatura Diam%','%',0],
+  ['v','Velocità Set','m/min',0], ['rup','Ramp+','s',0], ['rdn','Ramp−','s',0]
+];
+const LZ_CALC_KEYS = ['unw','rewA','rewB','taper','rollA','rollB','v']; // quelli che il programma calcola dal materiale
+const LZ_DIFETTI = [['cordonature','Cordonature'],['spire','Spire disallineate / telescopio'],['strappi','Strappi o rotture'],['incisione','Incisione non conforme']];
+const LZ_DEV_THR = 0.30;   // oltre questo scostamento dal calcolo teorico compare un avviso (la ricetta salvata non cambia)
+const LZ_DIFF_TOL = 0.03;  // nel confronto delle rilevazioni: oltre il 3% dalla ricetta salvata il valore è evidenziato
+function lzSlug(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80); }
+function lzNum(x){ return (x===null || x===undefined || x==='' || typeof x==='boolean') ? NaN : Number(x); }
+// scostamento relativo di a rispetto a b (0,1 = +10%)
+function lzRel(a, b){
+  a = lzNum(a); b = lzNum(b);
+  if(!Number.isFinite(a) || !Number.isFinite(b)) return NaN;
+  if(b===0) return a===0 ? 0 : Infinity;
+  return (a - b)/Math.abs(b);
+}
+// parametri salvati che si discostano dal calcolo teorico oltre la soglia
+function lzDeviations(saved, calc, thr){
+  const out = [];
+  for(const k of LZ_CALC_KEYS){
+    const val = lzNum((saved||{})[k]), c = lzNum((calc||{})[k]);
+    if(!(c > 0) || !Number.isFinite(val)) continue;
+    const pct = lzRel(val, c);
+    if(Math.abs(pct) > thr) out.push({k, val, calc:c, pct});
+  }
+  return out;
+}
+// chiavi in cui due serie di valori differiscono oltre la tolleranza (solo dove ci sono entrambi)
+function lzDiffKeys(a, b, tol){
+  return LZ_KEYS.map(x=>x[0]).filter(k => { const d = lzRel((a||{})[k], (b||{})[k]); return Number.isFinite(d) ? Math.abs(d) > tol : d===Infinity; });
+}
+function lzEsito(difetti){ return LZ_DIFETTI.some(([k]) => difetti && difetti[k]) ? 'difetti' : 'ok'; }
+// per ogni parametro: minimo e massimo sui lotti senza difetti
+function lzRanges(rils){
+  const ok = (rils||[]).filter(r => lzEsito(r.difetti)==='ok'), per = {};
+  for(const [k] of LZ_KEYS){
+    const vals = ok.map(r => lzNum((r.valori||{})[k])).filter(Number.isFinite);
+    if(vals.length) per[k] = {min:Math.min(...vals), max:Math.max(...vals), n:vals.length};
+  }
+  return {n:ok.length, per};
+}
+// passare dall'impianto più lento al più veloce: guadagno di velocità e tempo di marcia risparmiato a parità di metri
+function lzSpeedCompare(vSlow, vFast){
+  vSlow = lzNum(vSlow); vFast = lzNum(vFast);
+  if(!(vSlow > 0) || !(vFast > 0)) return null;
+  return {dv:vFast - vSlow, pct:(vFast - vSlow)/vSlow, tempo:1 - vSlow/vFast};
+}
+function lzPushHist(hist, entry, cap){ return [entry].concat(Array.isArray(hist) ? hist : []).slice(0, cap || 40); }
+function lzNextVersion(ab){ return ab && Number.isFinite(lzNum(ab.versione)) ? lzNum(ab.versione) + 1 : 1; }
+/* ============================= FINE LASER: CALCOLI PURI ============================= */
+
 let OV = {};
 let CAN_EDIT = false; // permesso di modifica del ricettario nel gestionale (vedi RICETTARIO_ACCESS)
 let LAST = null, DL = null;
@@ -777,6 +895,7 @@ function compute(){
   if(printed) A.push(['info','Prima di avviare verifica sulla scheda cliente il lato stampa e il senso di avvolgimento.']);
   if(Lmother>0 && sets<1) A.push(['crit','La bobina madre non basta per una tiratura completa.']);
   else if(Lmother>0 && rest/Lmother>0.05) A.push(['warn',`Avanzo di ${nf(rest)} m sulla madre (${nf(rest/Lmother*100,1)}%). Con ${nf(Lmother/(sets+1))} m per bobina faresti ${sets+1} tirature senza avanzo.`]);
+  lzAlerts(res, A);
   if(!A.some(a=>a[0]==='crit'||a[0]==='warn')) A.push(['ok','Nessuna criticità sul piano di taglio e sulle dimensioni.']);
   return res;
 }
@@ -803,6 +922,7 @@ function render(){
   if(r.invalid){
     $('outActions').hidden = true;
     renderDiag();
+    renderLaserSide();
     out.innerHTML = `<div class="panel err-box">${r.errors.length ? 'Correggi gli strati non riconosciuti nella struttura. Materiali accettati: PET, BOPP/OPP, OPP perlato, CPP, PE, HDPE, OPA, AL, PVC, PS, EVOH, CARTA, ADH.' : 'Completa struttura, larghezza fascia, numero fasce e obiettivo bobina.'}</div>`;
     return;
   }
@@ -819,7 +939,7 @@ function render(){
   const ov = (key, calcVal, dec, unit, label) => {
     const man = OV[key]!=null;
     const cur = man ? OV[key] : +(+calcVal).toFixed(dec);
-    return `<span class="ovf${man?' man':''}"><input type="number" class="ov" id="ov_${key}" data-ov="${key}" step="${dec?(1/Math.pow(10,dec)):1}" value="${cur}" aria-label="${label}"><span class="u">${unit}</span>${man?`<button type="button" class="rst" data-rst="${key}" title="Torna al valore calcolato" aria-label="Torna al valore calcolato">↺</button>`:''}</span>${man?`<span class="sub man-note">manuale · calcolato ${nf(calcVal,dec)}</span>`:''}`;
+    return `<span class="ovf${man?' man':''}"><input type="number" class="ov" id="ov_${key}" data-ov="${key}" step="${dec?(1/Math.pow(10,dec)):1}" value="${cur}" aria-label="${label}"><span class="u">${unit}</span>${man?`<button type="button" class="rst" data-rst="${key}" title="Torna al valore calcolato" aria-label="Torna al valore calcolato">↺</button>`:''}</span>${man?`<span class="sub man-note">${lzOvWord(key)} · calcolato ${nf(calcVal,dec)}</span>`:''}`;
   };
   const nMan = Object.keys(OV).length;
   const endA = r.rewA*(1-r.taper/100), endB = r.rewB*(1-r.taper/100);
@@ -1018,7 +1138,8 @@ function render(){
 
 `;
   const fromArch = LOADED ? `<div class="fromarch"><span>Dall'archivio: <b>${esc(LOADED.codice)}</b> · impianto ${esc(CUR)} · <span class="esito e-${esc(LOADED.esito)}">${ESITI[LOADED.esito]||'da provare'}</span> · salvata il ${fmtD(LOADED.aggiornata)}</span><button type="button" class="ghost sm" id="closeArch">Chiudi</button></div>` : '';
-  out.innerHTML = `${fromArch}
+  const fromLz = lzBanner();
+  out.innerHTML = `${fromArch}${fromLz}
   <div class="kpis">
     <div class="kpi"><span class="k">Spessore totale</span><span class="v">${nf(r.T,1)}<small>µm</small></span></div>
     <div class="kpi"><span class="k">Grammatura</span><span class="v">${nf(r.G,1)}<small>g/m²</small></span></div>
@@ -1038,24 +1159,26 @@ function render(){
     </div>
   </div>
 
-  <div class="ovbar"><span>${nMan ? `<b>${nMan} ${nMan===1?'valore modificato':'valori modificati'} a mano</b>, evidenziati in blu. Tutti gli altri sono calcolati.` : 'Tutti i valori nei riquadri sono modificabili: scrivi sopra al valore calcolato.'}</span>${nMan?'<button type="button" class="ghost" id="resetOv">Ripristina i calcolati</button>':''}</div>
+  <div class="ovbar"><span>${lzCurAb() && nMan ? `<b>Valori della ${LZ_LOADED.src==='rilevazione' ? 'rilevazione' : 'ricetta laser'}</b>, evidenziati: sotto ognuno c'è il valore calcolato dal materiale.` : nMan ? `<b>${nMan} ${nMan===1?'valore modificato':'valori modificati'} a mano</b>, evidenziati in blu. Tutti gli altri sono calcolati.` : 'Tutti i valori nei riquadri sono modificabili: scrivi sopra al valore calcolato.'}</span>${nMan?'<button type="button" class="ghost" id="resetOv">Ripristina i calcolati</button>':''}</div>
 
-${STATIONS}
+${lzStation()}${STATIONS}
 
   <div class="panel">
     <div class="panel-h"><h3>Controlli e avvisi</h3></div>
-    <div class="alerts">${r.alerts.map(a=>`<div class="al ${a[0]}"><span class="pill">${{crit:'blocco',warn:'attenzione',info:'nota',ok:'ok'}[a[0]]}</span><span>${a[1]}</span></div>`).join('')}</div>
+    <div class="alerts">${r.alerts.map(a=>`<div class="al ${a[0]}"><span class="pill">${{crit:'blocco',warn:'attenzione',info:'nota',ok:'ok'}[a[0]]}</span><span>${esc(a[1])}</span></div>`).join('')}</div>
   </div>
 
   <p class="note">${PANEL[CUR]==='tb306' ? 'Campi e unità come sul pannello Euromac TB 3.06 (impianto 100), dal manuale d\'istruzioni.' : PANEL[CUR]==='tb610' ? 'Campi e unità come sul pannello Euromac TB 6.10M (impianto 119), dal manuale d\'uso.' : 'Unità e nomi dei campi come sul pannello LAEM TR 415.'} Le modifiche manuali valgono per questo lavoro e si azzerano quando cambi i dati del lavoro. Per cambiare la regola per tutti i lavori usa la taratura in fondo. Valori teorici di partenza calcolati dalla fisica del materiale. Vanno confermati con una prova sulla TR 415 e, dopo le prove, fissati nella taratura. </p>`;
 
   $('outActions').hidden = false;
   if($('closeArch')) $('closeArch').onclick = () => { LOADED = null; render(); };
+  if($('closeLz')) $('closeLz').onclick = () => { LZ_LOADED = null; render(); };
   renderDiag();
+  renderLaserSide();
 }
 
 function recipeRows(r){
-  const U = CFG.unit, mk = k => OV[k]!=null ? 'manuale' : 'calcolato';
+  const U = CFG.unit, mk = k => OV[k]!=null ? lzOvWord(k) : 'calcolato';
   const R = (sez, par, val, un, k, calcVal) => [sez, par, val, un||'', k ? mk(k) : '', (k && OV[k]!=null && calcVal!=null) ? calcVal : ''];
   const r2 = x => Math.round(x*100)/100, r1 = x => Math.round(x*10)/10, r0 = x => Math.round(x);
   const rows = [
@@ -1098,6 +1221,7 @@ function recipeRows(r){
     R('Produzione','Resa oraria',r0(r.kgh),'kg/h')
   ];
   const out = rows.filter(Boolean);
+  out.splice(5, 0, ...lzExportRows());
   if(PANEL[CUR]==='tb610'){
     const car = carFromTaper(r.taper, r.Dco, r.D), sh = Math.max(0, Math.min(0.95, CFG.periShare/100));
     const keep = new Set(['Lavoro','Piano di taglio','Taglio','Bobina finita','Produzione']);
@@ -1288,12 +1412,13 @@ function recipeTextT6(r){
 function recipeText(r){
   if(PANEL[CUR]==='tb610') return recipeTextT6(r);
   if(PANEL[CUR]==='tb306') return recipeTextTB(r);
-  const U = CFG.unit, m = k => OV[k]!=null ? ' (manuale)' : '';
+  const U = CFG.unit, m = k => OV[k]!=null ? ` (${lzOvWord(k)})` : '', lzab = lzCurAb();
   const endA = r.rewA*(1-r.taper/100), endB = r.rewB*(1-r.taper/100);
   const lines = [
     `RICETTA IMPIANTO ${CUR} · ${MACH[CUR].model} · ${$('jobCode').value}`,
     `Struttura: ${$('struct').value}  (${nf(r.T,1)} µm, ${nf(r.G,1)} g/m²)`,
     `Taglio: ${r.n} × ${nf(r.w,1)} mm su madre ${nf(r.Wm)} mm, rifilo ${nf(Math.max(0,r.trim),1)} mm/lato · ${r.knife.type}${m('knife')}`,
+    lzab && LASER_UNITS[CUR] ? `LASER       ${LASER_UNITS[CUR]} · ${LZ_TIPI[lzab.tipo]||''} · programma n° ${lzab.prog||'—'}${lzab.posizione?` · ${lzab.posizione}`:''} · ricetta ${LZ_STATI[lzab.stato]||'in prova'} v${lzab.versione||1}` : '',
     `SVOLGITORE  Tensione Set ${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${U}${m('unw')}`,
     `TENSIONE    Albero A Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
     r.nB ? `            Albero B Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
@@ -1361,6 +1486,8 @@ function renderLog(){
 }
 function setMachine(id){
   if(!MACH[id] || id===CUR) return;
+  // articolo laser aperto: sull'altro impianto si carica la sua ricetta, se c'è; altrimenti restano i valori calcolati e l'avviso
+  if(LZ_LOADED && lzAbOf(lzArt(LZ_LOADED.id), id)){ lzOpen(LZ_LOADED.id, id); return; }
   CUR = id; CFG = MACH[id].cfg; OV = {};
   save(true); renderMachUI(); renderCalib(); render();
 }
@@ -1404,7 +1531,7 @@ $('importFile').addEventListener('change', e=>{
   };
   rd.readAsText(f);
 });
-$('job').addEventListener('input', e=>{ if(e.target.name==='mach'){ setMachine(e.target.value); return; } if(e.target.id!=='jobCode') OV={}; render(); });
+$('job').addEventListener('input', e=>{ if(e.target.name==='mach'){ setMachine(e.target.value); return; } if(e.target.id!=='jobCode'){ OV={}; LZ_LOADED=null; } render(); });
 $('job').addEventListener('change', render);
 $('out').addEventListener('change', e=>{
   if(ACCESS_KNOWN && !CAN_EDIT) return;
@@ -1611,7 +1738,7 @@ async function downloadPdf(r){
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(16);
   T(`RICETTA TAGLIO · IMPIANTO ${CUR}`, M, 11);
   doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-  T(`${MACH[CUR].model} · stampata il ${new Date().toLocaleDateString('it-IT')}${LOADED?` · archivio: ${ESITI[LOADED.esito]||'da provare'}`:''}`, M, 18);
+  T(`${MACH[CUR].model} · stampata il ${new Date().toLocaleDateString('it-IT')}${LOADED?` · archivio: ${ESITI[LOADED.esito]||'da provare'}`:''}${lzCurAb()?` · ricetta laser ${LZ_STATI[lzCurAb().stato]||'in prova'} v${lzCurAb().versione||1}`:''}`, M, 18);
   // lavoro
   let y = 33; ink(); doc.setFont('helvetica','bold'); doc.setFontSize(13);
   T($('jobCode').value || 'Lavoro', M, y); y += 6;
@@ -1635,7 +1762,7 @@ async function downloadPdf(r){
   const tbN = PANEL[CUR]==='tb306', t6N = PANEL[CUR]==='tb610';
   T(`${tbN?'Albero superiore':t6N?'Stazioni destre':'Albero A'}: ${r.nA} fasce (scuro) · ${tbN?'Albero inferiore':t6N?'Stazioni sinistre':'Albero B'}: ${r.nB} fasce (chiaro) · rifilo ${nf(trimW,1)} mm per lato`, M, y); y += 7;
   // stazioni nell'ordine del pannello
-  const man = k => OV[k]!=null ? ' (man.)' : '';
+  const man = k => OV[k]!=null && lzOvWord(k)==='manuale' ? ' (man.)' : '', lzab = lzCurAb() && LASER_UNITS[CUR] ? lzCurAb() : null;
   let L, R;
   if(PANEL[CUR]==='tb610'){
     const sh = Math.max(0, Math.min(0.95, CFG.periShare/100)), car = carFromTaper(r.taper, r.Dco, r.D), nb = CFG.rollNperBar > 0;
@@ -1670,6 +1797,7 @@ async function downloadPdf(r){
     ];
   } else {
   L = [
+    ...(lzab ? [[`0 · LASER IN LINEA · ${LASER_UNITS[CUR]}`, [['Programma da richiamare', `n° ${lzab.prog||'—'}`], ['Incisione', LZ_TIPI[lzab.tipo]||'—', lzab.posizione ? String(lzab.posizione).slice(0,60) : '']]]] : []),
     ['1 · SVOLGITORE', [['Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
     ['2 · TAGLIO', [['Sistema', `${r.knife.type}${man('knife')}`], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
     ['3 · CONTROLLO DELLA TENSIONE', [['Albero A · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
@@ -1714,9 +1842,9 @@ async function downloadPdf(r){
   // riquadro per la prova a bordo macchina
   let yb = Math.max(y + 4, 250); if(yb > 262){ doc.addPage(); yb = 20; }
   doc.setDrawColor(21,32,31); doc.setLineWidth(0.3); doc.rect(M, yb, W-2*M, 30);
-  ink(); doc.setFont('helvetica','bold'); doc.setFontSize(9); T('PROVA IN MACCHINA', M+3, yb+6);
+  ink(); doc.setFont('helvetica','bold'); doc.setFontSize(9); T(lzab ? 'RILEVAZIONE LOTTO LASER (riportala nel ricettario)' : 'PROVA IN MACCHINA', M+3, yb+6);
   doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  T('Esito:   [  ] ok     [  ] da correggere', M+3, yb+13);
+  T(lzab ? 'Bobina:  [  ] buona   [  ] cordonature   [  ] spire disallineate   [  ] strappi   [  ] incisione' : 'Esito:   [  ] ok     [  ] da correggere', M+3, yb+13);
   T('Note: ______________________________________________________________________________', M+3, yb+20);
   T('Operatore: ______________________     Data: ____________     Firma: ______________________', M+3, yb+27);
   grey(); doc.setFontSize(7.5);
@@ -1763,7 +1891,7 @@ function openRecipe(id){
   $(x.mode==='D'?'modeD':'modeL').checked = true; $('printed').checked = !!x.printed;
   set('mw', x.mw); set('ml', x.ml); set('md', x.md);
   OV = x.ov && typeof x.ov==='object' ? clone(x.ov) : {};
-  LOADED = {id, codice:x.codice, esito:x.esito, aggiornata:x.aggiornata};
+  LOADED = {id, codice:x.codice, esito:x.esito, aggiornata:x.aggiornata}; LZ_LOADED = null;
   $('saveEsito').value = x.esito || 'prova';
   render(); $('job').scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -1800,6 +1928,418 @@ $('archList').addEventListener('click', async e => {
   try{ await DB.doc('ricette/'+id).delete(); if(LOADED && LOADED.id===id){ LOADED = null; render(); } }catch(err){ $('archState').hidden = false; $('archState').textContent = 'Eliminazione non riuscita, riprova.'; }
 });
 
+// ================= LAVORI LASER (115 SEI · 116 Lang) =================
+// Articoli in sezioni/ricettario/dati/laser__<codice>: una ricetta per impianto ("abilitazione") con stato, versione e storico.
+// La ricetta laser non si calcola: si salva quella provata. I parametri del laser restano sul pannello della macchina (numero programma).
+// Rilevazioni dei lotti in sezioni/rilevazioni/dati/ril__<codice>--<impianto>--<ora> (permesso "Rilevazioni lotti laser").
+let LZ = null, LZ_ERR = false, LZ_LOADED = null, LZ_OPEN = null, LZ_ARM = null, LZ_BUSY = false;
+let RIL = null, RIL_ERR = false, RIL_DB = null, CAN_RIL = false, CAN_RIL_VIEW = false, ME = '';
+const LZ_RIL_OPEN = new Set();
+const LZ_SHORT = {unw:'Svolg.', rewA:'Alb. A', rewB:'Alb. B', taper:'Taper', rollA:'Rull. A', rollB:'Rull. B', rollVel:'Vel%', rollDiam:'Diam%', v:'Vel.', rup:'Ramp+', rdn:'Ramp−'};
+const lzArt = id => (LZ||[]).find(a=>a.id===id) || null;
+const lzAbOf = (art, mach) => (art && art.abil && art.abil[mach]) || null;
+const lzCurAb = () => LZ_LOADED ? lzAbOf(lzArt(LZ_LOADED.id), CUR) : null;
+const lzMachUnit = mach => ((MACH[mach]||{}).cfg||{}).unit || 'N';
+const lzKeyDef = k => LZ_KEYS.find(x=>x[0]===k) || [k,k,'',0];
+const lzUnitOf = (k, mach) => k==='unw' ? lzMachUnit(mach) : lzKeyDef(k)[2];
+function lzDecOf(k, mach){ if(k!=='unw') return lzKeyDef(k)[3]; const u = lzMachUnit(mach); return u==='N/cm' ? 2 : u==='N' ? 0 : 1; }
+function lzFmt(k, v, mach){ const x = lzNum(v); return Number.isFinite(x) ? `${nf(x, lzDecOf(k, mach))} ${lzUnitOf(k, mach)}`.trim() : '—'; }
+const lzValsText = (av, mach) => LZ_KEYS.filter(([k])=>Number.isFinite(lzNum((av||{})[k]))).map(([k,l])=>`${l} ${lzFmt(k, av[k], mach)}`).join(' · ');
+const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
+function lzToast(el, m){ if(!el) return; el.textContent = m; clearTimeout(el._h); el._h = setTimeout(()=>{ el.textContent = ''; }, 3500); }
+// valori della ricetta sullo schermo, nelle unità del pannello LAEM (quelli che si salvano nella ricetta laser)
+function lzValuesOf(r){
+  if(!r || r.invalid) return null;
+  return {unw:+unwToPanel(r.unw, r.Wm).toFixed(unwDec()), rewA:+r.rewSetA.toFixed(2), rewB: r.nB ? +r.rewSetB.toFixed(2) : null,
+    taper:+(+r.taper).toFixed(1), rollA:Math.round(r.rollA), rollB: r.nB ? Math.round(r.rollB) : null, rollVel:+r.rollVel, rollDiam:+r.rollDiam,
+    v:Math.round(r.v), rup:Math.round(r.rup), rdn:Math.round(r.rdn)};
+}
+// gli stessi parametri come li calcola il programma dal materiale
+function lzCalcOf(r){
+  const c = r.calc;
+  return {unw:c.unw, rewA:c.rewA, rewB: r.nB ? c.rewB : null, taper:c.taper, rollA:c.rollA, rollB: r.nB ? c.rollB : null,
+    rollVel:c.rollVel, rollDiam:c.rollDiam, v:c.v, rup:c.rup, rdn:c.rdn};
+}
+// da dove viene un valore scritto sopra al calcolato: dalla ricetta laser, da una rilevazione o da una modifica a mano
+function lzOvWord(k){
+  const ab = lzCurAb(); if(!ab) return 'manuale';
+  if(LZ_LOADED.src==='rilevazione') return 'rilevazione';
+  if(k==='knife') return OV.knife===ab.knife ? 'ricetta laser' : 'manuale';
+  const d = lzRel(OV[k], (ab.av||{})[k]);
+  return Number.isFinite(d) && Math.abs(d) <= 0.005 ? 'ricetta laser' : 'manuale';
+}
+function lzSnapshot(ab){ return {tipo:ab.tipo||'', prog:ab.prog||'', posizione:ab.posizione||'', controllo:ab.controllo||'', note:ab.note||'', av:ab.av||{}, stato:ab.stato||'prova', versione:ab.versione||1}; }
+function lzUpsertLocal(id, art){ LZ = (LZ||[]).filter(x=>x.id!==id).concat(art ? [Object.assign(clone(art), {id})] : []); }
+function lzRilsOf(id, mach){ return (RIL||[]).filter(x=>x.articolo===id && x.impianto===mach).sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')) || String(b.registrataIl||'').localeCompare(String(a.registrataIl||''))); }
+
+function lzAlerts(r, A){
+  if(!LZ_LOADED) return;
+  const art = lzArt(LZ_LOADED.id), cod = art ? art.codice : LZ_LOADED.codice, ab = lzAbOf(art, CUR);
+  if(!LASER_UNITS[CUR]){ A.push(['crit', `Articolo laser ${cod}: l'impianto ${CUR} non ha il laser in linea. Gli articoli laser si lavorano sulla 115 (SEI) o sulla 116 (Lang).`]); return; }
+  if(!ab){
+    const altri = art ? Object.keys(art.abil||{}).filter(m=>m!==CUR) : [];
+    A.push(['crit', `Articolo laser ${cod}: non validato sull'impianto ${CUR}${altri.length ? ` (c'è solo la ricetta della ${altri.join(', ')})` : ''}. Qui sotto ci sono i valori calcolati, non quelli dell'altro impianto: fai la prova con il ${LASER_UNITS[CUR]}, registra le rilevazioni e salva la ricetta in prova.`]);
+    return;
+  }
+  if(ab.stato!=='validata') A.push(['warn', `Ricetta laser in prova sull'impianto ${CUR}: valori da confermare con le rilevazioni dei lotti prima di validarla.`]);
+  if(ab.unwUnit && ab.unwUnit!==CFG.unit) A.push(['warn', `La tensione svolgitore della ricetta laser è salvata in ${ab.unwUnit}, ma in taratura l'impianto ${CUR} ora usa ${CFG.unit}: non l'ho caricata, controlla il valore prima di partire.`]);
+  if(LZ_LOADED.src==='rilevazione') A.push(['info', `Valori presi dalla rilevazione ${LZ_LOADED.srcLabel}, non dalla ricetta salvata (v${ab.versione||1}). Per tenerli aggiorna la ricetta laser con il motivo.`]);
+  else {
+    const diff = lzDiffKeys(lzValuesOf(r), ab.av||{}, 0.005);
+    if(diff.length) A.push(['info', `Valori diversi dalla ricetta laser salvata: ${diff.map(k=>lzKeyDef(k)[1]).join(', ')}.${CAN_EDIT ? ' Se la modifica va tenuta, aggiorna la ricetta laser con il motivo; altrimenti chiudi e riapri l\'articolo.' : ''}`]);
+  }
+  const dev = lzDeviations(ab.av||{}, lzCalcOf(r), LZ_DEV_THR);
+  if(dev.length) A.push(['info', `Controllo con il calcolo teorico: ${dev.map(d=>`${lzKeyDef(d.k)[1]} salvato ${lzFmt(d.k, d.val, CUR)}, calcolato ${lzFmt(d.k, d.calc, CUR)} (${d.pct>0?'+':''}${nf(d.pct*100)}%)`).join(' · ')}. La ricetta salvata non cambia: se è provata vale lei. L'avviso serve a notare un errore di battitura.`]);
+}
+function lzBanner(){
+  if(!LZ_LOADED) return '';
+  const art = lzArt(LZ_LOADED.id), ab = lzAbOf(art, CUR), cod = art ? art.codice : LZ_LOADED.codice;
+  const st = ab ? `<span class="stato s-${ab.stato==='validata'?'validata':'prova'}">${LZ_STATI[ab.stato]||'in prova'} v${ab.versione||1}</span>${ab.stato==='validata' && ab.validataIl ? ` · validata il ${fmtD(ab.validataIl)}` : ''}`
+    : `<span class="stato s-prova">${LASER_UNITS[CUR] ? 'non validato qui' : 'impianto senza laser'}</span>`;
+  return `<div class="fromarch lz-banner"><span>Lavoro laser: <b>${esc(cod)}</b> · impianto ${esc(CUR)}${LASER_UNITS[CUR] ? ` · ${LASER_UNITS[CUR]}` : ''} · ${st}${LZ_LOADED.src==='rilevazione' ? ` · valori della rilevazione ${esc(LZ_LOADED.srcLabel)}` : ''}</span><button type="button" class="ghost sm" id="closeLz">Chiudi</button></div>`;
+}
+function lzStation(){
+  const ab = lzCurAb(); if(!ab || !LASER_UNITS[CUR]) return '';
+  return `<div class="st lz-st">
+    <div class="st-h"><h3>0 · Laser in linea</h3><span class="tag">${LASER_UNITS[CUR]} · tra svolgitore e taglio</span></div>
+    <dl>
+      <dt>Programma da richiamare<span class="dsub">sul pannello del laser</span></dt><dd>n° ${esc(ab.prog||'—')}</dd>
+      <dt>Incisione</dt><dd>${esc(LZ_TIPI[ab.tipo]||'—')}</dd>
+    </dl>
+    ${ab.posizione ? `<p class="why"><b>Riferimento posizione:</b> ${esc(ab.posizione)}</p>` : ''}
+    ${ab.controllo ? `<p class="why"><b>Controllo a inizio bobina:</b> ${esc(ab.controllo)}</p>` : ''}
+    ${ab.note ? `<p class="why"><b>Note:</b> ${esc(ab.note)}</p>` : ''}
+    <p class="why">I parametri del laser sono nel programma salvato sulla macchina: qui non si ricopiano. I valori di avvolgimento qui sotto sono quelli della ricetta laser${ab.stato==='validata' ? ' validata' : ' in prova'}.</p>
+  </div>`;
+}
+function lzSetJob(x, codice){
+  const set = (i,v) => { $(i).value = v==null ? '' : v; };
+  set('jobCode', codice); set('struct', x.struttura); set('w', x.w); set('n', x.n); set('target', x.target);
+  if(x.core){ const cs = $('core'); if(![...cs.options].some(o=>+o.value===+x.core)) cs.add(new Option(`${x.core} mm`, x.core)); cs.value = String(x.core); }
+  $(x.mode==='D'?'modeD':'modeL').checked = true; $('printed').checked = !!x.printed;
+  set('mw', x.mw); set('ml', x.ml); set('md', x.md);
+}
+// Apre un articolo laser nel calcolatore: lavoro e valori della ricetta di quell'impianto (o di una rilevazione)
+function lzOpen(id, mach, vals, srcLabel){
+  const art = lzArt(id); if(!art) return;
+  const ab = lzAbOf(art, mach);
+  if(MACH[mach] && mach!==CUR){ CUR = mach; CFG = MACH[CUR].cfg; save(true); renderMachUI(); renderCalib(); }
+  if(ab && ab.job) lzSetJob(ab.job, art.codice); else $('jobCode').value = art.codice;
+  OV = {};
+  const src = vals || (ab && ab.av) || {};
+  for(const [k] of LZ_KEYS){
+    const v = lzNum(src[k]); if(!Number.isFinite(v)) continue;
+    if(k==='unw' && ab && ab.unwUnit && ab.unwUnit!==CFG.unit) continue;
+    OV[k] = v;
+  }
+  if(ab && ab.knife) OV.knife = ab.knife;
+  LOADED = null;
+  LZ_LOADED = {id, codice:art.codice, src: vals ? 'rilevazione' : 'ricetta', srcLabel: srcLabel || ''};
+  const c = compute(); if(!c.invalid && OV.knife===c.calc.knife) delete OV.knife;
+  render(); $('job').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ---- pannello "Salva come ricetta laser" (solo chi può modificare il ricettario, impianti 115 e 116)
+function lzSaveHint(){
+  const h = $('lzSaveHint'), req = $('lzMotivoReq'); if(!h) return;
+  const art = lzArt(lzSlug(($('lzCode')||{}).value||'')), ab = lzAbOf(art, CUR), stato = ($('lzStato')||{}).value;
+  const need = !!ab || stato==='validata';
+  if(req) req.textContent = need ? '(obbligatorio)' : '(facoltativo)';
+  h.textContent = ab ? `Salvando sostituisci la ricetta v${ab.versione||1} dell'impianto ${CUR} (${LZ_STATI[ab.stato]||'in prova'}) con i valori della ricetta qui sopra: la versione attuale resta nello storico con il motivo.`
+    : art ? `L'articolo esiste già su un altro impianto: aggiungi la ricetta dell'impianto ${CUR}. Quella dell'altro impianto non cambia.`
+    : `Si salvano il lavoro e i valori di avvolgimento della ricetta qui sopra per l'impianto ${CUR}. Prima scrivi nei riquadri della ricetta i valori che usate davvero.`;
+}
+function renderLzSave(){
+  const p = $('lzSavePanel'); if(!p) return;
+  const show = !!(DB && CAN_EDIT && LASER_UNITS[CUR] && LAST && !LAST.invalid);
+  p.hidden = !show; if(!show){ p.dataset.key = ''; return; }
+  const art = LZ_LOADED ? lzArt(LZ_LOADED.id) : null, ab = lzAbOf(art, CUR);
+  const key = `${LZ_LOADED ? `${LZ_LOADED.id}|${LZ_LOADED.src}|${LZ_LOADED.srcLabel}` : ''}|${CUR}|${ab ? `${ab.versione}|${ab.stato}` : ''}`;
+  if(p.dataset.key===key){
+    const c = $('lzCode'); if(c && !art && !c.dataset.touched) c.value = $('jobCode').value.trim(); // il codice segue il lavoro finché non lo cambi qui
+    lzSaveHint(); return;
+  }
+  p.dataset.key = key;
+  p.open = !!LZ_LOADED;
+  const tipo = ab ? ab.tipo : (CUR==='115' ? 'scoring' : 'trasversale');
+  p.innerHTML = `<summary><div><h3>${ab ? 'Aggiorna ricetta laser' : 'Salva come ricetta laser'}</h3><div class="hint">Impianto ${CUR} · ${LASER_UNITS[CUR]}: i valori della ricetta qui sopra diventano la ricetta dell'articolo.</div></div></summary>
+  <div class="panel-b">
+    <div class="row2">
+      <div class="field"><label for="lzCode">Codice articolo interno</label><input type="text" id="lzCode" value="${esc(art ? art.codice : $('jobCode').value.trim())}"${art ? ' readonly' : ''}></div>
+      <div class="field"><label for="lzTipo">Incisione</label><select id="lzTipo">${Object.entries(LZ_TIPI).map(([k,l])=>`<option value="${k}"${k===tipo?' selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <p class="hint" style="margin:0">Solo il codice interno dell'articolo: niente nomi di clienti o loro specifiche.</p>
+    <div class="row2">
+      <div class="field"><label for="lzProg">N° programma laser</label><input type="text" id="lzProg" value="${esc(ab ? ab.prog||'' : '')}" placeholder="come sul pannello ${LASER_UNITS[CUR]}"></div>
+      <div class="field"><label for="lzStato">Stato</label><select id="lzStato"><option value="prova"${!ab || ab.stato!=='validata' ? ' selected' : ''}>In prova</option><option value="validata"${ab && ab.stato==='validata' ? ' selected' : ''}>Validata</option></select></div>
+    </div>
+    <div class="field"><label for="lzPos">Riferimento posizione</label><input type="text" id="lzPos" value="${esc(ab ? ab.posizione||'' : '')}" placeholder="${tipo==='scoring' ? 'Es. linea a 12 mm dal bordo sinistro di ogni fascia' : 'Es. fotocellula su tacca nera, passo 180 mm'}"></div>
+    <div class="field"><label for="lzCtrl">Controllo a inizio bobina</label><input type="text" id="lzCtrl" value="${esc(ab ? ab.controllo||'' : '')}" placeholder="Es. prova di strappo sui primi metri"></div>
+    <div class="field"><label for="lzNote">Note</label><input type="text" id="lzNote" value="${esc(ab ? ab.note||'' : '')}"></div>
+    <div class="field"><label for="lzMotivo">Motivo <span id="lzMotivoReq"></span></label><input type="text" id="lzMotivo" placeholder="Es. trascritta dal foglio a bordo macchina · confermata su 3 lotti senza difetti"></div>
+    <div class="actions"><button type="button" id="lzSave">${ab ? 'Aggiorna ricetta laser' : 'Salva ricetta laser'}</button><span class="toast" id="lzToast"></span></div>
+    <p class="hint" id="lzSaveHint"></p>
+  </div>`;
+  lzSaveHint();
+}
+async function lzSaveRecipe(){
+  const say = m => lzToast($('lzToast'), m);
+  if(!DB || !CAN_EDIT || LZ_BUSY) return;
+  const r = LAST; if(!r || r.invalid){ say('Completa il lavoro prima di salvarlo.'); return; }
+  if(!LASER_UNITS[CUR]){ say('Le ricette laser si salvano solo sugli impianti 115 e 116.'); return; }
+  const codice = $('lzCode').value.trim(); if(!codice){ say('Scrivi il codice articolo.'); $('lzCode').focus(); return; }
+  const id = lzSlug(codice); if(!id){ say('Codice non valido: usa lettere e numeri.'); $('lzCode').focus(); return; }
+  const prevArt = lzArt(id), prevAb = lzAbOf(prevArt, CUR);
+  const stato = $('lzStato').value==='validata' ? 'validata' : 'prova', motivo = $('lzMotivo').value.trim();
+  if((prevAb || stato==='validata') && !motivo){ say('Scrivi il motivo: resta nello storico della ricetta.'); $('lzMotivo').focus(); return; }
+  const now = new Date().toISOString();
+  const job = jobState(); ['ov','codice','impianto','modello'].forEach(k=>delete job[k]);
+  const ab = {tipo:$('lzTipo').value, prog:$('lzProg').value.trim(), posizione:$('lzPos').value.trim(), controllo:$('lzCtrl').value.trim(), note:$('lzNote').value.trim(),
+    av:lzValuesOf(r), unwUnit:CFG.unit, knife:r.knife.type, job, stato, versione:lzNextVersion(prevAb),
+    salvataIl:now, salvataDa:ME, validataIl: stato==='validata' ? now : null, validataDa: stato==='validata' ? ME : null};
+  const azione = !prevAb ? (stato==='validata' ? 'creata e validata' : 'creata in prova')
+    : (prevAb.stato!=='validata' && stato==='validata') ? 'modificata e validata'
+    : (prevAb.stato==='validata' && stato!=='validata') ? 'modificata e rimessa in prova' : 'modificata';
+  const art = prevArt ? clone(prevArt) : {creato:now};
+  delete art.id;
+  art.codice = prevArt ? prevArt.codice : codice; art.aggiornato = now;
+  art.abil = Object.assign({}, art.abil || {}, {[CUR]: ab});
+  art.storico = lzPushHist(art.storico, {data:now, da:ME, impianto:CUR, azione, versione:ab.versione, motivo,
+    prima: prevAb ? lzSnapshot(prevAb) : null, cambiati: prevAb ? lzDiffKeys(ab.av, prevAb.av, 0.005) : []}, 40);
+  LZ_BUSY = true; $('lzSave').disabled = true;
+  try{
+    await DB.doc('laser/'+id).set(art);
+    lzUpsertLocal(id, art);
+    LZ_LOADED = {id, codice:art.codice, src:'ricetta', srcLabel:''};
+    $('lzMotivo').value = '';
+    render(); renderLzList();
+    lzToast($('lzToast'), prevAb ? `Ricetta laser aggiornata (v${ab.versione})` : 'Ricetta laser salvata');
+  }catch(e){ say('Salvataggio non riuscito, riprova.'); }
+  LZ_BUSY = false; if($('lzSave')) $('lzSave').disabled = false;
+}
+
+// ---- pannello "Rilevazione lotto" (chi ha "Rilevazioni lotti laser: può modificare")
+function lzFillRilValues(){
+  const vals = lzValuesOf(LAST) || {};
+  document.querySelectorAll('#rilPanel [data-ril]').forEach(el=>{ const v = lzNum(vals[el.dataset.ril]); el.value = Number.isFinite(v) ? v : ''; });
+}
+function renderRilPanel(){
+  const p = $('rilPanel'); if(!p) return;
+  const art = LZ_LOADED ? lzArt(LZ_LOADED.id) : null, ab = lzAbOf(art, CUR);
+  const show = !!(RIL_DB && CAN_RIL && ab && LASER_UNITS[CUR] && LAST && !LAST.invalid);
+  p.hidden = !show; if(!show){ p.dataset.key = ''; return; }
+  const key = `${LZ_LOADED.id}|${CUR}|${LAST.nB ? 2 : 1}`;
+  if(p.dataset.key===key) return;
+  p.dataset.key = key;
+  p.innerHTML = `<div class="panel-h"><h3>Rilevazione lotto</h3><span class="eyebrow">${esc(art.codice)} · impianto ${esc(CUR)}</span></div>
+  <div class="panel-b">
+    <p class="note">Scrivi i valori <b>impostati davvero</b> in macchina per questo lotto e com'è venuta la bobina. Servono a confrontare le squadre e a validare la ricetta: non cambiano la ricetta salvata.</p>
+    <div class="rilgrid">
+      <div class="field"><label for="rilData">Data</label><input type="date" id="rilData" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="field"><label for="rilSq">Squadra</label><select id="rilSq"><option value="">—</option><option>A</option><option>B</option><option>C</option></select></div>
+      <div class="field"><label for="rilLotto">Lotto / ODL</label><input type="text" id="rilLotto"></div>
+    </div>
+    <div class="rilgrid">${LZ_KEYS.filter(([k])=>(k!=='rewB' && k!=='rollB') || LAST.nB).map(([k,l])=>`<div class="field"><label for="ril_${k}">${esc(l)} · ${esc(lzUnitOf(k, CUR))}</label><input type="number" step="any" id="ril_${k}" data-ril="${k}"></div>`).join('')}</div>
+    <div class="actions"><button type="button" class="ghost sm" id="rilReset">Riprendi i valori della ricetta</button></div>
+    <div class="field"><span class="lbl">Com'è venuta la bobina</span><div class="checks">${LZ_DIFETTI.map(([k,l])=>`<label class="check"><input type="checkbox" id="rilD_${k}"> ${esc(l)}</label>`).join('')}</div><span class="hint">Nessuna casella spuntata = bobina buona.</span></div>
+    <div class="field"><label for="rilNote">Note</label><input type="text" id="rilNote" placeholder="Es. cordonatura leggera dopo metà bobina"></div>
+    <div class="actions"><button type="button" id="rilSave">Registra rilevazione</button><span class="toast" id="rilToast"></span></div>
+  </div>`;
+  lzFillRilValues();
+}
+async function lzSaveRil(){
+  const say = m => lzToast($('rilToast'), m);
+  if(!RIL_DB || !CAN_RIL || LZ_BUSY) return;
+  const art = LZ_LOADED && lzArt(LZ_LOADED.id), ab = lzAbOf(art, CUR); if(!ab) return;
+  const valori = {};
+  document.querySelectorAll('#rilPanel [data-ril]').forEach(el=>{ const v = parseFloat(String(el.value).replace(',','.')); if(Number.isFinite(v)) valori[el.dataset.ril] = v; });
+  if(!Object.keys(valori).length){ say('Scrivi i valori impostati in macchina.'); return; }
+  const difetti = {}; LZ_DIFETTI.forEach(([k])=>{ difetti[k] = $('rilD_'+k).checked; });
+  const now = new Date().toISOString();
+  const id = `${LZ_LOADED.id}--${CUR}--${now.replace(/\D/g,'').slice(0,17)}`;
+  const body = {articolo:LZ_LOADED.id, codice:art.codice, impianto:CUR, data:$('rilData').value || now.slice(0,10), squadra:$('rilSq').value,
+    lotto:$('rilLotto').value.trim(), valori, difetti, esito:lzEsito(difetti), note:$('rilNote').value.trim(),
+    versioneRicetta:ab.versione || 1, registrataDa:ME, registrataIl:now};
+  LZ_BUSY = true; $('rilSave').disabled = true;
+  try{
+    await RIL_DB.doc('ril/'+id).set(body);
+    RIL = (RIL||[]).filter(x=>x.id!==id).concat([Object.assign({id}, body)]);
+    $('rilLotto').value = ''; $('rilNote').value = ''; LZ_DIFETTI.forEach(([k])=>{ $('rilD_'+k).checked = false; });
+    say(body.esito==='ok' ? 'Rilevazione registrata: bobina buona' : 'Rilevazione registrata con i difetti');
+    renderLzList();
+  }catch(e){ say('Registrazione non riuscita, riprova.'); }
+  LZ_BUSY = false; $('rilSave').disabled = false;
+}
+function renderLaserSide(){ renderLzSave(); renderRilPanel(); }
+
+// ---- elenco articoli, dettaglio, confronto delle rilevazioni, storico
+function lzRilTable(a, m, b){
+  if(!CAN_RIL_VIEW) return '';
+  if(RIL_ERR) return '<p class="hint">Rilevazioni non raggiungibili in questo momento: ricarica la pagina.</p>';
+  if(RIL===null) return '<p class="hint">Caricamento rilevazioni…</p>';
+  const rils = lzRilsOf(a.id, m);
+  if(!rils.length) return `<p class="hint">Nessuna rilevazione dei lotti. Si registrano aprendo l'articolo nel calcolatore: sotto la ricetta compare "Rilevazione lotto".</p>`;
+  const av = b.av || {};
+  const keys = LZ_KEYS.map(x=>x[0]).filter(k => Number.isFinite(lzNum(av[k])) || rils.some(r=>Number.isFinite(lzNum((r.valori||{})[k]))));
+  const cell = (k, v) => { const x = lzNum(v); return Number.isFinite(x) ? nf(x, lzDecOf(k, m)) : '—'; };
+  const rg = lzRanges(rils), nDif = rils.filter(r=>lzEsito(r.difetti)!=='ok').length;
+  const sq = [...new Set(rils.map(r=>r.squadra).filter(Boolean))].sort();
+  const var_ = keys.filter(k => rg.per[k] && rg.per[k].min!==rg.per[k].max).map(k => `${LZ_SHORT[k]} ${cell(k, rg.per[k].min)}–${cell(k, rg.per[k].max)}`);
+  const ncol = keys.length + 5;
+  const rows = rils.slice(0, 60).map(r => {
+    const dk = new Set(lzDiffKeys(r.valori, av, LZ_DIFF_TOL)), bad = lzEsito(r.difetti)!=='ok';
+    const dif = LZ_DIFETTI.filter(([k])=>r.difetti && r.difetti[k]).map(([,l])=>l).join(', ');
+    const act = `${CAN_EDIT ? `<button type="button" class="ghost sm" data-rilload="${esc(r.id)}" title="Apri nel calcolatore con questi valori">Carica</button>` : ''}${CAN_EDIT && CAN_RIL ? ` <button type="button" class="rst" data-rildel="${esc(r.id)}" aria-label="Elimina rilevazione">${LZ_ARM==='ril:'+r.id ? 'Conferma' : '×'}</button>` : ''}`;
+    return `<tr class="${bad ? 'bad' : ''}"><td>${fmtD(r.data)}</td><td>${esc(r.squadra||'—')}</td><td>${esc(r.lotto||'')}</td>${keys.map(k=>`<td class="n${dk.has(k) ? ' diff' : ''}">${cell(k, (r.valori||{})[k])}</td>`).join('')}<td><span class="esito ${bad ? 'e-dif' : 'e-ok'}" title="${esc(dif)}">${bad ? 'difetti' : 'buona'}</span></td><td>${act}</td></tr>`
+      + ((r.note || dif) ? `<tr><td></td><td colspan="${ncol-1}" class="hint">${esc([dif, r.note].filter(Boolean).join(' · '))}${r.registrataDa ? ` · ${esc(r.registrataDa)}` : ''}${r.versioneRicetta && r.versioneRicetta!==(b.versione||1) ? ` · ricetta v${r.versioneRicetta}` : ''}</td></tr>` : '');
+  }).join('');
+  const k_ = `${a.id}|${m}`;
+  return `<details class="sub" data-rilopen="${esc(k_)}"${LZ_RIL_OPEN.has(k_) ? ' open' : ''}><summary>Rilevazioni dei lotti (${rils.length}${nDif ? ` · ${nDif} con difetti` : ''})</summary>
+    <div class="tbl-wrap" style="margin-top:8px"><table class="ril"><thead><tr><th>Data</th><th>Sq.</th><th>Lotto</th>${keys.map(k=>`<th title="${esc(lzKeyDef(k)[1])} (${esc(lzUnitOf(k, m))})">${LZ_SHORT[k]}</th>`).join('')}<th>Bobina</th><th></th></tr></thead>
+    <tbody><tr class="ref"><td colspan="3">Ricetta v${b.versione||1}</td>${keys.map(k=>`<td class="n">${cell(k, av[k])}</td>`).join('')}<td></td><td></td></tr>${rows}</tbody></table></div>
+    <p class="hint">${rils.length} lotti · ${nDif} con difetti · squadre: ${esc(sq.join(', ') || '—')}. Evidenziati i valori oltre il ${nf(LZ_DIFF_TOL*100)}% dalla ricetta salvata. ${rg.n ? (var_.length ? `Sui ${rg.n} lotti buoni i valori variano: ${esc(var_.join(' · '))}.` : `Sui ${rg.n} lotti buoni i valori sono gli stessi.`) : 'Nessun lotto buono finora.'}</p>
+  </details>`;
+}
+function lzCard(a, m){
+  const b = a.abil[m], av = b.av || {}, job = b.job || {}, kk = `${a.id}|${m}`;
+  const vals = LZ_KEYS.filter(([k])=>Number.isFinite(lzNum(av[k]))).map(([k,l])=>`<span>${esc(l)} <b>${esc(lzFmt(k, av[k], m))}</b></span>`).join('');
+  const meta = [`programma n° ${esc(b.prog||'—')}`, esc(LZ_TIPI[b.tipo]||''), b.posizione ? `riferimento: ${esc(b.posizione)}` : '', b.controllo ? `controllo: ${esc(b.controllo)}` : '', b.note ? esc(b.note) : ''].filter(Boolean).join(' · ');
+  const who = b.stato==='validata' && b.validataIl ? `validata il ${fmtD(b.validataIl)}${b.validataDa ? ' da '+esc(b.validataDa) : ''}` : `salvata il ${fmtD(b.salvataIl)}${b.salvataDa ? ' da '+esc(b.salvataDa) : ''}`;
+  const edit = CAN_EDIT ? `${b.stato!=='validata'
+      ? `<button type="button" class="ghost sm" data-lzact="valida" data-id="${esc(a.id)}" data-mach="${m}">Valida</button>`
+      : `<button type="button" class="ghost sm" data-lzact="prova" data-id="${esc(a.id)}" data-mach="${m}">Rimetti in prova</button>`}
+    <button type="button" class="ghost sm danger" data-lzact="elimina" data-id="${esc(a.id)}" data-mach="${m}">${LZ_ARM===`ab:${a.id}:${m}` ? 'Conferma eliminazione' : 'Elimina ricetta impianto'}</button>` : '';
+  return `<div class="lz-card">
+    <div class="lz-head"><h3>Impianto ${m} · ${LASER_UNITS[m]}</h3><span><span class="stato s-${b.stato==='validata' ? 'validata' : 'prova'}">${LZ_STATI[b.stato]||'in prova'}</span> <span class="hint">v${b.versione||1} · ${who}</span></span></div>
+    <div class="lz-meta">${meta}</div>
+    <div class="lz-meta">Lavoro: ${esc(job.struttura||'—')} · ${nf(job.n)} × ${nf(job.w,1)} mm${b.knife ? ` · ${esc(b.knife)}` : ''}</div>
+    <div class="lz-vals">${vals}</div>
+    <div class="actions"><button type="button" class="sm" data-lzopen="${esc(a.id)}" data-mach="${m}">Apri nel calcolatore</button>${edit}<span class="toast" data-lztoast="${esc(kk)}"></span></div>
+    ${CAN_EDIT ? `<div class="field"><label for="lzMot_${esc(a.id)}_${m}">Motivo (serve per valida, rimetti in prova ed elimina)</label><input type="text" id="lzMot_${esc(a.id)}_${m}" data-lzmot="${esc(kk)}" placeholder="Es. 3 lotti senza difetti, stessi valori su tutte le squadre"></div>` : ''}
+    ${lzRilTable(a, m, b)}
+  </div>`;
+}
+function lzDetail(a){
+  const machs = Object.keys(a.abil||{}).filter(m=>LASER_UNITS[m]).sort();
+  let speed = '';
+  const vv = machs.map(m=>({m, v:lzNum((a.abil[m].av||{}).v), st:a.abil[m].stato})).filter(x=>x.v>0);
+  if(vv.length===2){
+    const [s, f] = vv[0].v<=vv[1].v ? vv : [vv[1], vv[0]], c = lzSpeedCompare(s.v, f.v);
+    speed = c && c.dv>0 ? `<p class="note"><b>Velocità:</b> sulla ${f.m} ${nf(f.v)} m/min, sulla ${s.m} ${nf(s.v)} m/min (+${nf(c.pct*100)}%). A parità di metri il tempo di marcia scende del ${nf(c.tempo*100)}%, cambi esclusi.${s.st!=='validata' || f.st!=='validata' ? ' Confronto da confermare: una delle due ricette è ancora in prova.' : ''}</p>`
+      : `<p class="note"><b>Velocità:</b> uguale sui due impianti (${nf(s.v)} m/min).</p>`;
+  } else if(vv.length===1 && CAN_EDIT){
+    const other = Object.keys(LASER_UNITS).find(m=>m!==vv[0].m);
+    speed = `<p class="hint">Ricetta solo sull'impianto ${vv[0].m}. Per provarlo sulla ${other}: apri l'articolo, scegli l'impianto ${other}, fai la prova e salva la ricetta in prova; quando le rilevazioni la confermano la validi. La ricetta della ${vv[0].m} non viene toccata.</p>`;
+  }
+  const hist = a.storico || [];
+  const histHtml = hist.length ? `<details class="sub"><summary>Storico modifiche (${hist.length})</summary><ul class="hist">${hist.map(h=>`<li><span class="d">${fmtDT(h.data)}</span> · impianto ${esc(h.impianto||'')} · <b>${esc(h.azione||'')}</b>${h.versione ? ` · v${h.versione}` : ''}${h.da ? ` · ${esc(h.da)}` : ''}${h.motivo ? `<br>${esc(h.motivo)}` : ''}${h.cambiati && h.cambiati.length ? `<br><span class="hint">valori cambiati: ${esc(h.cambiati.map(k=>lzKeyDef(k)[1]).join(', '))}</span>` : ''}${h.prima && h.prima.av && ((h.cambiati && h.cambiati.length) || /eliminat/.test(h.azione||'')) ? `<br><span class="hint">prima (v${h.prima.versione||1}, ${esc(LZ_STATI[h.prima.stato]||'')}, programma n° ${esc(h.prima.prog||'—')}): ${esc(lzValsText(h.prima.av, h.impianto))}</span>` : ''}</li>`).join('')}</ul></details>` : '';
+  const del = CAN_EDIT && !machs.length ? `<div class="actions"><button type="button" class="ghost sm danger" data-lzdelart="${esc(a.id)}">${LZ_ARM==='art:'+a.id ? 'Conferma eliminazione' : 'Elimina articolo'}</button></div>` : '';
+  return `<div class="lz-detail">${speed}${machs.map(m=>lzCard(a, m)).join('') || '<p class="hint">Nessuna ricetta per impianto.</p>'}${histHtml}${del}</div>`;
+}
+function renderLzList(){
+  const list = $('lzList'), st = $('lzState'), cnt = $('lzCount'); if(!list) return;
+  if(!DB){ list.innerHTML = ''; st.hidden = false; st.textContent = 'Lavori laser non disponibili: apri il ricettario dal gestionale, con il tuo account.'; return; }
+  if(LZ_ERR){ st.hidden = false; st.textContent = 'Lavori laser non raggiungibili in questo momento: ricarica la pagina.'; return; }
+  if(LZ===null){ st.hidden = false; st.textContent = 'Caricamento articoli laser…'; return; }
+  const keep = {}; list.querySelectorAll('[data-lzmot]').forEach(i=>{ if(i.value) keep[i.dataset.lzmot] = i.value; });
+  const q = $('lzQ').value.trim().toLowerCase(), only = $('lzMach').value;
+  const rows = LZ.filter(a => (!only || lzAbOf(a, only)) && (!q || `${a.codice} ${Object.values(a.abil||{}).map(b=>(b.job||{}).struttura||'').join(' ')}`.toLowerCase().includes(q)))
+    .sort((a,b)=>String(a.codice).localeCompare(String(b.codice), 'it'));
+  cnt.textContent = `${LZ.length} ${LZ.length===1 ? 'articolo' : 'articoli'} · 115 SEI · 116 Lang`;
+  st.hidden = rows.length>0;
+  st.textContent = LZ.length ? 'Nessun articolo corrisponde alla ricerca.'
+    : CAN_EDIT ? 'Nessun articolo laser. Per inserirne uno: scegli l\'impianto 115 o 116, compila il lavoro, scrivi nei riquadri della ricetta i valori che usate oggi e apri "Salva come ricetta laser" sotto la ricetta.'
+    : 'Nessun articolo laser inserito.';
+  list.innerHTML = rows.map(a => {
+    const machs = Object.keys(a.abil||{}).filter(m=>LASER_UNITS[m]).sort();
+    const struct = machs.map(m=>(a.abil[m].job||{}).struttura).find(Boolean) || '';
+    const chips = machs.map(m => { const b = a.abil[m];
+      return `<button type="button" class="lz-ab" data-lzopen="${esc(a.id)}" data-mach="${m}" title="Apri nel calcolatore">${m} · ${esc(b.tipo==='scoring' ? 'scoring' : 'trasversale')} · prog. ${esc(b.prog||'—')} · <span class="stato s-${b.stato==='validata' ? 'validata' : 'prova'}">${LZ_STATI[b.stato]||'in prova'} v${b.versione||1}</span>${Number.isFinite(lzNum((b.av||{}).v)) ? ` · ${nf(b.av.v)} m/min` : ''}</button>`; }).join('');
+    return `<li>
+      <div class="lz-head"><div class="a-main"><b>${esc(a.codice)}</b><span class="a-sub">${esc(struct)}</span></div>
+        <div class="a-act"><button type="button" class="ghost sm" data-lzdet="${esc(a.id)}">${LZ_OPEN===a.id ? 'Chiudi' : 'Dettaglio'}</button></div></div>
+      <div class="lz-abs">${chips || '<span class="hint">nessuna ricetta per impianto</span>'}</div>
+      ${LZ_OPEN===a.id ? lzDetail(a) : ''}
+    </li>`;
+  }).join('');
+  list.querySelectorAll('[data-lzmot]').forEach(i=>{ if(keep[i.dataset.lzmot]) i.value = keep[i.dataset.lzmot]; });
+}
+async function lzAction(act, id, mach){
+  if(!DB || !CAN_EDIT || LZ_BUSY) return;
+  const art = lzArt(id), ab = lzAbOf(art, mach); if(!ab) return;
+  const kk = `${id}|${mach}`, tEl = [...document.querySelectorAll('[data-lztoast]')].find(x=>x.dataset.lztoast===kk);
+  const motEl = [...document.querySelectorAll('[data-lzmot]')].find(x=>x.dataset.lzmot===kk), motivo = motEl ? motEl.value.trim() : '';
+  if(!motivo){ lzToast(tEl, 'Scrivi il motivo: resta nello storico.'); if(motEl) motEl.focus(); return; }
+  const arm = `ab:${id}:${mach}`;
+  if(act==='elimina' && LZ_ARM!==arm){ LZ_ARM = arm; renderLzList(); setTimeout(()=>{ if(LZ_ARM===arm){ LZ_ARM = null; renderLzList(); } }, 4000); return; }
+  LZ_ARM = null;
+  const now = new Date().toISOString(), next = clone(art); delete next.id;
+  let azione;
+  if(act==='valida'){ next.abil[mach] = Object.assign({}, ab, {stato:'validata', validataIl:now, validataDa:ME}); azione = 'validata'; }
+  else if(act==='prova'){ next.abil[mach] = Object.assign({}, ab, {stato:'prova', validataIl:null, validataDa:null}); azione = 'rimessa in prova'; }
+  else if(act==='elimina'){ delete next.abil[mach]; azione = 'ricetta impianto eliminata'; }
+  else return;
+  next.storico = lzPushHist(next.storico, {data:now, da:ME, impianto:mach, azione, versione:ab.versione||1, motivo, prima:lzSnapshot(ab), cambiati:[]}, 40);
+  next.aggiornato = now;
+  LZ_BUSY = true;
+  try{
+    await DB.doc('laser/'+id).set(next);
+    lzUpsertLocal(id, next);
+    if(motEl) motEl.value = '';
+    renderLzList(); render();
+  }catch(e){ lzToast(tEl, 'Salvataggio non riuscito, riprova.'); }
+  LZ_BUSY = false;
+}
+$('lzQ').addEventListener('input', renderLzList);
+$('lzMach').addEventListener('change', renderLzList);
+$('lzList').addEventListener('toggle', e => {
+  const d = e.target; if(!d.dataset || !d.dataset.rilopen) return;
+  if(d.open) LZ_RIL_OPEN.add(d.dataset.rilopen); else LZ_RIL_OPEN.delete(d.dataset.rilopen);
+}, true);
+$('lzList').addEventListener('click', async e => {
+  const det = e.target.closest('[data-lzdet]');
+  if(det){ LZ_OPEN = LZ_OPEN===det.dataset.lzdet ? null : det.dataset.lzdet; renderLzList(); return; }
+  const op = e.target.closest('[data-lzopen]');
+  if(op){ lzOpen(op.dataset.lzopen, op.dataset.mach); return; }
+  const ac = e.target.closest('[data-lzact]');
+  if(ac){ lzAction(ac.dataset.lzact, ac.dataset.id, ac.dataset.mach); return; }
+  const rl = e.target.closest('[data-rilload]');
+  if(rl){ const r = (RIL||[]).find(x=>x.id===rl.dataset.rilload); if(r) lzOpen(r.articolo, r.impianto, r.valori, `del ${fmtD(r.data)}${r.squadra ? ' · squadra '+r.squadra : ''}`); return; }
+  const rd = e.target.closest('[data-rildel]');
+  if(rd && RIL_DB && CAN_RIL && CAN_EDIT){
+    const id = rd.dataset.rildel, arm = 'ril:'+id;
+    if(LZ_ARM!==arm){ LZ_ARM = arm; renderLzList(); setTimeout(()=>{ if(LZ_ARM===arm){ LZ_ARM = null; renderLzList(); } }, 4000); return; }
+    LZ_ARM = null;
+    try{ await RIL_DB.doc('ril/'+id).delete(); RIL = (RIL||[]).filter(x=>x.id!==id); renderLzList(); }
+    catch(err){ $('lzState').hidden = false; $('lzState').textContent = 'Eliminazione della rilevazione non riuscita, riprova.'; }
+    return;
+  }
+  const da = e.target.closest('[data-lzdelart]');
+  if(da && DB && CAN_EDIT){
+    const id = da.dataset.lzdelart, arm = 'art:'+id;
+    if(LZ_ARM!==arm){ LZ_ARM = arm; renderLzList(); setTimeout(()=>{ if(LZ_ARM===arm){ LZ_ARM = null; renderLzList(); } }, 4000); return; }
+    LZ_ARM = null;
+    try{ await DB.doc('laser/'+id).delete(); lzUpsertLocal(id, null); if(LZ_LOADED && LZ_LOADED.id===id) LZ_LOADED = null; LZ_OPEN = null; renderLzList(); render(); }
+    catch(err){ $('lzState').hidden = false; $('lzState').textContent = 'Eliminazione non riuscita, riprova.'; }
+  }
+});
+$('lzSavePanel').addEventListener('click', e => { if(e.target.id==='lzSave') lzSaveRecipe(); });
+$('lzSavePanel').addEventListener('input', e => { if(e.target.id==='lzCode'){ e.target.dataset.touched = '1'; lzSaveHint(); } });
+$('lzSavePanel').addEventListener('change', e => {
+  if(e.target.id==='lzStato') lzSaveHint();
+  if(e.target.id==='lzTipo') $('lzPos').placeholder = e.target.value==='scoring' ? 'Es. linea a 12 mm dal bordo sinistro di ogni fascia' : 'Es. fotocellula su tacca nera, passo 180 mm';
+});
+$('rilPanel').addEventListener('click', e => {
+  if(e.target.id==='rilSave') lzSaveRil();
+  else if(e.target.id==='rilReset') lzFillRilValues();
+});
+function lzExportRows(){
+  const ab = lzCurAb(); if(!ab || !LASER_UNITS[CUR]) return [];
+  return [['Laser','Unità laser',LASER_UNITS[CUR],'','',''], ['Laser','Incisione',LZ_TIPI[ab.tipo]||'','','',''], ['Laser','Programma laser da richiamare',ab.prog||'—','','',''],
+    ab.posizione ? ['Laser','Riferimento posizione',ab.posizione,'','',''] : null, ab.controllo ? ['Laser','Controllo a inizio bobina',ab.controllo,'','',''] : null,
+    ['Laser','Ricetta laser',`${LZ_STATI[ab.stato]||'in prova'} · versione ${ab.versione||1}`,'','','']].filter(Boolean);
+}
+
 // ================= AVVIO: dati dal database del gestionale =================
 // Sola consultazione: niente campi o pulsanti per modificare taratura, limiti, storico e archivio (si leggono soltanto).
 let ACCESS_KNOWN = false; // i blocchi partono solo dopo aver verificato i permessi
@@ -1821,8 +2361,9 @@ new MutationObserver(lockReadOnly).observe(document.body, {childList:true, subtr
   const acc = await window.RICETTARIO_ACCESS;
   if(!acc){ renderArchive(); return; }
   CAN_EDIT = acc.canEdit; ACCESS_KNOWN = true;
+  ME = acc.nome || ''; CAN_RIL = acc.ril==='edit'; CAN_RIL_VIEW = acc.ril==='view' || acc.ril==='edit'; RIL_DB = acc.rilDb || null;
   const db = acc.db;
-  DB = db; renderArchive(); lockReadOnly();
+  DB = db; renderArchive(); renderLzList(); lockReadOnly();
   try{
     const [t, l] = await Promise.all([db.doc('config/taratura').get(), db.doc('config/limiti').get()]);
     if(t.exists){ applyStore(clone(t.data())); CFG = MACH[CUR].cfg; try{ localStorage.setItem(STORE, JSON.stringify(snapshot())); }catch(e){} }
@@ -1832,12 +2373,25 @@ new MutationObserver(lockReadOnly).observe(document.body, {childList:true, subtr
   db.collection('ricette').orderBy('aggiornata','desc').limit(500).onSnapshot(
     snap => { ARCH = snap.docs.map(d => Object.assign({id:d.id}, d.data())); renderArchive(); },
     () => { ARCH_ERR = true; renderArchive(); });
+  // articoli laser: se cambia quello aperto nel calcolatore, ricalcolo avvisi e pannelli
+  let lzSig = '';
+  db.collection('laser').onSnapshot(
+    snap => {
+      LZ = snap.docs.map(d => Object.assign({}, d.data(), {id:d.id})); renderLzList();
+      const sig = LZ_LOADED ? JSON.stringify(lzArt(LZ_LOADED.id)) : '';
+      if(sig!==lzSig){ lzSig = sig; render(); }
+    },
+    () => { LZ_ERR = true; renderLzList(); });
+  if(RIL_DB) RIL_DB.collection('ril').onSnapshot(
+    snap => { RIL = snap.docs.map(d => Object.assign({}, d.data(), {id:d.id})); renderLzList(); },
+    () => { RIL_ERR = true; renderLzList(); });
 })();
 
 renderMachUI();
 renderCalib();
 render();
 renderArchive();
+renderLzList();
 })();
 </script>
 

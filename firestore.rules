@@ -36,7 +36,9 @@ service cloud.firestore {
 
     // Operatori, impianti e turni delle squadre servono a tutti per calcolare i turni (calendario, situazione di oggi).
     // Le statistiche assenze leggono i dati delle coperture.
-    // Il ricettario (ricettario.html) tiene i suoi dati in sezioni/ricettario.
+    // Il ricettario (ricettario.html) tiene i suoi dati in sezioni/ricettario (ricette laser comprese)
+    // e le rilevazioni dei lotti laser in sezioni/rilevazioni: permesso a parte, così un operatore può registrarle
+    // anche con il ricettario in sola consultazione. Le regole generiche qui sotto valgono già per entrambe.
     function puoLeggere(sezione) {
       return admin() || (attivo() && (
         sezione in ['operatori', 'impianti', 'turni']

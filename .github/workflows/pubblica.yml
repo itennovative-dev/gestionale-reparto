@@ -22,6 +22,9 @@ jobs:
       - name: Test dei calcoli (se fallisce, il sito non viene aggiornato)
         run: node tests/calcoli.test.mjs
 
+      - name: Test del ricettario laser (se fallisce, il sito non viene aggiornato)
+        run: node tests/ricettario-laser.test.mjs
+
       - name: Prepara la cartella del sito (solo le pagine, nessun documento)
         run: |
           mkdir -p public

@@ -1622,7 +1622,8 @@ const PERM_SECTIONS = [
   {id:'competenze',   label:'Matrice competenze',            kind:'full'},
   {id:'manutenzione', label:'Manutenzione impianti',         kind:'full'},
   {id:'fermi',        label:'Registro fermi macchina',       kind:'full'},
-  {id:'ricettario',   label:'Ricettario taglierine',         kind:'full', hint:'modificare = salvare in archivio e tarare gli impianti'},
+  {id:'ricettario',   label:'Ricettario taglierine',         kind:'full', hint:'modificare = salvare in archivio, tarare gli impianti e validare le ricette laser'},
+  {id:'rilevazioni',  label:'Rilevazioni lotti laser',       kind:'full', hint:'consultazione = vedere il confronto · modificare = registrare i valori impostati sui lotti (serve anche il ricettario)'},
   {id:'produzione',   label:'Statistiche produzione',        kind:'full', hint:'modificare = importare i file'},
   {id:'opstats',      label:'Statistiche turni e operatori', kind:'full', hint:'modificare = importare i file'},
   {id:'assenze',      label:'Statistiche assenze',           kind:'view'},
@@ -6950,7 +6951,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-23 · ricettario integrato nel gestionale';
+const APP_VERSION = '2026-10-26 · ricettario: lavori laser 115/116';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
