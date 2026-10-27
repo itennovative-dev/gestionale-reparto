@@ -2666,18 +2666,19 @@ async function saveExtraShifts(){
 function extraAssignOptions(){
   const list = ALL_PLANTS.slice();
   if(!list.includes('TA')) list.push('TA');
-  list.push('EUTROLOG');
+  list.push('EUTROLOG', 'RT');
   return list;
 }
 function extraAssignLabel(a){
   if(a===EXTRA_CLEAN) return 'Pulizia reparto';
   if(!a) return 'da definire';
+  if(a==='RT') return 'RT';
   return a==='TA' || a==='EUTROLOG' ? plantLabelOf(a) : 'Impianto '+a;
 }
 function extraAssignShort(a){
   if(a===EXTRA_CLEAN) return 'Pulizia';
   if(!a) return '—';
-  return a==='TA' ? 'T. anime' : a==='EUTROLOG' ? 'Eutrolog' : 'Imp. '+a;
+  return a==='TA' ? 'T. anime' : a==='EUTROLOG' ? 'Eutrolog' : a==='RT' ? 'RT' : 'Imp. '+a;
 }
 function extraAssignRank(a){
   if(a===EXTRA_CLEAN) return 900;
@@ -7543,7 +7544,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · turni aggiuntivi del sabato';
+const APP_VERSION = '2026-10-27 · turni aggiuntivi: assegnazione RT';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
