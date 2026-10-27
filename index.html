@@ -257,6 +257,45 @@
   #page-home .menu-grid{grid-template-columns:repeat(auto-fill, minmax(98px,1fr)); gap:10px;}
   #page-home .menu-tile{padding:20px 8px; gap:10px; font-size:11.5px; text-align:center;}
   #page-home .home-footer{grid-column:1 / -1;}
+  /* ---- Home: planner della settimana ---- */
+  .hp-nav{display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12px; color:var(--sub);}
+  .hp-nav strong{color:var(--ink); font-weight:600; min-width:150px; text-align:center;}
+  .hp-nav button{padding:4px 10px; font-size:12px;}
+  .hp-nav .hp-count{margin-left:8px;}
+  .hp-grid{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:10px;}
+  .hp-day{
+    --dc:var(--steel);
+    background:var(--card); border:1px solid var(--line); border-top:4px solid var(--dc); border-radius:12px;
+    padding:10px 11px 9px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:190px; min-width:0;
+  }
+  .hp-day:nth-child(1){--dc:#c4704e;} .hp-day:nth-child(2){--dc:#c48f4a;} .hp-day:nth-child(3){--dc:#b39c45;}
+  .hp-day:nth-child(4){--dc:#7d9861;} .hp-day:nth-child(5){--dc:#5e91a0;} .hp-day:nth-child(6){--dc:#6a7ea6;}
+  .hp-day:nth-child(7){--dc:#ab5b53;}
+  .hp-day.today{border-color:var(--dc); box-shadow:0 0 0 1px var(--dc), 0 6px 18px rgba(38,37,31,.08);}
+  .hp-day.past{opacity:.72;}
+  .hp-head{display:flex; align-items:baseline; justify-content:space-between; gap:6px;}
+  .hp-head b{font-size:11.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--dc); font-weight:700;}
+  .hp-head span{font-size:11px; color:var(--sub); white-space:nowrap;}
+  .hp-head .hp-today{background:var(--dc); color:#fff; border-radius:9px; padding:1px 7px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; margin-left:4px;}
+  .hp-tasks{flex:1; margin:8px 0 6px;}
+  .hp-task{display:flex; align-items:flex-start; gap:6px; padding:5px 0; border-bottom:1px dashed var(--line); font-size:12.5px; line-height:1.35;}
+  .hp-task input[type=checkbox]{width:auto; margin:2px 0 0; accent-color:var(--dc); flex:none; cursor:pointer;}
+  .hp-task .planner-task-time{min-width:0; margin-right:3px;}
+  .hp-task .hp-text{flex:1; min-width:0; overflow-wrap:break-word;}
+  .hp-task.done .hp-text{text-decoration:line-through; color:var(--sub);}
+  .hp-task .hp-del{border:none; background:none; color:var(--sub); cursor:pointer; padding:0 2px; font-size:14px; line-height:1; opacity:0; flex:none;}
+  .hp-task:hover .hp-del{opacity:1;} .hp-task .hp-del:hover{color:var(--danger);}
+  @media (hover:none){ .hp-task .hp-del{opacity:.6;} }
+  .hp-empty{font-size:11.5px; color:var(--sub); padding:4px 0;}
+  .hp-add{display:flex; flex-wrap:wrap; gap:4px;}
+  .hp-add input{font-size:11.5px; padding:5px 6px;}
+  .hp-add input[type=text]{flex:1 1 110px; min-width:0; order:-1;}
+  .hp-add input[type=time]{width:auto; flex:1 0 72px;}
+  .hp-add button{flex:none; padding:4px 10px; font-size:12px;}
+  @media (max-width:999px){
+    .hp-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(230px,80%); overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px;}
+    .hp-day{scroll-snap-align:start;}
+  }
   /* ---- Home su PC: sfrutta tutta la larghezza dello schermo ---- */
   @media (min-width:1000px){
     #page-home .today-wrap, #page-home .menu-wrap, #page-home .home-banner{max-width:none; padding-left:3vw; padding-right:3vw;}
@@ -391,6 +430,7 @@
     <p id="homeDateLine">Gestionale di reparto · squadre A · B · C</p>
   </div>
 
+  <section class="today-wrap home-planner" id="homePlanner" data-sec="planner"></section>
   <section class="today-wrap" id="homeToday"></section>
 
   <div class="menu-wrap">
@@ -2426,17 +2466,27 @@ function jumpPlannerDate(dateStr){
   if(!dateStr) return;
   switchPlannerWeek(isoWeek(dateStr));
 }
-function addPlannerTask(dayKey){
-  const timeInput = document.getElementById('plannerTime_'+dayKey);
-  const textInput = document.getElementById('plannerText_'+dayKey);
+async function addPlannerTask(dayKey, view){
+  const home = view==='home';
+  const pre = home ? 'hp' : 'planner';
+  const timeInput = document.getElementById(pre+'Time_'+dayKey);
+  const textInput = document.getElementById(pre+'Text_'+dayKey);
   const text = textInput.value.trim();
   if(!text){ toast('Scrivi cosa devi fare'); return; }
   const time = timeInput.value.trim();
-  plannerData[dayKey] = plannerData[dayKey] || [];
-  plannerData[dayKey].push({id: Date.now()+'-'+Math.random().toString(36).slice(2,6), time, text, done:false});
+  const weekId = home ? homePlannerWeek : plannerWeek;
+  const data = home ? await loadPlannerWeek(weekId) : plannerData;
+  data[dayKey] = data[dayKey] || [];
+  data[dayKey].push({id: Date.now()+'-'+Math.random().toString(36).slice(2,6), time, text, done:false});
   textInput.value = ''; timeInput.value = '';
-  savePlannerWeek(plannerWeek, plannerData);
-  renderPlannerGrid();
+  await savePlannerWeek(weekId, data);
+  if(plannerWeek===weekId) plannerData = data;
+  refreshPlanners();
+  if(home){ await renderHomePlanner(); const f = document.getElementById('hpText_'+dayKey); if(f) f.focus(); }
+}
+function refreshPlanners(){
+  if(plannerWeek) renderPlannerGrid();
+  renderHomePlanner();
   renderHomeBanner();
 }
 async function togglePlannerTask(weekId, dayKey, id){
@@ -2446,28 +2496,26 @@ async function togglePlannerTask(weekId, dayKey, id){
   if(t) t.done = !t.done;
   await savePlannerWeek(weekId, data);
   if(plannerWeek===weekId) plannerData = data;
-  renderPlannerGrid();
-  renderHomeBanner();
+  refreshPlanners();
 }
 async function deletePlannerTask(weekId, dayKey, id){
   const data = await loadPlannerWeek(weekId);
   data[dayKey] = (data[dayKey] || []).filter(x=>x.id!==id);
   await savePlannerWeek(weekId, data);
   if(plannerWeek===weekId) plannerData = data;
-  renderPlannerGrid();
-  renderHomeBanner();
+  refreshPlanners();
 }
 function renderPlannerGrid(){
   const el = document.getElementById('plannerGrid');
-  if(!el) return;
+  if(!el || !plannerWeek) return;
   const days = plannerWeekDays(plannerWeek);
   el.innerHTML = days.map((d,i)=>{
     const tasks = (plannerData[d] || []).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const rows = tasks.map(t=>`
       <div class="planner-task ${t.done?'done':''}">
         <input type="checkbox" ${t.done?'checked':''} onchange="togglePlannerTask('${plannerWeek}','${d}','${t.id}')">
-        ${t.time?`<span class="planner-task-time">${t.time}</span>`:''}
-        <span class="planner-task-text">${t.text}</span>
+        ${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span>`:''}
+        <span class="planner-task-text">${escHtml(t.text)}</span>
         <button class="btn-danger" onclick="deletePlannerTask('${plannerWeek}','${d}','${t.id}')">×</button>
       </div>`).join('') || '<p class="empty" style="padding:6px 0; font-size:12px;">Nessun impegno.</p>';
     return `<div class="planner-day">
@@ -2475,11 +2523,68 @@ function renderPlannerGrid(){
       <div class="planner-tasks">${rows}</div>
       <div class="planner-add">
         <input type="time" id="plannerTime_${d}">
-        <input type="text" id="plannerText_${d}" placeholder="Cosa devi fare...">
+        <input type="text" id="plannerText_${d}" placeholder="Cosa devi fare..." onkeydown="if(event.key==='Enter') addPlannerTask('${d}')">
         <button class="btn-ghost" onclick="addPlannerTask('${d}')">+</button>
       </div>
     </div>`;
   }).join('');
+}
+
+/* Home: planner dell'intera settimana, con inserimento e spunta degli impegni (stessi dati del Planner settimanale). */
+let homePlannerWeek = null;
+function navigateHomePlanner(delta){
+  if(!delta || !homePlannerWeek){ homePlannerWeek = isoWeek(todayStr()); }
+  else { const m = isoWeekMonday(homePlannerWeek); m.setDate(m.getDate()+delta*7); homePlannerWeek = isoWeek(toLocalDateStr(m)); }
+  renderHomePlanner(true);
+}
+async function renderHomePlanner(scrollToToday){
+  const el = document.getElementById('homePlanner');
+  if(!el) return;
+  if(!canView('planner')){ el.style.display='none'; el.innerHTML=''; return; }
+  const today = todayStr();
+  const curWeek = isoWeek(today);
+  if(!homePlannerWeek) homePlannerWeek = curWeek;
+  const week = homePlannerWeek;
+  const data = await loadPlannerWeek(week);
+  if(week!==homePlannerWeek) return;   // nel frattempo si è cambiata settimana
+  const edit = canEdit('planner');
+  const days = plannerWeekDays(week);
+  let tot = 0, open = 0;
+  const cols = days.map((d,i)=>{
+    const tasks = (data[d] || []).slice().sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+    tot += tasks.length; open += tasks.filter(t=>!t.done).length;
+    const rows = tasks.map(t=>`<div class="hp-task ${t.done?'done':''}">
+        <input type="checkbox" ${t.done?'checked':''} title="Fatto" onchange="togglePlannerTask('${week}','${d}','${escHtml(escJs(t.id))}')">
+        <span class="hp-text">${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span> `:''}${escHtml(t.text)}</span>
+        ${edit?`<button class="hp-del" title="Elimina" onclick="deletePlannerTask('${week}','${d}','${escHtml(escJs(t.id))}')">×</button>`:''}
+      </div>`).join('') || `<div class="hp-empty">Nessun impegno</div>`;
+    const add = edit ? `<div class="hp-add">
+        <input type="time" id="hpTime_${d}" title="Ora (facoltativa)">
+        <input type="text" id="hpText_${d}" placeholder="Aggiungi..." onkeydown="if(event.key==='Enter') addPlannerTask('${d}','home')">
+        <button class="btn-ghost" title="Aggiungi" onclick="addPlannerTask('${d}','home')">+</button>
+      </div>` : '';
+    const dd = new Date(d+'T00:00:00').toLocaleDateString('it-IT',{day:'2-digit', month:'2-digit'});
+    return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
+      <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
+      <div class="hp-tasks">${rows}</div>${add}
+    </div>`;
+  }).join('');
+  const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
+  el.style.display = '';
+  el.innerHTML = `<div class="today-head"><h2>Planner della settimana</h2>
+      <div class="hp-nav">
+        <button class="btn-ghost" onclick="navigateHomePlanner(-1)" title="Settimana precedente">‹</button>
+        <strong>${plannerWeekLabelText(week)}</strong>
+        <button class="btn-ghost" onclick="navigateHomePlanner(1)" title="Settimana successiva">›</button>
+        ${week!==curWeek?`<button class="btn-ghost" onclick="navigateHomePlanner(0)">questa settimana</button>`:''}
+        <span class="hp-count">${count}</span>
+      </div></div>
+    <div class="hp-grid">${cols}</div>`;
+  // su telefono i giorni scorrono di lato: porto in vista oggi
+  if(scrollToToday===true && window.innerWidth<1000){
+    const t = el.querySelector('.hp-day.today'), g = el.querySelector('.hp-grid');
+    if(t && g) g.scrollLeft = t.offsetLeft - g.offsetLeft;
+  }
 }
 
 /* Home: situazione di oggi (assenti, turni scoperti, impianti fermi, manutenzioni, impegni). */
@@ -6914,7 +7019,7 @@ function showPage(id){
     if(el) el.style.display = (p===id) ? 'block' : 'none';
   });
   window.scrollTo(0,0);
-  if(id==='page-home') renderHomeBanner();
+  if(id==='page-home'){ renderHomePlanner(true); renderHomeBanner(); }
   if(id==='panel-planner') switchPlannerWeek(plannerWeek || isoWeek(todayStr()));
   if(id==='panel-calendar') renderMonthlyCalendarPreview();
   if(id==='panel-maintenance') renderMaintenancePanel();
@@ -6963,7 +7068,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · home a tutta larghezza su PC';
+const APP_VERSION = '2026-10-27 · planner settimanale in home';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7003,6 +7108,7 @@ async function startApp(){
   loadHoursData();
   loadSkills();
   loadDowntime();
+  renderHomePlanner(true);
   renderHomeBanner();
 }
 
