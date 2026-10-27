@@ -265,46 +265,67 @@
   .hp-grid{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:10px;}
   .hp-day{
     --dc:var(--steel);
-    background:var(--card); border:1px solid var(--line); border-top:4px solid var(--dc); border-radius:12px;
-    padding:10px 11px 9px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:190px; min-width:0;
+    background:var(--card); border:1px solid #ddd8cc; border-top:5px solid var(--dc); border-radius:12px;
+    padding:0 0 10px; box-shadow:var(--shadow); display:flex; flex-direction:column; min-height:190px; min-width:0;
   }
   .hp-day:nth-child(1){--dc:#c4704e;} .hp-day:nth-child(2){--dc:#c48f4a;} .hp-day:nth-child(3){--dc:#b39c45;}
   .hp-day:nth-child(4){--dc:#7d9861;} .hp-day:nth-child(5){--dc:#5e91a0;} .hp-day:nth-child(6){--dc:#6a7ea6;}
   .hp-day:nth-child(7){--dc:#ab5b53;}
-  .hp-day.today{border-color:var(--dc); box-shadow:0 0 0 1px var(--dc), 0 6px 18px rgba(38,37,31,.08);}
-  .hp-day.past{opacity:.72;}
-  .hp-head{display:flex; align-items:baseline; justify-content:space-between; gap:6px;}
-  .hp-head b{font-size:11.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--dc); font-weight:700;}
-  .hp-head span{font-size:11px; color:var(--sub); white-space:nowrap;}
-  .hp-head .hp-today{background:var(--dc); color:#fff; border-radius:9px; padding:1px 7px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; margin-left:4px;}
-  .hp-tasks{margin:8px 0 6px;}
-  .hp-task{display:flex; align-items:flex-start; gap:6px; padding:5px 0; border-bottom:1px dashed var(--line); font-size:12.5px; line-height:1.35;}
-  .hp-task input[type=checkbox]{width:auto; margin:2px 0 0; accent-color:var(--dc); flex:none; cursor:pointer;}
-  .hp-task .planner-task-time{min-width:0; margin-right:3px;}
-  .hp-task .hp-text{flex:1; min-width:0; overflow-wrap:break-word;}
-  .hp-task.done .hp-text{text-decoration:line-through; color:var(--sub);}
-  .hp-task .hp-del{border:none; background:none; color:var(--sub); cursor:pointer; padding:0 2px; font-size:14px; line-height:1; opacity:0; flex:none;}
+  .hp-day.today{border-color:var(--dc); border-width:2px 2px 2px 2px; border-top-width:5px; box-shadow:0 6px 20px rgba(38,37,31,.12);}
+  .hp-day.past{opacity:.7;}
+  /* intestazione del giorno: fascia piena, nome grande */
+  .hp-head{display:flex; align-items:center; justify-content:space-between; gap:6px; padding:9px 11px 8px; border-bottom:1.5px solid #ddd8cc;}
+  .hp-head b{font-size:13.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--dc); font-weight:800;}
+  .hp-head span{font-size:12.5px; font-weight:700; color:var(--ink); white-space:nowrap;}
+  .hp-head .hp-today{background:var(--dc); color:#fff; border-radius:9px; padding:2px 7px; font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; margin-left:5px; vertical-align:2px;}
+  /* sezioni: titolo marcato + fondo diverso per assenti e sostituti */
+  .hp-sec{margin:10px 9px 0; padding:0;}
+  .hp-sec-title{
+    display:flex; align-items:baseline; gap:6px; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--ink); font-weight:800; padding-bottom:5px; margin-bottom:4px; border-bottom:2px solid var(--ink);
+  }
+  .hp-sec-abs .hp-sec-title, .hp-sec-free .hp-sec-title{cursor:pointer;}
+  .hp-sec-title .hp-n{font-size:10.5px; font-weight:700; background:var(--ink); color:#fff; border-radius:8px; padding:1px 6px; letter-spacing:.02em;}
+  .hp-sec-title .hp-sub{font-size:9.5px; font-weight:600; color:var(--sub); letter-spacing:.04em; text-transform:none;}
+  .hp-sec-abs{background:#f8ecea; border-radius:8px; padding:7px 8px 4px; border-left:4px solid var(--danger);}
+  .hp-sec-abs .hp-sec-title{color:#8c3f38; border-bottom-color:#e2bdb7;}
+  .hp-sec-abs .hp-n{background:var(--danger);}
+  .hp-sec-free{background:#ebf1f3; border-radius:8px; padding:7px 8px 4px; border-left:4px solid var(--t2);}
+  .hp-sec-free .hp-sec-title{color:#3e5c6c; border-bottom-color:#c2d3da;}
+  .hp-tasks{margin:2px 0 8px;}
+  .hp-task{display:flex; align-items:flex-start; gap:6px; padding:6px 0; border-bottom:1px solid #e6e1d7; font-size:13px; line-height:1.35; color:var(--ink);}
+  .hp-task input[type=checkbox]{width:15px; height:15px; margin:1px 0 0; accent-color:var(--dc); flex:none; cursor:pointer;}
+  .hp-task .planner-task-time{min-width:0; margin-right:3px; font-weight:700; color:var(--ink);}
+  .hp-task .hp-text{flex:1; min-width:0; overflow-wrap:break-word; font-weight:500;}
+  .hp-task.done .hp-text{text-decoration:line-through; color:var(--sub); font-weight:400;}
+  .hp-task.done .planner-task-time{color:var(--sub); font-weight:400;}
+  .hp-task .hp-del{border:none; background:none; color:var(--sub); cursor:pointer; padding:0 2px; font-size:15px; line-height:1; opacity:0; flex:none;}
   .hp-task:hover .hp-del{opacity:1;} .hp-task .hp-del:hover{color:var(--danger);}
   @media (hover:none){ .hp-task .hp-del{opacity:.6;} }
-  .hp-empty{font-size:11.5px; color:var(--sub); padding:4px 0;}
-  .hp-sec{margin-top:10px; padding-top:8px; border-top:1px solid var(--line);}
-  .hp-sec-title{font-size:10px; text-transform:uppercase; letter-spacing:.09em; color:var(--steel); font-weight:600; margin-bottom:4px; cursor:pointer;}
-  .hp-sec-title:hover{color:var(--ink);}
-  .hp-row{display:flex; gap:6px; align-items:flex-start; padding:4px 0; font-size:12px; line-height:1.35;}
-  .hp-row + .hp-row{border-top:1px dashed var(--line);}
-  .hp-row .badge{flex:none; font-size:9.5px; padding:2px 5px; min-width:20px; margin-top:1px;}
-  .hp-row .hp-who{flex:1; min-width:0; overflow-wrap:break-word;}
-  .hp-row .hp-why{color:var(--sub); font-size:11px;}
-  .hp-row .hp-cov{display:block; font-size:11.5px; color:var(--ok);}
-  .hp-row .hp-cov.no{color:var(--danger); font-weight:600;}
-  .hp-row .hp-cov.wait{color:var(--sub);}
-  .hp-row.off .hp-who{color:var(--sub);}
+  .hp-empty{font-size:12px; color:var(--sub); padding:5px 0; font-style:italic;}
+  .hp-row{display:flex; gap:6px; align-items:flex-start; padding:5px 0; font-size:12.5px; line-height:1.35;}
+  .hp-row + .hp-row{border-top:1px solid rgba(38,37,31,.1);}
+  .hp-row .badge{flex:none; font-size:10px; padding:2px 5px; min-width:22px; margin-top:1px; border:1px solid rgba(38,37,31,.12);}
+  .hp-row .hp-who{flex:1; min-width:0; overflow-wrap:break-word; font-weight:700; color:var(--ink);}
+  .hp-row .hp-why{color:#6f6b60; font-size:11.5px; font-weight:500;}
+  .hp-row .hp-cov{display:block; font-size:12px; color:#3f6a47; font-weight:600;}
+  .hp-row .hp-cov.no{color:#9a3c33; font-weight:800;}
+  .hp-row .hp-cov.wait{color:var(--sub); font-weight:500; font-style:italic;}
+  .hp-row.off .hp-who{color:var(--sub); font-weight:500;}
   .hp-add{display:flex; flex-wrap:wrap; gap:4px;}
-  .hp-add input{font-size:11.5px; padding:5px 6px;}
+  .hp-add input{font-size:12px; padding:5px 6px; border-color:#d9d4c8;}
   .hp-add input[type=text]{flex:3 1 90px; min-width:0;}
   .hp-add-tb{display:flex; gap:4px; flex:1 0 112px; min-width:0;}
   .hp-add input[type=time]{width:0; flex:1 1 0; min-width:0;}
-  .hp-add button{flex:none; padding:4px 10px; font-size:12px;}
+  .hp-add button{flex:none; padding:4px 10px; font-size:13px; font-weight:700;}
+  @media (min-width:1000px) and (max-width:1499px){
+    .hp-head{padding:8px 8px 7px;}
+    .hp-head b{font-size:12px; letter-spacing:.03em;}
+    .hp-head span{font-size:11.5px;}
+    .hp-head .hp-today{display:none;}      /* oggi resta evidenziato dal bordo */
+    .hp-sec{margin:9px 6px 0;}
+    .hp-sec-abs, .hp-sec-free{padding:6px 6px 3px; border-left-width:3px;}
+  }
   @media (max-width:999px){
     .hp-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(230px,80%); overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px;}
     .hp-day{scroll-snap-align:start;}
@@ -2719,7 +2740,7 @@ async function renderHomePlanner(scrollToToday){
     }).filter(Boolean).sort((a,b)=>(!!b.set - !!a.set) || String(a.turno||'9').localeCompare(String(b.turno||'9')));
     let html = '';
     if(dayAbs.length){
-      html += `<div class="hp-sec"><div class="hp-sec-title" onclick="showPage('page-coperture')">Assenti · ${dayAbs.length}</div>` + dayAbs.map(a=>{
+      html += `<div class="hp-sec hp-sec-abs"><div class="hp-sec-title" onclick="showPage('page-coperture')">Assenti <span class="hp-n">${dayAbs.length}</span></div>` + dayAbs.map(a=>{
         const ps = dayProp.filter(p=>p.absentName===a.name && String(p.turno)===String(a.turno));
         const pp = ps.length ? ps : dayProp.filter(p=>p.absentName===a.name);
         let cov;
@@ -2731,7 +2752,7 @@ async function renderHomePlanner(scrollToToday){
       }).join('') + `</div>`;
     }
     if(isWeekday && (dayAbs.length || free.some(f=>f.set))){
-      html += `<div class="hp-sec"><div class="hp-sec-title" onclick="showPage('page-coperture')">Sostituti senza sostituzioni</div>` + free.map(f=>
+      html += `<div class="hp-sec hp-sec-free"><div class="hp-sec-title" onclick="showPage('page-coperture')">Sostituti liberi</div>` + free.map(f=>
         `<div class="hp-row ${f.set?'':'off'}">${tBadge(f.turno)}<div class="hp-who">${escHtml(f.name)} <span class="hp-why">· ${escHtml(f.note)}</span></div></div>`).join('')
         + `</div>`;
     }
@@ -2754,7 +2775,8 @@ async function renderHomePlanner(scrollToToday){
     const dd = new Date(d+'T00:00:00').toLocaleDateString('it-IT',{day:'2-digit', month:'2-digit'});
     return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
       <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
-      <div class="hp-tasks">${rows}</div>${add}${coverageHtml(d)}
+      <div class="hp-sec hp-sec-tasks"><div class="hp-sec-title">Impegni${tasks.length?` <span class="hp-n" title="da fare / totale">${tasks.filter(t=>!t.done).length}/${tasks.length}</span>`:''}</div>
+      <div class="hp-tasks">${rows}</div>${add}</div>${coverageHtml(d)}
     </div>`;
   }).join('');
   const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
@@ -7247,7 +7269,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · post-it personali';
+const APP_VERSION = '2026-10-27 · planner home più leggibile';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
