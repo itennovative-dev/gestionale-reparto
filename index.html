@@ -348,6 +348,31 @@
 
   /* ---- Stampa A4 (proposta sostituzioni e calendario per la bacheca) ---- */
   #printArea{display:none;}
+  /* ---- Turni aggiuntivi del sabato ---- */
+  .extra-layout{display:grid; grid-template-columns:290px minmax(0,1fr); gap:18px; align-items:start;}
+  @media (max-width:900px){ .extra-layout{grid-template-columns:1fr;} }
+  .extra-item{display:flex; justify-content:space-between; align-items:center; gap:8px; width:100%; text-align:left; background:var(--card);
+    border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; cursor:pointer; font:inherit; color:var(--ink);}
+  .extra-item:hover{border-color:var(--steel);}
+  .extra-item.sel{border:2px solid var(--ink); padding:9px 11px;}
+  .extra-item.past{opacity:.6;}
+  .extra-item b{font-size:13px;} .extra-item small{color:var(--sub); font-size:11.5px; display:block; margin-top:2px;}
+  .extra-item .pill{background:var(--ok-bg); color:var(--ok); font-weight:700; font-size:11px; border-radius:9px; padding:2px 8px; white-space:nowrap;}
+  .extra-head{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px;}
+  .extra-head label, .extra-add label{font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--steel); font-weight:600; display:flex; flex-direction:column; gap:5px;}
+  .extra-add{display:grid; grid-template-columns:minmax(0,2fr) minmax(0,1.4fr) auto; gap:10px; align-items:end; margin-top:12px;}
+  @media (max-width:600px){ .extra-head, .extra-add{grid-template-columns:1fr;} }
+  .extra-table td{vertical-align:middle;}
+  .extra-table .who{font-weight:700;}
+  .extra-warn{background:var(--t1-bg); color:#6e5530; border-radius:8px; padding:8px 12px; font-size:12px; margin-top:10px;}
+  .extra-preview{overflow:auto; background:#efece5; border-radius:12px; padding:18px; margin-top:12px;}
+  .extra-preview > div{margin:0 auto;}
+  .hp-sec-extra{background:#edf3ea; border-radius:8px; padding:7px 8px 4px; border-left:4px solid var(--ok);}
+  .hp-sec-extra .hp-sec-title{color:#3f6a47; border-bottom-color:#c5d8c0;}
+  .hp-sec-extra .hp-n{background:var(--ok);}
+  .hp-row .hp-jobr{flex:none; font-size:11.5px; font-weight:700; color:#3f6a47; white-space:nowrap; padding-top:1px;}
+  .hp-row .hp-jobr.cl{color:#6c8394;}
+  .hp-sec-title{flex-wrap:wrap;} .hp-sec-title .hp-n{white-space:nowrap;}
   /* ---- Post-it personali ---- */
   #postitLayer{position:absolute; top:0; left:0; width:100%; height:0; z-index:40;}
   .postit{
@@ -457,6 +482,7 @@
 
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <symbol id="i-shifts" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 15.5l2 2 4-4"/></symbol>
+  <symbol id="i-extra" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M12 13v6M9 16h6"/></symbol>
   <symbol id="i-planner" viewBox="0 0 24 24"><path d="M3 6l1.5 1.5L7 5M3 13l1.5 1.5L7 12M3 20l1.5 1.5L7 19M11 6h10M11 13h10M11 20h10"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></symbol>
   <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
@@ -502,12 +528,13 @@
 
   <div class="menu-wrap">
 
-    <div class="menu-group" style="--n:3">
+    <div class="menu-group" style="--n:4">
       <h2>Oggi</h2>
       <div class="menu-grid">
         <button class="menu-tile" data-sec="coperture" onclick="showPage('page-coperture')"><svg class="ico"><use href="#i-shifts"/></svg><span>Coperture turni</span></button>
         <button class="menu-tile" data-sec="planner" onclick="showPage('panel-planner')"><svg class="ico"><use href="#i-planner"/></svg><span>Planner settimanale</span></button>
         <button class="menu-tile" data-sec="calendario" onclick="showPage('panel-calendar')"><svg class="ico"><use href="#i-calendar"/></svg><span>Calendario mensile</span></button>
+        <button class="menu-tile" data-sec="aggiuntivi" onclick="showPage('panel-extra')"><svg class="ico"><use href="#i-extra"/></svg><span>Turni aggiuntivi sabato</span></button>
       </div>
     </div>
 
@@ -1145,6 +1172,22 @@
   </div>
 </div>
 
+<div class="panel-section" id="panel-extra" style="display:none;">
+  <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
+  <div class="page-body" style="max-width:1400px;">
+    <h2><span class="n">•</span>Turni aggiuntivi del sabato</h2>
+    <p class="note">Scegli data e orario, aggiungi gli operatori e assegna a ciascuno l'impianto o la pulizia. Il turno compare nel planner della home e puoi scaricarne l'immagine da mandare al reparto.</p>
+    <div class="extra-layout" style="margin-top:16px;">
+      <div class="card extra-list-card">
+        <h3 class="panel-subtitle" style="margin-top:0;">Turni programmati</h3>
+        <div id="extraNewWrap"><button class="btn-primary" style="width:100%; justify-content:center;" onclick="newExtraShift()">+ Nuovo turno aggiuntivo</button></div>
+        <div id="extraList" style="margin-top:12px;"></div>
+      </div>
+      <div id="extraEditor"></div>
+    </div>
+  </div>
+</div>
+
 <div class="panel-section" id="panel-planner" style="display:none;">
   <div class="page-topbar"><button class="back-btn" onclick="showPage('page-home')">← Menu principale</button></div>
   <div class="page-body" style="max-width:1500px;">
@@ -1734,6 +1777,7 @@ const ADMIN_EMAIL = 'vilardogiovanni@gmail.com';
 const PERM_SECTIONS = [
   {id:'coperture',    label:'Coperture turni',               kind:'full', hint:'assenze, proposte e impostazioni coperture'},
   {id:'planner',      label:'Planner settimanale',           kind:'full'},
+  {id:'aggiuntivi',   label:'Turni aggiuntivi sabato',       kind:'full', hint:'operatori, impianti e pulizia dei turni extra; visibili anche nel planner'},
   {id:'calendario',   label:'Calendario mensile',            kind:'view'},
   {id:'operatori',    label:'Operatori e sostituti',         kind:'full'},
   {id:'impianti',     label:'Impianti',                      kind:'full'},
@@ -1755,6 +1799,7 @@ const KEY_SECTION_RULES = [
   ['sub-capacities','coperture'], ['fermo-order','coperture'], ['recipients-email','coperture'], ['nightshift-history','coperture'],
   ['teamturni:','turni'], ['team-rotation','turni'], ['turni-speciali','turni'],
   ['planner:','planner'],
+  ['extra-shifts','aggiuntivi'],
   ['roster-employees','operatori'], ['roster-substitutes','operatori'], ['schedule-official','operatori'],
   ['roster-plants','impianti'],
   ['clothing-sizes','indumenti'], ['skills-matrix','competenze'],
@@ -1762,7 +1807,7 @@ const KEY_SECTION_RULES = [
   ['downtime-log','fermi'], ['downtime-causes','fermi'],
   ['production-stats','produzione'], ['operator-records','opstats'],
 ];
-const STORAGE_SECTIONS = ['coperture','turni','planner','operatori','impianti','indumenti','competenze','manutenzione','fermi','produzione','opstats','altro'];
+const STORAGE_SECTIONS = ['coperture','turni','planner','aggiuntivi','operatori','impianti','indumenti','competenze','manutenzione','fermi','produzione','opstats','altro'];
 const ALWAYS_READABLE = ['operatori','impianti','turni']; // servono a tutti per calcolare i turni
 function storageSectionOf(key){
   if(PERSONAL_KEYS.includes(key)) return 'personale';
@@ -2604,6 +2649,220 @@ function renderPlannerGrid(){
   }).join('');
 }
 
+/* ============================= TURNI AGGIUNTIVI DEL SABATO =============================
+   Chiave 'extra-shifts': [{id, date, start, end, note, people:[{name, assign}]}]
+   assign = codice impianto ('115', 'TA', 'EUTROLOG'…), 'PULIZIA' oppure '' (da definire). */
+let EXTRA_SHIFTS = [], extraSelId = null;
+const EXTRA_CLEAN = 'PULIZIA';
+async function loadExtraShifts(){
+  try{ const r = await storageGet('extra-shifts'); EXTRA_SHIFTS = r ? JSON.parse(r.value) : []; }catch(e){ EXTRA_SHIFTS = []; }
+  if(!Array.isArray(EXTRA_SHIFTS)) EXTRA_SHIFTS = [];
+}
+async function saveExtraShifts(){
+  await storageSet('extra-shifts', JSON.stringify(EXTRA_SHIFTS));
+  renderExtraPage();
+  renderHomePlanner();
+}
+function extraAssignOptions(){
+  const list = ALL_PLANTS.slice();
+  if(!list.includes('TA')) list.push('TA');
+  list.push('EUTROLOG');
+  return list;
+}
+function extraAssignLabel(a){
+  if(a===EXTRA_CLEAN) return 'Pulizia reparto';
+  if(!a) return 'da definire';
+  return a==='TA' || a==='EUTROLOG' ? plantLabelOf(a) : 'Impianto '+a;
+}
+function extraAssignShort(a){
+  if(a===EXTRA_CLEAN) return 'Pulizia';
+  if(!a) return '—';
+  return a==='TA' ? 'T. anime' : a==='EUTROLOG' ? 'Eutrolog' : 'Imp. '+a;
+}
+function extraAssignRank(a){
+  if(a===EXTRA_CLEAN) return 900;
+  if(!a) return 999;
+  const i = extraAssignOptions().indexOf(a);
+  return i===-1 ? 800 : i;
+}
+function extraSortedPeople(sh){
+  return (sh.people||[]).slice().sort((a,b)=>extraAssignRank(a.assign)-extraAssignRank(b.assign) || String(a.name).localeCompare(String(b.name)));
+}
+function extraHour(t){ if(!t) return ''; const [h,m] = t.split(':'); return String(Number(h)) + (m && m!=='00' ? ':'+m : ''); }
+function extraDateLong(d){ return new Date(d+'T00:00:00').toLocaleDateString('it-IT',{weekday:'long', day:'numeric', month:'long'}); }
+function nextSaturdayStr(from){
+  const d = new Date((from||todayStr())+'T00:00:00');
+  d.setDate(d.getDate() + ((6 - d.getDay() + 7) % 7));
+  return toLocalDateStr(d);
+}
+function extraById(id){ return EXTRA_SHIFTS.find(x=>x.id===id); }
+
+async function newExtraShift(){
+  let date = nextSaturdayStr();
+  while(EXTRA_SHIFTS.some(x=>x.date===date)){ const d = new Date(date+'T00:00:00'); d.setDate(d.getDate()+7); date = toLocalDateStr(d); }
+  const sh = {id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), date, start:'06:00', end:'12:00', note:'', people:[]};
+  EXTRA_SHIFTS.push(sh);
+  extraSelId = sh.id;
+  await saveExtraShifts();
+}
+async function setExtraField(id, field, value){
+  const sh = extraById(id); if(!sh) return;
+  if(field==='date' && !value){ toast('Scegli una data'); renderExtraPage(); return; }
+  sh[field] = value;
+  if(field==='date' && new Date(value+'T00:00:00').getDay()!==6) toast('Attenzione: la data scelta non è un sabato');
+  await saveExtraShifts();
+}
+async function addExtraPerson(id){
+  const sh = extraById(id); if(!sh) return;
+  const name = document.getElementById('extraNewName').value;
+  const assign = document.getElementById('extraNewAssign').value;
+  if(!name){ toast("Scegli l'operatore"); return; }
+  if((sh.people||[]).some(p=>p.name===name)){ toast(name+' è già nel turno'); return; }
+  sh.people = sh.people || [];
+  sh.people.push({name, assign});
+  await saveExtraShifts();
+  const n = document.getElementById('extraNewName'); if(n) n.focus();
+}
+async function setExtraAssign(id, idx, value){
+  const sh = extraById(id); if(!sh || !sh.people[idx]) return;
+  sh.people[idx].assign = value;
+  await saveExtraShifts();
+}
+async function removeExtraPerson(id, idx){
+  const sh = extraById(id); if(!sh) return;
+  sh.people.splice(idx,1);
+  await saveExtraShifts();
+}
+async function deleteExtraShift(id){
+  const sh = extraById(id); if(!sh) return;
+  if(!confirm(`Eliminare il turno aggiuntivo di ${extraDateLong(sh.date)}?`)) return;
+  EXTRA_SHIFTS = EXTRA_SHIFTS.filter(x=>x.id!==id);
+  if(extraSelId===id) extraSelId = null;
+  await saveExtraShifts();
+}
+function openExtraShift(id){ extraSelId = id; showPage('panel-extra'); }
+
+/* Immagine da mandare al reparto (stessa per anteprima e download) */
+function buildExtraImageHTML(sh){
+  const people = extraSortedPeople(sh);
+  const plants = people.filter(p=>p.assign!==EXTRA_CLEAN);
+  const clean = people.filter(p=>p.assign===EXTRA_CLEAN);
+  const day = new Date(sh.date+'T00:00:00');
+  const wd = day.toLocaleDateString('it-IT',{weekday:'long'});
+  const dateTxt = day.toLocaleDateString('it-IT',{day:'numeric', month:'long', year:'numeric'});
+  const row = (p,i)=>`<tr style="background:${i%2?'#f6f4ef':'#ffffff'};">
+      <td style="padding:11px 16px; border-bottom:1px solid #e3dfd6; font-size:19px; font-weight:700; color:#26251f;">${escHtml(p.name)}</td>
+      <td style="padding:11px 16px; border-bottom:1px solid #e3dfd6; font-size:18px; color:#26251f; text-align:right; white-space:nowrap;">${p.assign===EXTRA_CLEAN ? '' : escHtml(extraAssignLabel(p.assign))}</td></tr>`;
+  const table = (title, list, color)=> list.length ? `
+      <div style="margin-top:18px; font-family:'Arial Black',Arial,sans-serif; font-size:13px; letter-spacing:2px; color:${color}; text-transform:uppercase; border-bottom:3px solid ${color}; padding-bottom:6px;">${title}</div>
+      <table style="width:100%; border-collapse:collapse;">${list.map(row).join('')}</table>` : '';
+  return `<div style="width:640px; background:#ffffff; font-family:Arial,Helvetica,sans-serif; border-radius:14px; overflow:hidden; box-shadow:0 4px 18px rgba(0,0,0,.12);">
+    <div style="background:#2b2a27; color:#ffffff; padding:20px 28px;">
+      <div style="font-family:'Arial Black',Arial,sans-serif; font-size:24px; letter-spacing:3px;">REPARTO TAGLIO</div>
+      <div style="font-size:14px; color:#d9c9a8; margin-top:4px; letter-spacing:1px; text-transform:uppercase;">Turno aggiuntivo · ${escHtml(wd)} ${escHtml(dateTxt)}</div>
+    </div>
+    <div style="padding:24px 28px 26px;">
+      <div style="font-size:21px; line-height:1.45; color:#26251f;">Buongiorno, ${escHtml(wd)} <b>${escHtml(dateTxt)}</b> saranno presenti al taglio, dalle <b>${escHtml(extraHour(sh.start))}</b> alle <b>${escHtml(extraHour(sh.end))}</b> i seguenti operatori.</div>
+      ${people.length ? table('Impianti', plants, '#2b2a27') + table('Pulizia reparto', clean, '#5f7d64')
+        : `<div style="margin-top:18px; color:#8c887d; font-size:16px;">Nessun operatore inserito.</div>`}
+      ${sh.note ? `<div style="margin-top:18px; background:#f6f1e6; border-radius:8px; padding:12px 16px; font-size:16px; color:#6e5530;">${escHtml(sh.note)}</div>` : ''}
+    </div>
+  </div>`;
+}
+function downloadExtraImage(id){
+  const sh = extraById(id); if(!sh) return;
+  if(!(sh.people||[]).length){ toast('Aggiungi prima gli operatori'); return; }
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed; left:-9999px; top:0; padding:20px; background:#efece5;';
+  wrapper.innerHTML = buildExtraImageHTML(sh);
+  document.body.appendChild(wrapper);
+  html2canvas(wrapper, {backgroundColor:'#efece5', scale:2}).then(canvas=>{
+    canvas.toBlob(blob=>{
+      wrapper.remove();
+      shareOrDownloadImage(blob, `turno_aggiuntivo_${sh.date}.png`, 'Turno aggiuntivo', 'Turno aggiuntivo '+extraDateLong(sh.date));
+    });
+  }).catch(()=>{ wrapper.remove(); toast("Errore nella generazione dell'immagine"); });
+}
+
+function renderExtraPage(){
+  const listEl = document.getElementById('extraList'), ed = document.getElementById('extraEditor');
+  if(!listEl || !ed) return;
+  const edit = canEdit('aggiuntivi');
+  const nw = document.getElementById('extraNewWrap'); if(nw) nw.style.display = edit ? '' : 'none';
+  const today = todayStr();
+  const sorted = EXTRA_SHIFTS.slice().sort((a,b)=>{
+    const fa = a.date>=today, fb = b.date>=today;
+    if(fa!==fb) return fa ? -1 : 1;
+    return fa ? a.date.localeCompare(b.date) : b.date.localeCompare(a.date);
+  });
+  if(!extraSelId || !extraById(extraSelId)){
+    const next = sorted.find(x=>x.date>=today) || sorted[0];
+    extraSelId = next ? next.id : null;
+  }
+  listEl.innerHTML = sorted.length ? sorted.map(x=>{
+    const n = (x.people||[]).length;
+    return `<button class="extra-item ${x.id===extraSelId?'sel':''} ${x.date<today?'past':''}" onclick="extraSelId='${x.id}'; renderExtraPage();">
+      <span><b>${escHtml(extraDateLong(x.date))}</b><small>dalle ${escHtml(extraHour(x.start))} alle ${escHtml(extraHour(x.end))}${x.date<today?' · passato':''}</small></span>
+      <span class="pill">${n} op.</span></button>`;
+  }).join('') : `<p class="empty" style="font-size:12.5px;">Nessun turno aggiuntivo${edit?': creane uno con il pulsante qui sopra.':'.'}</p>`;
+
+  const sh = extraById(extraSelId);
+  if(!sh){ ed.innerHTML = ''; return; }
+  const people = sh.people || [];
+  const opts = extraAssignOptions();
+  const assignSelect = (val, attrs)=>`<select ${attrs}>
+      <option value="" ${!val?'selected':''}>— da definire —</option>
+      <optgroup label="Impianti">${opts.map(o=>`<option value="${o}" ${val===o?'selected':''}>${escHtml(extraAssignLabel(o))}</option>`).join('')}</optgroup>
+      <option value="${EXTRA_CLEAN}" ${val===EXTRA_CLEAN?'selected':''}>Pulizia reparto</option></select>`;
+  const used = new Set(people.map(p=>p.name));
+  const emps = EMPLOYEES.map(e=>e.name).filter(n=>!used.has(n)).sort((a,b)=>a.localeCompare(b));
+  const subs = SUBSTITUTES.map(e=>e.name).filter(n=>!used.has(n) && !EMPLOYEES.find(e=>e.name===n)).sort((a,b)=>a.localeCompare(b));
+  // avvisi: stesso impianto a più operatori, operatori senza assegnazione
+  const byPlant = {};
+  people.forEach(p=>{ if(p.assign && p.assign!==EXTRA_CLEAN) (byPlant[p.assign] = byPlant[p.assign] || []).push(p.name); });
+  const warns = Object.entries(byPlant).filter(([,n])=>n.length>1).map(([pl,n])=>`${extraAssignLabel(pl)}: ${n.map(escHtml).join(', ')}`);
+  const undef = people.filter(p=>!p.assign).length;
+  const rows = extraSortedPeople(sh).map(p=>{
+    const idx = people.indexOf(p);
+    return `<tr><td class="who">${escHtml(p.name)}</td>
+      <td>${edit ? assignSelect(p.assign, `onchange="setExtraAssign('${sh.id}',${idx},this.value)"`) : escHtml(extraAssignLabel(p.assign))}</td>
+      ${edit ? `<td style="width:40px; text-align:right;"><button class="btn-danger" title="Togli dal turno" onclick="removeExtraPerson('${sh.id}',${idx})">×</button></td>` : ''}</tr>`;
+  }).join('');
+  const nImp = people.filter(p=>p.assign && p.assign!==EXTRA_CLEAN).length, nCl = people.filter(p=>p.assign===EXTRA_CLEAN).length;
+  ed.innerHTML = `
+    <div class="card">
+      <h3 class="panel-subtitle" style="margin-top:0;">Turno di ${escHtml(extraDateLong(sh.date))}</h3>
+      ${edit ? `<div class="extra-head">
+        <label>Data<input type="date" value="${sh.date}" onchange="setExtraField('${sh.id}','date',this.value)"></label>
+        <label>Dalle<input type="time" value="${escHtml(sh.start)}" onchange="setExtraField('${sh.id}','start',this.value)"></label>
+        <label>Alle<input type="time" value="${escHtml(sh.end)}" onchange="setExtraField('${sh.id}','end',this.value)"></label>
+      </div>` : `<p class="note" style="margin:0;">Dalle ${escHtml(extraHour(sh.start))} alle ${escHtml(extraHour(sh.end))}</p>`}
+      <h3 class="panel-subtitle" style="margin-top:20px;">Operatori · ${people.length} <span class="note" style="text-transform:none; letter-spacing:0; font-weight:400;">(${nImp} su impianto, ${nCl} alla pulizia)</span></h3>
+      ${people.length ? `<table class="extra-table"><thead><tr><th>Operatore</th><th>Assegnazione</th>${edit?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>`
+        : `<p class="empty" style="font-size:12.5px;">Nessun operatore nel turno.</p>`}
+      ${edit ? `<div class="extra-add">
+        <label>Operatore<select id="extraNewName"><option value="">— scegli —</option>
+          ${emps.length?`<optgroup label="Operatori">${emps.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}</optgroup>`:''}
+          ${subs.length?`<optgroup label="Sostituti">${subs.map(n=>`<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}</optgroup>`:''}
+        </select></label>
+        <label>Assegnazione${assignSelect('', 'id="extraNewAssign"')}</label>
+        <button class="btn-primary" onclick="addExtraPerson('${sh.id}')">Aggiungi</button>
+      </div>` : ''}
+      ${warns.length ? `<div class="extra-warn"><b>Stesso impianto a più operatori</b> — ${warns.join(' · ')}</div>` : ''}
+      ${undef ? `<div class="extra-warn">${undef} operator${undef===1?'e':'i'} senza assegnazione: nell'immagine risult${undef===1?'a':'ano'} "da definire".</div>` : ''}
+      ${edit ? `<label style="display:block; margin-top:16px; font-size:11px; text-transform:uppercase; letter-spacing:.07em; color:var(--steel); font-weight:600;">Nota per il reparto (facoltativa, compare nell'immagine)
+        <input type="text" value="${escHtml(sh.note||'')}" placeholder="es. portare i DPI per la pulizia" onchange="setExtraField('${sh.id}','note',this.value)" style="margin-top:5px;"></label>` : ''}
+      <div class="btn-row" style="margin-top:18px;">
+        <button class="btn-primary" onclick="downloadExtraImage('${sh.id}')">Scarica immagine</button>
+        ${edit ? `<button class="btn-danger" onclick="deleteExtraShift('${sh.id}')">Elimina turno</button>` : ''}
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="panel-subtitle" style="margin-top:0;">Anteprima immagine</h3>
+      <div class="extra-preview">${buildExtraImageHTML(sh)}</div>
+    </div>`;
+}
+
 /* ============================= POST-IT PERSONALI =============================
    Foglietti da attaccare dove si vuole: ognuno resta sulla pagina dove è stato creato, nel punto in cui lo si trascina.
    Sono personali (personale/{uid}/dati/postit): ogni utente vede solo i suoi. Posizione: x in % della larghezza, y in px. */
@@ -2724,6 +2983,20 @@ async function renderHomePlanner(scrollToToday){
     try{ const r = await storageGet('manualfill:'+week); mfill = r ? JSON.parse(r.value) : {}; }catch(e){}
     if(week!==homePlannerWeek) return;
   }
+  // Turni aggiuntivi (sabato) della settimana
+  let extras = [];
+  if(canView('aggiuntivi')){
+    try{ const r = await storageGet('extra-shifts'); extras = r ? JSON.parse(r.value) : []; }catch(e){}
+    if(!Array.isArray(extras)) extras = [];
+    if(week!==homePlannerWeek) return;
+  }
+  const extraHtml = d => extras.filter(x=>x.date===d).map(x=>{
+    const ppl = extraSortedPeople(x);
+    return `<div class="hp-sec hp-sec-extra"><div class="hp-sec-title" onclick="openExtraShift('${escHtml(escJs(x.id))}')">Turno aggiuntivo <span class="hp-n">${escHtml(extraHour(x.start))}–${escHtml(extraHour(x.end))}</span></div>`
+      + (ppl.length ? ppl.map(p=>`<div class="hp-row"><div class="hp-who">${escHtml(p.name)}</div><span class="hp-jobr ${p.assign===EXTRA_CLEAN?'cl':''}">${escHtml(extraAssignShort(p.assign))}</span></div>`).join('')
+                    : `<div class="hp-empty">Nessun operatore inserito</div>`)
+      + `</div>`;
+  }).join('');
   const tBadge = t => t ? `<span class="badge t${escHtml(String(t))}">${escHtml(turnoLabel(String(t)))}</span>` : `<span class="badge tC">—</span>`;
   const coverageHtml = d => {
     if(!cop) return '';
@@ -2776,7 +3049,7 @@ async function renderHomePlanner(scrollToToday){
     return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
       <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
       <div class="hp-sec hp-sec-tasks"><div class="hp-sec-title">Impegni${tasks.length?` <span class="hp-n" title="da fare / totale">${tasks.filter(t=>!t.done).length}/${tasks.length}</span>`:''}</div>
-      <div class="hp-tasks">${rows}</div>${add}</div>${coverageHtml(d)}
+      <div class="hp-tasks">${rows}</div>${add}</div>${extraHtml(d)}${coverageHtml(d)}
     </div>`;
   }).join('');
   const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
@@ -7207,7 +7480,7 @@ function openMailDraft(){
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 /* ============================= PANNELLI A COMPARSA (icone) ============================= */
-const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account','panel-ricettario'];
+const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-extra','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account','panel-ricettario'];
 function showPage(id){
   if(!pageAllowed(id)){ toast('Non hai accesso a questa sezione'); id = 'page-home'; }
   CURRENT_PAGE = id;
@@ -7223,6 +7496,7 @@ function showPage(id){
   renderPostits();
   if(id==='panel-planner') switchPlannerWeek(plannerWeek || isoWeek(todayStr()));
   if(id==='panel-calendar') renderMonthlyCalendarPreview();
+  if(id==='panel-extra') renderExtraPage();
   if(id==='panel-maintenance') renderMaintenancePanel();
   if(id==='panel-weeks') renderWeeksList();
   if(id==='panel-roster' || id==='panel-plants') renderRosterPanels();
@@ -7269,7 +7543,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · planner home più leggibile';
+const APP_VERSION = '2026-10-27 · turni aggiuntivi del sabato';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7309,6 +7583,7 @@ async function startApp(){
   loadHoursData();
   loadSkills();
   loadDowntime();
+  await loadExtraShifts();
   loadPostits();
   renderHomePlanner(true);
   renderHomeBanner();
@@ -7357,7 +7632,7 @@ async function sendOwnPasswordReset(){
 const PAGE_SECTION = {
   'page-coperture':'coperture', 'panel-coperture-settings':'coperture', 'panel-capacity':'coperture', 'panel-fermo':'coperture',
   'panel-teamturni':'coperture', 'panel-email':'coperture', 'panel-weeks':'coperture',
-  'panel-planner':'planner', 'panel-calendar':'calendario', 'panel-roster':'operatori', 'panel-plants':'impianti',
+  'panel-planner':'planner', 'panel-extra':'aggiuntivi', 'panel-calendar':'calendario', 'panel-roster':'operatori', 'panel-plants':'impianti',
   'panel-clothing':'indumenti', 'panel-skills':'competenze', 'panel-maintenance':'manutenzione', 'panel-downtime':'fermi',
   'panel-production':'produzione', 'panel-opstats':'opstats', 'panel-stats':'assenze', 'panel-ricettario':'ricettario'
 };
@@ -7387,6 +7662,7 @@ const EDIT_FUNCTIONS = {
               'saveFermoOrderAndRecalc','saveRecipients','resetHistory','updateTeamRotation','saveTeamRotation',
               'addFixedShift1','removeFixedShift1','addShiftPair','removeShiftPair'],
   planner:   ['togglePlannerTask','addPlannerTask','deletePlannerTask'],
+  aggiuntivi:['newExtraShift','setExtraField','addExtraPerson','setExtraAssign','removeExtraPerson','deleteExtraShift'],
   operatori: ['addEmployee','editEmployee','deleteEmployee','cancelEditEmployee','addSubstitute','editSubstitute','deleteSubstitute','cancelEditSubstitute'],
   impianti:  ['addPlant','deletePlant'],
   indumenti: ['setClothingSize'],
