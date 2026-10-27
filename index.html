@@ -327,6 +327,36 @@
 
   /* ---- Stampa A4 (proposta sostituzioni e calendario per la bacheca) ---- */
   #printArea{display:none;}
+  /* ---- Post-it personali ---- */
+  #postitLayer{position:absolute; top:0; left:0; width:100%; height:0; z-index:40;}
+  .postit{
+    position:absolute; display:flex; flex-direction:column; min-width:140px; min-height:110px;
+    background:var(--pc); border-radius:3px 3px 3px 16px; box-shadow:0 2px 4px rgba(38,37,31,.12), 0 10px 22px rgba(38,37,31,.14);
+    resize:both; overflow:hidden; transform:rotate(-.6deg); transition:box-shadow .15s, transform .15s;
+  }
+  .postit:nth-child(even){transform:rotate(.6deg);}
+  .postit.dragging{transform:rotate(0) scale(1.03); box-shadow:0 14px 30px rgba(38,37,31,.25); transition:none;}
+  .postit[data-c="giallo"]{--pc:#fbeea6; --ph:#f3dd7a;} .postit[data-c="rosa"]{--pc:#f8d3d4; --ph:#efb7b9;}
+  .postit[data-c="verde"]{--pc:#d6ecc7; --ph:#bcdcaa;} .postit[data-c="azzurro"]{--pc:#cfe5f2; --ph:#addbea;}
+  .postit-bar{display:flex; align-items:center; gap:3px; padding:4px 5px 4px 8px; background:var(--ph); cursor:grab; touch-action:none; user-select:none; flex:none;}
+  .postit.dragging .postit-bar{cursor:grabbing;}
+  .postit-bar .grip{flex:1; height:6px; background:repeating-linear-gradient(90deg, rgba(38,37,31,.18) 0 2px, transparent 2px 5px); border-radius:2px; margin-right:4px;}
+  .postit-dot{width:12px; height:12px; border-radius:50%; border:1px solid rgba(38,37,31,.25); cursor:pointer; padding:0; flex:none;}
+  .postit-x{border:none; background:none; cursor:pointer; color:rgba(38,37,31,.55); font-size:15px; line-height:1; padding:0 2px; flex:none;}
+  .postit-x:hover{color:var(--danger);}
+  .postit textarea{
+    flex:1; border:none; background:transparent; resize:none; padding:8px 10px 12px; width:100%;
+    font:13.5px/1.4 "Segoe Print","Bradley Hand","Comic Sans MS",cursive; color:#3a3628; outline:none; border-radius:0;
+  }
+  .postit-add{
+    position:fixed; right:18px; bottom:18px; z-index:45; display:flex; align-items:center; gap:7px;
+    background:#fbeea6; color:#4a4430; border:1px solid #e8d77f; border-radius:999px; padding:9px 15px 9px 12px;
+    font-size:12.5px; font-weight:600; box-shadow:0 4px 14px rgba(38,37,31,.18); cursor:pointer;
+  }
+  .postit-add:hover{background:#f6e588;}
+  .postit-add svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8;}
+  @media (max-width:700px){ .postit-add span{display:none;} .postit-add{padding:11px;} }
+  @media print{ #postitLayer, .postit-add{display:none !important;} }
   @page{size:A4 portrait; margin:12mm;}
   @page landscape{size:A4 landscape; margin:8mm;}
   @media print{
@@ -435,6 +465,9 @@
   <symbol id="i-recipe" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 2h6v4H9zM9 11h6M9 15h6M9 19h3"/></symbol>
   <symbol id="i-sliders-sm" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
 </svg>
+
+<button class="postit-add" id="postitAdd" type="button" title="Attacca un post-it su questa pagina" onclick="addPostit()" style="display:none;"><svg viewBox="0 0 24 24"><path d="M4 4h16v11l-5 5H4z"/><path d="M15 20v-5h5M9 9h6M9 12.5h4"/></svg><span>Post-it</span></button>
+<div id="postitLayer"></div>
 
 <div id="page-home">
   <div class="home-header">
@@ -1712,6 +1745,7 @@ const STORAGE_SECTIONS = ['coperture','turni','planner','operatori','impianti','
 const ALWAYS_READABLE = ['operatori','impianti','turni']; // servono a tutti per calcolare i turni
 function storageSectionOf(key){
   if(PERSONAL_KEYS.includes(key)) return 'personale';
+  if(key==='postit') return 'postit';
   for(const [p, sec] of KEY_SECTION_RULES){
     if(p.endsWith(':') ? key.indexOf(p)===0 : key===p) return sec;
   }
@@ -1729,6 +1763,7 @@ function canView(sec){ return permLevel(sec)!=='none'; }
 function canEdit(sec){ return permLevel(sec)==='edit'; }
 function canReadStorage(s){
   if(CURRENT_USER.admin) return true;
+  if(s==='postit') return true;
   if(s==='personale') return canView('personale');
   if(ALWAYS_READABLE.includes(s)) return true;
   if(s==='coperture') return canView('coperture') || canView('assenze');
@@ -1737,6 +1772,7 @@ function canReadStorage(s){
 }
 function canWriteStorage(s){
   if(CURRENT_USER.admin) return true;
+  if(s==='postit') return true;
   if(s==='personale') return canView('personale');
   if(s==='turni') return canEdit('coperture');
   if(s==='altro') return false;
@@ -1750,7 +1786,7 @@ function cloudDocId(key){ return encodeURIComponent(key); }
 function cloudDocRef(key){
   if(LEGACY_MODE) return cloudDb.collection(CLOUD_COLLECTION).doc(cloudDocId(key));
   const s = storageSectionOf(key);
-  if(s==='personale') return cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati').doc(cloudDocId(key));
+  if(s==='personale' || s==='postit') return cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati').doc(cloudDocId(key));
   return cloudDb.collection('sezioni').doc(s).collection('dati').doc(cloudDocId(key));
 }
 async function cloudLoadAll(){
@@ -1763,8 +1799,12 @@ async function cloudLoadAll(){
   const cols = STORAGE_SECTIONS.filter(canReadStorage).map(s=>cloudDb.collection('sezioni').doc(s).collection('dati'));
   if(canReadStorage('personale')) cols.push(cloudDb.collection('personale').doc(CURRENT_USER.uid).collection('dati'));
   const snaps = await Promise.all(cols.map(c=>c.get()));
+  // i post-it stanno nell'area personale ma servono a tutti: se l'Area personale non è attiva li leggo a parte
+  let postitDoc = null;
+  if(!canReadStorage('personale')){ try{ postitDoc = await cloudDocRef('postit').get(); }catch(e){} }
   CLOUD_CACHE.clear();
   snaps.forEach(snap=>snap.forEach(doc=>{ const d = doc.data(); if(d && typeof d.k==='string') CLOUD_CACHE.set(d.k, d.v); }));
+  if(postitDoc && postitDoc.exists){ const d = postitDoc.data(); if(d && typeof d.k==='string') CLOUD_CACHE.set(d.k, d.v); }
 }
 function cloudWrite(key, value){
   if(value.length > CLOUD_MAX_VALUE){
@@ -2542,6 +2582,98 @@ function renderPlannerGrid(){
     </div>`;
   }).join('');
 }
+
+/* ============================= POST-IT PERSONALI =============================
+   Foglietti da attaccare dove si vuole: ognuno resta sulla pagina dove è stato creato, nel punto in cui lo si trascina.
+   Sono personali (personale/{uid}/dati/postit): ogni utente vede solo i suoi. Posizione: x in % della larghezza, y in px. */
+let POSTITS = null, CURRENT_PAGE = 'page-home', postitSaveTimer = null;
+const POSTIT_COLORS = ['giallo','rosa','verde','azzurro'];
+async function loadPostits(){
+  try{ const r = await storageGet('postit'); POSTITS = r ? JSON.parse(r.value) : []; }catch(e){ POSTITS = []; }
+  if(!Array.isArray(POSTITS)) POSTITS = [];
+  renderPostits();
+}
+function savePostits(){
+  clearTimeout(postitSaveTimer);
+  postitSaveTimer = setTimeout(()=>storageSet('postit', JSON.stringify(POSTITS)), 500);
+}
+function addPostit(){
+  if(!POSTITS) POSTITS = [];
+  const w = 200, h = 170, W = document.documentElement.clientWidth;
+  const n = POSTITS.filter(p=>p.page===CURRENT_PAGE).length;
+  const xPx = Math.max(8, Math.min(W - w - 8, W/2 - w/2 + (n%5)*24));
+  const yPx = window.scrollY + Math.max(80, window.innerHeight/2 - h/2) + (n%5)*24;
+  const p = {id: Date.now().toString(36)+Math.random().toString(36).slice(2,5), page: CURRENT_PAGE,
+             x: +(xPx/W*100).toFixed(2), y: Math.round(yPx), w, h, color: POSTIT_COLORS[n%4], text:'', z: postitTopZ()+1};
+  POSTITS.push(p);
+  savePostits();
+  renderPostits();
+  const ta = document.querySelector(`.postit[data-id="${p.id}"] textarea`); if(ta) ta.focus();
+}
+function postitTopZ(){ return (POSTITS||[]).reduce((m,p)=>Math.max(m, p.z||0), 0); }
+function renderPostits(){
+  const layer = document.getElementById('postitLayer'), btn = document.getElementById('postitAdd');
+  if(!layer) return;
+  const logged = !CLOUD_ENABLED || !!CURRENT_USER.uid;
+  if(btn) btn.style.display = (logged && POSTITS) ? '' : 'none';
+  if(!logged || !POSTITS){ layer.innerHTML=''; return; }
+  const W = document.documentElement.clientWidth;
+  layer.innerHTML = '';
+  POSTITS.filter(p=>p.page===CURRENT_PAGE).sort((a,b)=>(a.z||0)-(b.z||0)).forEach(p=>{
+    const el = document.createElement('div');
+    el.className = 'postit'; el.dataset.id = p.id; el.dataset.c = POSTIT_COLORS.includes(p.color) ? p.color : 'giallo';
+    const w = Math.min(p.w||200, W-16);
+    el.style.cssText = `left:${Math.max(0, Math.min(p.x/100*W, W-w-4))}px; top:${Math.max(0,p.y)}px; width:${w}px; height:${p.h||170}px; z-index:${p.z||1};`;
+    el.innerHTML = `<div class="postit-bar" title="Trascina per spostare"><span class="grip"></span>
+        ${POSTIT_COLORS.map(c=>`<button class="postit-dot" type="button" title="${c}" data-color="${c}" style="background:${c==='giallo'?'#f3dd7a':c==='rosa'?'#efb7b9':c==='verde'?'#bcdcaa':'#addbea'}"></button>`).join('')}
+        <button class="postit-x" type="button" title="Stacca il post-it">×</button></div>
+      <textarea placeholder="Scrivi qui..." spellcheck="false"></textarea>`;
+    const ta = el.querySelector('textarea');
+    ta.value = p.text || '';
+    ta.addEventListener('input', ()=>{ p.text = ta.value; savePostits(); });
+    el.addEventListener('pointerdown', ()=>{ if((p.z||0) < postitTopZ()){ p.z = postitTopZ()+1; el.style.zIndex = p.z; savePostits(); } });
+    el.querySelectorAll('.postit-dot').forEach(b=>b.addEventListener('click', e=>{ e.stopPropagation(); p.color = b.dataset.color; el.dataset.c = p.color; savePostits(); }));
+    el.querySelector('.postit-x').addEventListener('click', e=>{
+      e.stopPropagation();
+      if(p.text.trim() && !confirm('Staccare questo post-it? Il testo verrà eliminato.')) return;
+      POSTITS = POSTITS.filter(x=>x.id!==p.id); savePostits(); el.remove();
+    });
+    // trascinamento dalla barra (mouse e dito)
+    const bar = el.querySelector('.postit-bar');
+    bar.addEventListener('pointerdown', e=>{
+      if(e.target.closest('button')) return;
+      e.preventDefault();
+      const sx = e.pageX, sy = e.pageY, ox = el.offsetLeft, oy = el.offsetTop;
+      el.classList.add('dragging'); bar.setPointerCapture(e.pointerId);
+      const move = ev=>{
+        const W2 = document.documentElement.clientWidth;
+        el.style.left = Math.max(0, Math.min(W2 - el.offsetWidth, ox + ev.pageX - sx)) + 'px';
+        el.style.top  = Math.max(0, oy + ev.pageY - sy) + 'px';
+      };
+      const up = ()=>{
+        bar.removeEventListener('pointermove', move); bar.removeEventListener('pointerup', up); bar.removeEventListener('pointercancel', up);
+        el.classList.remove('dragging');
+        p.x = +(el.offsetLeft / document.documentElement.clientWidth * 100).toFixed(2); p.y = el.offsetTop;
+        savePostits();
+      };
+      bar.addEventListener('pointermove', move); bar.addEventListener('pointerup', up); bar.addEventListener('pointercancel', up);
+    });
+    // ridimensionamento (angolo in basso a destra): salvo la nuova misura
+    // (si confronta con la misura iniziale, così su uno schermo stretto non si salva la larghezza ridotta in automatico)
+    let rt = null, base = null;
+    new ResizeObserver(()=>{
+      if(!base){ base = [el.offsetWidth, el.offsetHeight]; return; }
+      clearTimeout(rt); rt = setTimeout(()=>{
+        if(!el.isConnected) return;
+        const nw = el.offsetWidth, nh = el.offsetHeight;
+        if(Math.abs(nw-base[0])>2 || Math.abs(nh-base[1])>2){ p.w = nw; p.h = nh; base = [nw, nh]; savePostits(); }
+      }, 300);
+    }).observe(el);
+    layer.appendChild(el);
+  });
+}
+let postitResizeT = null;
+window.addEventListener('resize', ()=>{ clearTimeout(postitResizeT); postitResizeT = setTimeout(()=>{ if(!document.querySelector('.postit.dragging')) renderPostits(); }, 200); });
 
 /* Home: planner dell'intera settimana, con inserimento e spunta degli impegni (stessi dati del Planner settimanale). */
 let homePlannerWeek = null;
@@ -7056,6 +7188,7 @@ function openMailDraft(){
 const ALL_APP_PAGES = ['page-home','page-coperture','panel-coperture-settings','panel-planner','panel-roster','panel-plants','panel-capacity','panel-fermo','panel-teamturni','panel-clothing','panel-calendar','panel-maintenance','panel-stats','panel-import','panel-production','panel-opstats','panel-hours','panel-hours-settings','panel-hours-months','panel-hours-dashboard','panel-hours-goal','panel-hours-leave','panel-hours-tax','panel-hours-tfr','panel-hours-import','panel-skills','panel-downtime','panel-weeks','panel-email','panel-backup','panel-users','panel-account','panel-ricettario'];
 function showPage(id){
   if(!pageAllowed(id)){ toast('Non hai accesso a questa sezione'); id = 'page-home'; }
+  CURRENT_PAGE = id;
   updateReadOnlyBar(id);
   if(PAGE_HISTORY[PAGE_HISTORY.length-1]!==id) PAGE_HISTORY.push(id);
   if(PAGE_HISTORY.length>30) PAGE_HISTORY.shift();
@@ -7065,6 +7198,7 @@ function showPage(id){
   });
   window.scrollTo(0,0);
   if(id==='page-home'){ renderHomePlanner(true); renderHomeBanner(); }
+  renderPostits();
   if(id==='panel-planner') switchPlannerWeek(plannerWeek || isoWeek(todayStr()));
   if(id==='panel-calendar') renderMonthlyCalendarPreview();
   if(id==='panel-maintenance') renderMaintenancePanel();
@@ -7113,7 +7247,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · tolta card Impegni di oggi';
+const APP_VERSION = '2026-10-27 · post-it personali';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7153,6 +7287,7 @@ async function startApp(){
   loadHoursData();
   loadSkills();
   loadDowntime();
+  loadPostits();
   renderHomePlanner(true);
   renderHomeBanner();
 }

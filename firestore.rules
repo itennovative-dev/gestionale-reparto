@@ -62,9 +62,11 @@ service cloud.firestore {
       allow write: if puoScrivere(sezione);
     }
 
-    // Area personale (Conteggio ore): solo il proprietario, e solo se l'area gli è stata attivata
+    // Area personale (Conteggio ore): solo il proprietario, e solo se l'area gli è stata attivata.
+    // I post-it (documento "postit") sono personali ma per tutti gli utenti attivi, anche senza Area personale.
     match /personale/{uid}/dati/{id} {
-      allow read, write: if loggato() && request.auth.uid == uid && (admin() || (attivo() && vede('personale')));
+      allow read, write: if loggato() && request.auth.uid == uid
+                         && (admin() || (attivo() && (vede('personale') || id == 'postit')));
     }
 
     // Utenti e permessi: ognuno legge solo il proprio profilo, solo l'amministratore li modifica
