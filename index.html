@@ -257,6 +257,18 @@
   #page-home .menu-grid{grid-template-columns:repeat(auto-fill, minmax(98px,1fr)); gap:10px;}
   #page-home .menu-tile{padding:20px 8px; gap:10px; font-size:11.5px; text-align:center;}
   #page-home .home-footer{grid-column:1 / -1;}
+  /* ---- Home su PC: sfrutta tutta la larghezza dello schermo ---- */
+  @media (min-width:1000px){
+    #page-home .today-wrap, #page-home .menu-wrap, #page-home .home-banner{max-width:none; padding-left:3vw; padding-right:3vw;}
+    #page-home .menu-wrap{grid-template-columns:repeat(2, minmax(0,1fr)); column-gap:40px;}
+    #page-home .menu-grid{grid-template-columns:repeat(var(--n,3), minmax(0,1fr));}
+  }
+  @media (min-width:1400px){
+    /* i gruppi affiancati su una riga, larghi in proporzione alle tessere che contengono */
+    #page-home .menu-wrap{display:flex; flex-wrap:wrap; align-items:flex-start; column-gap:32px;}
+    #page-home .menu-group{flex:var(--n,3) 1 0; min-width:0;}
+    #page-home .home-footer, #page-home .menu-wrap > .note{flex-basis:100%;}
+  }
   .home-footer{display:flex; gap:10px; flex-wrap:wrap; justify-content:center; border-top:1px solid var(--line); padding-top:22px; margin-top:10px;}
   .footer-link{display:inline-flex; align-items:center; background:transparent; border:1px solid var(--line); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--steel);}
   .footer-link:hover{color:var(--ink); border-color:var(--steel);}
@@ -383,7 +395,7 @@
 
   <div class="menu-wrap">
 
-    <div class="menu-group">
+    <div class="menu-group" style="--n:3">
       <h2>Oggi</h2>
       <div class="menu-grid">
         <button class="menu-tile" data-sec="coperture" onclick="showPage('page-coperture')"><svg class="ico"><use href="#i-shifts"/></svg><span>Coperture turni</span></button>
@@ -392,7 +404,7 @@
       </div>
     </div>
 
-    <div class="menu-group">
+    <div class="menu-group" style="--n:3">
       <h2>Persone</h2>
       <div class="menu-grid">
         <button class="menu-tile" data-sec="operatori" onclick="showPage('panel-roster')"><svg class="ico"><use href="#i-users"/></svg><span>Operatori e sostituti</span></button>
@@ -401,7 +413,7 @@
       </div>
     </div>
 
-    <div class="menu-group">
+    <div class="menu-group" style="--n:4">
       <h2>Impianti</h2>
       <div class="menu-grid">
         <button class="menu-tile" data-sec="impianti" onclick="showPage('panel-plants')"><svg class="ico"><use href="#i-factory"/></svg><span>Impianti</span></button>
@@ -411,7 +423,7 @@
       </div>
     </div>
 
-    <div class="menu-group">
+    <div class="menu-group" style="--n:3">
       <h2>Analisi</h2>
       <div class="menu-grid">
         <button class="menu-tile" data-sec="produzione" onclick="showPage('panel-production')"><svg class="ico"><use href="#i-trend"/></svg><span>Statistiche produzione</span></button>
@@ -6951,7 +6963,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-26 · ricettario: lavori laser 115/116';
+const APP_VERSION = '2026-10-27 · home a tutta larghezza su PC';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
@@ -7135,8 +7147,9 @@ function applyPermissionsUI(){
   document.querySelectorAll('[data-sec-edit]').forEach(el=>{ el.style.display = canEdit(el.dataset.secEdit) ? '' : 'none'; });
   document.querySelectorAll('[data-admin]').forEach(el=>{ el.style.display = CURRENT_USER.admin ? '' : 'none'; });
   document.querySelectorAll('#page-home .menu-group').forEach(g=>{
-    const any = [...g.querySelectorAll('.menu-tile')].some(t=>t.style.display!=='none');
-    g.style.display = any ? '' : 'none';
+    const n = [...g.querySelectorAll('.menu-tile')].filter(t=>t.style.display!=='none').length;
+    g.style.display = n ? '' : 'none';
+    g.style.setProperty('--n', Math.max(n,1));
   });
   const lbl = document.getElementById('accountFooterLabel');
   if(lbl && CURRENT_USER.email) lbl.textContent = (CURRENT_USER.admin ? 'Il mio account' : CURRENT_USER.nome) + ' · esci';
