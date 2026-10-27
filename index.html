@@ -638,6 +638,8 @@
             <option>Ferie</option><option>L.104</option><option>Banca ore</option>
             <option>Riposo compensativo</option><option>Malattia</option><option>Infortunio</option>
             <option>Assenza ingiustificata</option><option>No 3°turno</option>
+            <option>Donazione sangue</option><option>Sciopero</option><option>Corso</option>
+            <option>Fa il 1°turno</option><option>Fa il 2°turno</option><option>Fa il 3°turno</option>
           </select>
         </div>
         <div><label>Impianto (auto)</label><input type="text" id="newPlant" placeholder="—" readonly></div>
@@ -661,6 +663,8 @@
               <option>Ferie</option><option>L.104</option><option>Banca ore</option>
               <option>Riposo compensativo</option><option>Malattia</option><option>Infortunio</option>
               <option>Assenza ingiustificata</option><option>No 3°turno</option>
+              <option>Donazione sangue</option><option>Sciopero</option><option>Corso</option>
+              <option>Fa il 1°turno</option><option>Fa il 2°turno</option><option>Fa il 3°turno</option>
             </select>
           </div>
         </div>
@@ -1544,7 +1548,7 @@ function currentViceResponsabile(){
   const e = EMPLOYEES.find(e=>e.viceResponsabile);
   return e ? e.name : null;
 }
-const MOTIVI = ["Ferie","L.104","Banca ore","Riposo compensativo","Malattia","Infortunio","Assenza ingiustificata","No 3°turno"];
+const MOTIVI = ["Ferie","L.104","Banca ore","Riposo compensativo","Malattia","Infortunio","Assenza ingiustificata","No 3°turno","Donazione sangue","Sciopero","Corso","Fa il 1°turno","Fa il 2°turno","Fa il 3°turno"];
 const ALL_PLANTS = ["100","103","110","111","115","116","118","119"];
 let FERMO_ORDER = ["110","119","100","116","115","118","111","103","TA"]; // dal più sacrificabile al meno
 
@@ -7544,7 +7548,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · turni aggiuntivi: assegnazione RT';
+const APP_VERSION = '2026-10-27 · nuovi motivi di assenza';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
