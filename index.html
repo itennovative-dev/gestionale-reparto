@@ -277,7 +277,7 @@
   .hp-head b{font-size:11.5px; text-transform:uppercase; letter-spacing:.09em; color:var(--dc); font-weight:700;}
   .hp-head span{font-size:11px; color:var(--sub); white-space:nowrap;}
   .hp-head .hp-today{background:var(--dc); color:#fff; border-radius:9px; padding:1px 7px; font-size:10px; letter-spacing:.06em; text-transform:uppercase; margin-left:4px;}
-  .hp-tasks{flex:1; margin:8px 0 6px;}
+  .hp-tasks{margin:8px 0 6px;}
   .hp-task{display:flex; align-items:flex-start; gap:6px; padding:5px 0; border-bottom:1px dashed var(--line); font-size:12.5px; line-height:1.35;}
   .hp-task input[type=checkbox]{width:auto; margin:2px 0 0; accent-color:var(--dc); flex:none; cursor:pointer;}
   .hp-task .planner-task-time{min-width:0; margin-right:3px;}
@@ -287,10 +287,23 @@
   .hp-task:hover .hp-del{opacity:1;} .hp-task .hp-del:hover{color:var(--danger);}
   @media (hover:none){ .hp-task .hp-del{opacity:.6;} }
   .hp-empty{font-size:11.5px; color:var(--sub); padding:4px 0;}
+  .hp-sec{margin-top:10px; padding-top:8px; border-top:1px solid var(--line);}
+  .hp-sec-title{font-size:10px; text-transform:uppercase; letter-spacing:.09em; color:var(--steel); font-weight:600; margin-bottom:4px; cursor:pointer;}
+  .hp-sec-title:hover{color:var(--ink);}
+  .hp-row{display:flex; gap:6px; align-items:flex-start; padding:4px 0; font-size:12px; line-height:1.35;}
+  .hp-row + .hp-row{border-top:1px dashed var(--line);}
+  .hp-row .badge{flex:none; font-size:9.5px; padding:2px 5px; min-width:20px; margin-top:1px;}
+  .hp-row .hp-who{flex:1; min-width:0; overflow-wrap:break-word;}
+  .hp-row .hp-why{color:var(--sub); font-size:11px;}
+  .hp-row .hp-cov{display:block; font-size:11.5px; color:var(--ok);}
+  .hp-row .hp-cov.no{color:var(--danger); font-weight:600;}
+  .hp-row .hp-cov.wait{color:var(--sub);}
+  .hp-row.off .hp-who{color:var(--sub);}
   .hp-add{display:flex; flex-wrap:wrap; gap:4px;}
   .hp-add input{font-size:11.5px; padding:5px 6px;}
-  .hp-add input[type=text]{flex:1 1 110px; min-width:0; order:-1;}
-  .hp-add input[type=time]{width:auto; flex:1 0 72px;}
+  .hp-add input[type=text]{flex:3 1 90px; min-width:0;}
+  .hp-add-tb{display:flex; gap:4px; flex:1 0 112px;}
+  .hp-add input[type=time]{width:auto; flex:1 1 auto; min-width:0;}
   .hp-add button{flex:none; padding:4px 10px; font-size:12px;}
   @media (max-width:999px){
     .hp-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(230px,80%); overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px;}
@@ -2549,6 +2562,49 @@ async function renderHomePlanner(scrollToToday){
   if(week!==homePlannerWeek) return;   // nel frattempo si è cambiata settimana
   const edit = canEdit('planner');
   const days = plannerWeekDays(week);
+  // Coperture della settimana: assenti, sostituti in copertura, sostituti senza sostituzioni (turno e lavoro assegnato)
+  const cop = canView('coperture');
+  let abs = [], prop = [], mfill = {};
+  if(cop){
+    try{ const r = await storageGet('absences:'+week); abs = r ? JSON.parse(r.value) : []; }catch(e){}
+    try{ const r = await storageGet('proposal:'+week); prop = r ? (JSON.parse(r.value).proposal || []) : []; }catch(e){}
+    try{ const r = await storageGet('manualfill:'+week); mfill = r ? JSON.parse(r.value) : {}; }catch(e){}
+    if(week!==homePlannerWeek) return;
+  }
+  const tBadge = t => t ? `<span class="badge t${escHtml(String(t))}">${escHtml(turnoLabel(String(t)))}</span>` : `<span class="badge tC">—</span>`;
+  const coverageHtml = d => {
+    if(!cop) return '';
+    const dayAbs = abs.filter(a=>a.date===d).sort((a,b)=>String(a.turno).localeCompare(String(b.turno)) || String(a.name).localeCompare(String(b.name)));
+    const dayProp = prop.filter(p=>p.date===d);
+    const busy = new Set(dayProp.filter(p=>p.assigned).map(p=>p.assigned));
+    // sostituti senza sostituzioni: solo nei giorni lavorativi con assenze/proposta o con un lavoro assegnato
+    const isWeekday = new Date(d+'T00:00:00').getDay()%6 !== 0;
+    const free = SUBSTITUTES.filter(sb=>!busy.has(sb.name)).map(sb=>{
+      const mf = mfill[sb.name] && mfill[sb.name][d];
+      const set = mf && (mf.turno || mf.activity || mf.impianto);
+      if(sb.conditional && !set) return null;          // i sostituti "condizionali" solo se hanno un lavoro assegnato
+      return {name:sb.name, turno: set ? mf.turno : '', note: summaryNoteFor(mf), set};
+    }).filter(Boolean).sort((a,b)=>(!!b.set - !!a.set) || String(a.turno||'9').localeCompare(String(b.turno||'9')));
+    let html = '';
+    if(dayAbs.length){
+      html += `<div class="hp-sec"><div class="hp-sec-title" onclick="showPage('page-coperture')">Assenti · ${dayAbs.length}</div>` + dayAbs.map(a=>{
+        const ps = dayProp.filter(p=>p.absentName===a.name && String(p.turno)===String(a.turno));
+        const pp = ps.length ? ps : dayProp.filter(p=>p.absentName===a.name);
+        let cov;
+        if(!pp.length) cov = `<span class="hp-cov wait">${prop.length ? 'nessuna copertura prevista' : 'proposta da generare'}</span>`;
+        else cov = pp.map(p=> p.assigned
+            ? `<span class="hp-cov">→ ${escHtml(p.assigned)} · imp. ${escHtml(p.plant)}</span>`
+            : `<span class="hp-cov no">${p.fermo ? 'imp. '+escHtml(p.plant)+' fermo' : 'imp. '+escHtml(p.plant)+' da coprire'}</span>`).join('');
+        return `<div class="hp-row">${tBadge(a.turno)}<div class="hp-who">${escHtml(a.name)} <span class="hp-why">· ${escHtml(a.motivo||'')}</span>${cov}</div></div>`;
+      }).join('') + `</div>`;
+    }
+    if(isWeekday && (dayAbs.length || free.some(f=>f.set))){
+      html += `<div class="hp-sec"><div class="hp-sec-title" onclick="showPage('page-coperture')">Sostituti senza sostituzioni</div>` + free.map(f=>
+        `<div class="hp-row ${f.set?'':'off'}">${tBadge(f.turno)}<div class="hp-who">${escHtml(f.name)} <span class="hp-why">· ${escHtml(f.note)}</span></div></div>`).join('')
+        + `</div>`;
+    }
+    return html;
+  };
   let tot = 0, open = 0;
   const cols = days.map((d,i)=>{
     const tasks = (data[d] || []).slice().sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
@@ -2559,14 +2615,14 @@ async function renderHomePlanner(scrollToToday){
         ${edit?`<button class="hp-del" title="Elimina" onclick="deletePlannerTask('${week}','${d}','${escHtml(escJs(t.id))}')">×</button>`:''}
       </div>`).join('') || `<div class="hp-empty">Nessun impegno</div>`;
     const add = edit ? `<div class="hp-add">
-        <input type="time" id="hpTime_${d}" title="Ora (facoltativa)">
         <input type="text" id="hpText_${d}" placeholder="Aggiungi..." onkeydown="if(event.key==='Enter') addPlannerTask('${d}','home')">
-        <button class="btn-ghost" title="Aggiungi" onclick="addPlannerTask('${d}','home')">+</button>
+        <span class="hp-add-tb"><input type="time" id="hpTime_${d}" title="Ora (facoltativa)">
+        <button class="btn-ghost" title="Aggiungi" onclick="addPlannerTask('${d}','home')">+</button></span>
       </div>` : '';
     const dd = new Date(d+'T00:00:00').toLocaleDateString('it-IT',{day:'2-digit', month:'2-digit'});
     return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
       <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
-      <div class="hp-tasks">${rows}</div>${add}
+      <div class="hp-tasks">${rows}</div>${add}${coverageHtml(d)}
     </div>`;
   }).join('');
   const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
@@ -7068,7 +7124,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · planner settimanale in home';
+const APP_VERSION = '2026-10-27 · planner home con assenti e sostituti';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
