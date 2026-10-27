@@ -2774,7 +2774,7 @@ function buildExtraImageHTML(sh){
     </div>
   </div>`;
 }
-function downloadExtraImage(id){
+function downloadExtraImage(id, share){
   const sh = extraById(id); if(!sh) return;
   if(!(sh.people||[]).length){ toast('Aggiungi prima gli operatori'); return; }
   const wrapper = document.createElement('div');
@@ -2784,7 +2784,9 @@ function downloadExtraImage(id){
   html2canvas(wrapper, {backgroundColor:'#efece5', scale:2}).then(canvas=>{
     canvas.toBlob(blob=>{
       wrapper.remove();
-      shareOrDownloadImage(blob, `turno_aggiuntivo_${sh.date}.png`, 'Turno aggiuntivo', 'Turno aggiuntivo '+extraDateLong(sh.date));
+      const fname = `turno_aggiuntivo_${sh.date}.png`;
+      if(share) shareOrDownloadImage(blob, fname, 'Turno aggiuntivo', 'Turno aggiuntivo '+extraDateLong(sh.date));
+      else { downloadBlob(blob, fname); toast('Immagine scaricata'); }
     });
   }).catch(()=>{ wrapper.remove(); toast("Errore nella generazione dell'immagine"); });
 }
@@ -2859,6 +2861,7 @@ function renderExtraPage(){
         <input type="text" value="${escHtml(sh.note||'')}" placeholder="es. portare i DPI per la pulizia" onchange="setExtraField('${sh.id}','note',this.value)" style="margin-top:5px;"></label>` : ''}
       <div class="btn-row" style="margin-top:18px;">
         <button class="btn-primary" onclick="downloadExtraImage('${sh.id}')">Scarica immagine</button>
+        ${navigator.share ? `<button class="btn-ghost" onclick="downloadExtraImage('${sh.id}', true)">Condividi</button>` : ''}
         ${edit ? `<button class="btn-danger" onclick="deleteExtraShift('${sh.id}')">Elimina turno</button>` : ''}
       </div>
     </div>
@@ -7548,7 +7551,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · nuovi motivi di assenza';
+const APP_VERSION = '2026-10-27 · turno aggiuntivo: scarica immagine';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
