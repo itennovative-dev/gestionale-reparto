@@ -302,8 +302,8 @@
   .hp-add{display:flex; flex-wrap:wrap; gap:4px;}
   .hp-add input{font-size:11.5px; padding:5px 6px;}
   .hp-add input[type=text]{flex:3 1 90px; min-width:0;}
-  .hp-add-tb{display:flex; gap:4px; flex:1 0 112px;}
-  .hp-add input[type=time]{width:auto; flex:1 1 auto; min-width:0;}
+  .hp-add-tb{display:flex; gap:4px; flex:1 0 112px; min-width:0;}
+  .hp-add input[type=time]{width:0; flex:1 1 0; min-width:0;}
   .hp-add button{flex:none; padding:4px 10px; font-size:12px;}
   @media (max-width:999px){
     .hp-grid{grid-template-columns:none; grid-auto-flow:column; grid-auto-columns:minmax(230px,80%); overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:6px;}
@@ -2643,7 +2643,7 @@ async function renderHomePlanner(scrollToToday){
   }
 }
 
-/* Home: situazione di oggi (assenti, turni scoperti, impianti fermi, manutenzioni, impegni). */
+/* Home: situazione di oggi (assenti, turni scoperti, impianti fermi, manutenzioni). Gli impegni sono nel planner sopra. */
 async function renderHomeBanner(){
   const el = document.getElementById('homeToday');
   if(!el) return;
@@ -2656,7 +2656,6 @@ async function renderHomeBanner(){
   let abs = [], prop = [];
   try{ const r = await storageGet('absences:'+week); abs = r ? JSON.parse(r.value) : []; }catch(e){}
   try{ const r = await storageGet('proposal:'+week); prop = r ? (JSON.parse(r.value).proposal || []) : []; }catch(e){}
-  const planner = await loadPlannerWeek(week);
 
   // 1. Assenti oggi
   const absToday = abs.filter(a=>a.date===today).sort((a,b)=>String(a.turno).localeCompare(String(b.turno)));
@@ -2673,10 +2672,6 @@ async function renderHomeBanner(){
   const in7 = toLocalDateStr(new Date(Date.now()+7*86400000));
   const maint = MAINTENANCE_PLAN.filter(i=>i.status!=='done' && i.dueDate<=in7).sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
   const overdue = maint.filter(i=>i.dueDate<today).length;
-  // 5. Impegni di oggi
-  const tasks = (planner[today] || []).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const tasksOpen = tasks.filter(t=>!t.done).length;
-
   const more = (arr, n)=> arr.length>n ? `<li class="muted">+ altri ${arr.length-n}</li>` : '';
   const card = (cls, page, label, num, sub, items)=>`
     <div class="today-card ${cls}" onclick="showPage('${page}')" role="button" tabindex="0">
@@ -2704,14 +2699,8 @@ async function renderHomeBanner(){
     overdue ? `${overdue} scadut${overdue===1?'a':'e'} · entro 7 giorni` : 'in scadenza entro 7 giorni',
     maint.slice(0,4).map(i=>`<li>${i.dueDate<today?'<b>scaduta</b> · ':fmtDate(i.dueDate)+' · '}Imp. ${escHtml(plantLabelOf(i.plant))} <span class="muted">· ${escHtml(i.description)}</span></li>`).join('') + more(maint,4));
 
-  const taskItems = tasks.slice(0,4).map(t=>`<li><label class="banner-task ${t.done?'done':''}" onclick="event.stopPropagation()">
-      <input type="checkbox" ${t.done?'checked':''} onchange="togglePlannerTask('${week}','${today}','${escHtml(escJs(t.id))}')">
-      ${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span>`:''}<span>${escHtml(t.text)}</span></label></li>`).join('') + more(tasks,4);
-  const cTasks = card('', 'panel-planner', 'Impegni di oggi', tasksOpen,
-    tasks.length ? (tasksOpen ? `da fare su ${tasks.length}` : 'tutti completati') : 'nessun impegno in agenda', taskItems);
-
   const cards = (canView('coperture') ? cAbs+cOpen : '') + (canView('coperture')||canView('manutenzione') ? cFermi : '')
-    + (canView('manutenzione') ? cMaint : '') + (canView('planner') ? cTasks : '');
+    + (canView('manutenzione') ? cMaint : '');
   el.style.display = cards ? '' : 'none';
   el.innerHTML = `<div class="today-head"><h2>Situazione di oggi</h2><span>Settimana ${week.split('-W')[1]} · ${dateLong}</span></div>
     <div class="today-grid">${cards}</div>`;
@@ -7124,7 +7113,7 @@ function toast(msg){
   toastTimer = setTimeout(()=>t.classList.remove('show'), 2600);
 }
 
-const APP_VERSION = '2026-10-27 · planner home con assenti e sostituti';
+const APP_VERSION = '2026-10-27 · tolta card Impegni di oggi';
 document.addEventListener('DOMContentLoaded', ()=>{ const v = document.getElementById('appVersion'); if(v) v.textContent = APP_VERSION; });
 // Controlla se sul server c'è una versione più nuova di quella aperta (il browser tiene copie in memoria fino a ~10 minuti)
 async function checkNewVersion(){
