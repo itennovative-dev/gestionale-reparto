@@ -189,6 +189,21 @@
   .planner-add input[type=time]{width:82px; flex:none;}
   .planner-add input[type=text]{flex:1; min-width:0;}
   .planner-add button{flex:none; padding:6px 10px;}
+  .planner-search{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:14px;}
+  .planner-search input[type=search]{flex:1; min-width:220px;}
+  .planner-search select{width:auto;}
+  .ps-results{margin-top:10px;}
+  .ps-group{font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--sub); margin:14px 0 4px;}
+  .ps-item{display:flex; gap:12px; align-items:baseline; padding:8px 10px; border-bottom:1px solid var(--line); cursor:pointer; border-radius:8px;}
+  .ps-item:hover{background:var(--tc-bg);}
+  .ps-date{min-width:150px; font-size:12px; color:var(--steel);}
+  .ps-date.today{color:var(--ink); font-weight:700;}
+  .ps-text{flex:1; font-size:13px;}
+  .ps-item.done .ps-text{text-decoration:line-through; color:var(--sub);}
+  .ps-tag{font-size:10.5px; padding:1px 7px; border-radius:10px; background:var(--tc-bg); color:var(--sub); white-space:nowrap;}
+  .ps-text mark{background:#f3e3a6; color:inherit; border-radius:2px; padding:0 1px;}
+  .planner-task.ps-flash, .planner-day.ps-flash{outline:2px solid var(--steel); outline-offset:2px; border-radius:6px;}
+  @media (max-width:600px){ .ps-item{flex-wrap:wrap; gap:4px 10px;} .ps-date{min-width:0; width:100%;} }
 
   /* ---- Indumenti operatori ---- */
   .clothing-totals-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:10px;}
@@ -1204,6 +1219,16 @@
       <span class="note">vai a una data:</span>
       <input type="date" id="plannerJumpDate" onchange="jumpPlannerDate(this.value)">
     </div>
+    <div class="planner-search">
+      <input type="search" id="plannerSearchText" data-ro-ok placeholder="Cerca negli impegni (passati e futuri)…" oninput="schedulePlannerSearch()" onkeydown="if(event.key==='Escape'){this.value='';runPlannerSearch();}">
+      <select id="plannerSearchScope" data-ro-ok onchange="runPlannerSearch()">
+        <option value="all">Passati e futuri</option>
+        <option value="future">Solo da oggi in poi</option>
+        <option value="past">Solo passati</option>
+      </select>
+      <label class="note" style="display:flex; align-items:center; gap:5px; margin:0;"><input type="checkbox" id="plannerSearchOpen" data-ro-ok onchange="runPlannerSearch()" style="width:auto;"> solo non completati</label>
+    </div>
+    <div class="ps-results" id="plannerSearchResults"></div>
     <div class="planner-grid" id="plannerGrid" style="margin-top:16px;"></div>
   </div>
 </div>
@@ -2635,13 +2660,13 @@ function renderPlannerGrid(){
   el.innerHTML = days.map((d,i)=>{
     const tasks = (plannerData[d] || []).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const rows = tasks.map(t=>`
-      <div class="planner-task ${t.done?'done':''}">
+      <div class="planner-task ${t.done?'done':''}" data-tid="${escHtml(t.id)}">
         <input type="checkbox" ${t.done?'checked':''} onchange="togglePlannerTask('${plannerWeek}','${d}','${t.id}')">
         ${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span>`:''}
         <span class="planner-task-text">${escHtml(t.text)}</span>
         <button class="btn-danger" onclick="deletePlannerTask('${plannerWeek}','${d}','${t.id}')">×</button>
       </div>`).join('') || '<p class="empty" style="padding:6px 0; font-size:12px;">Nessun impegno.</p>';
-    return `<div class="planner-day">
+    return `<div class="planner-day" data-day="${d}">
       <div class="planner-day-head"><span>${DAY_NAMES_IT[i]}</span><span class="planner-day-date">${fmtDate(d)}</span></div>
       <div class="planner-tasks">${rows}</div>
       <div class="planner-add">
@@ -2651,6 +2676,99 @@ function renderPlannerGrid(){
       </div>
     </div>`;
   }).join('');
+}
+
+/* ---- Ricerca negli impegni del planner (tutte le settimane salvate + turni aggiuntivi) ---- */
+let plannerSearchTimer = null;
+function schedulePlannerSearch(){
+  clearTimeout(plannerSearchTimer);
+  plannerSearchTimer = setTimeout(runPlannerSearch, 200);
+}
+function psNorm(str){
+  return String(str||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+// evidenzia le parole cercate nel testo (senza distinguere maiuscole/accenti)
+function psHighlight(text, words){
+  const src = String(text||'');
+  const norm = psNorm(src);
+  const marks = new Array(src.length).fill(false);
+  words.forEach(w=>{ if(!w) return; let i = norm.indexOf(w); while(i!==-1){ for(let k=i;k<i+w.length;k++) marks[k]=true; i = norm.indexOf(w, i+w.length); } });
+  let out = '', open = false;
+  for(let i=0;i<src.length;i++){
+    if(marks[i] && !open){ out += '<mark>'; open = true; }
+    if(!marks[i] && open){ out += '</mark>'; open = false; }
+    out += escHtml(src[i]);
+  }
+  return out + (open ? '</mark>' : '');
+}
+async function collectPlannerItems(){
+  const items = [];
+  const keys = ((await storageList('planner:')) || {}).keys || [];
+  for(const key of keys){
+    const weekId = key.slice('planner:'.length);
+    let data = {};
+    try{ const r = await storageGet(key); data = r ? JSON.parse(r.value) : {}; }catch(e){ continue; }
+    Object.keys(data||{}).forEach(day=>{
+      (data[day]||[]).forEach(t=>{
+        if(!t || !t.text) return;
+        items.push({kind:'task', weekId, day, id:t.id, time:t.time||'', text:t.text, done:!!t.done, hay:psNorm(t.text+' '+(t.time||''))});
+      });
+    });
+  }
+  if(canView('aggiuntivi')){
+    let extras = [];
+    try{ const r = await storageGet('extra-shifts'); extras = r ? JSON.parse(r.value) : []; }catch(e){}
+    (Array.isArray(extras)?extras:[]).forEach(x=>{
+      if(!x || !x.date) return;
+      const ppl = (x.people||[]).map(p=>p.name + (p.assign ? ' ('+extraAssignShort(p.assign)+')' : '')).join(', ');
+      const text = `Turno aggiuntivo ${extraHour(x.start)}–${extraHour(x.end)}` + (ppl ? ': '+ppl : '') + (x.note ? ' — '+x.note : '');
+      items.push({kind:'extra', weekId:isoWeek(x.date), day:x.date, id:x.id, time:x.start||'', text, done:false, hay:psNorm(text+' turno aggiuntivo sabato straordinario')});
+    });
+  }
+  return items;
+}
+async function runPlannerSearch(){
+  const box = document.getElementById('plannerSearchResults');
+  if(!box) return;
+  const q = (document.getElementById('plannerSearchText').value || '').trim();
+  if(!q){ box.innerHTML = ''; return; }
+  const words = psNorm(q).split(/\s+/).filter(Boolean);
+  const scope = document.getElementById('plannerSearchScope').value;
+  const onlyOpen = document.getElementById('plannerSearchOpen').checked;
+  const today = todayStr();
+  const all = await collectPlannerItems();
+  // nel frattempo il testo potrebbe essere cambiato: mostra solo l'ultima ricerca
+  if((document.getElementById('plannerSearchText').value || '').trim() !== q) return;
+  const hits = all.filter(it=>
+    words.every(w=>it.hay.includes(w)) &&
+    (scope==='all' || (scope==='future' ? it.day>=today : it.day<today)) &&
+    (!onlyOpen || !it.done)
+  );
+  if(!hits.length){ box.innerHTML = '<p class="empty" style="padding:8px 0;">Nessun impegno trovato.</p>'; return; }
+  const byTime = (a,b)=>a.day.localeCompare(b.day) || (a.time||'').localeCompare(b.time||'');
+  const future = hits.filter(h=>h.day>=today).sort(byTime);          // dal più vicino
+  const past = hits.filter(h=>h.day<today).sort(byTime).reverse();   // dal più recente
+  const longDate = d => new Date(d+'T00:00:00').toLocaleDateString('it-IT',{weekday:'short', day:'2-digit', month:'short', year:'numeric'});
+  const row = h => `<div class="ps-item ${h.done?'done':''}" onclick="openPlannerSearchHit('${h.weekId}','${h.day}','${escHtml(escJs(h.id||''))}','${h.kind}')">
+      <span class="ps-date ${h.day===today?'today':''}">${h.day===today?'Oggi':longDate(h.day)}${h.time?' · '+escHtml(h.time):''}</span>
+      <span class="ps-text">${psHighlight(h.text, words)}</span>
+      ${h.kind==='extra'?'<span class="ps-tag">turno aggiuntivo</span>':''}${h.done?'<span class="ps-tag">fatto</span>':''}
+    </div>`;
+  let html = `<p class="note" style="margin:0;">${hits.length} risultat${hits.length===1?'o':'i'}</p>`;
+  if(future.length) html += `<div class="ps-group">Da oggi in poi (${future.length})</div>` + future.map(row).join('');
+  if(past.length) html += `<div class="ps-group">Passati (${past.length})</div>` + past.map(row).join('');
+  box.innerHTML = html;
+}
+async function openPlannerSearchHit(weekId, day, id, kind){
+  if(kind==='extra' && typeof openExtraShift==='function' && canView('aggiuntivi')){ openExtraShift(id); return; }
+  await switchPlannerWeek(weekId);
+  const grid = document.getElementById('plannerGrid');
+  if(!grid) return;
+  const target = (id && grid.querySelector(`[data-tid="${CSS.escape(id)}"]`)) || grid.querySelector(`[data-day="${day}"]`);
+  if(!target) return;
+  target.scrollIntoView({behavior:'smooth', block:'center'});
+  target.classList.add('ps-flash');
+  setTimeout(()=>target.classList.remove('ps-flash'), 2200);
 }
 
 /* ============================= TURNI AGGIUNTIVI DEL SABATO =============================
