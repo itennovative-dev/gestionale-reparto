@@ -385,6 +385,20 @@
   .hp-sec-extra{background:#edf3ea; border-radius:8px; padding:7px 8px 4px; border-left:4px solid var(--ok);}
   .hp-sec-extra .hp-sec-title{color:#3f6a47; border-bottom-color:#c5d8c0;}
   .hp-sec-extra .hp-n{background:var(--ok);}
+  .hp-sec-maint{background:#f6f0e4; border-radius:8px; padding:7px 8px 4px; border-left:4px solid #b08a3e;}
+  .hp-sec-maint .hp-sec-title{color:#7a5d22; border-bottom-color:#e3d3b1; cursor:pointer;}
+  .hp-sec-maint .hp-n{background:#b08a3e;}
+  .mt-item{display:flex; align-items:flex-start; gap:6px; padding:5px 0; font-size:12.5px; line-height:1.35;}
+  .mt-item + .mt-item{border-top:1px solid rgba(38,37,31,.1);}
+  .mt-item input[type=checkbox]{width:15px; height:15px; margin:1px 0 0; flex:none; cursor:pointer; accent-color:#b08a3e;}
+  .mt-item .mt-text{flex:1; min-width:0; overflow-wrap:break-word; cursor:pointer;}
+  .mt-item .mt-plant{font-weight:700; color:var(--ink);}
+  .mt-item .mt-sub{display:block; font-size:11.5px; color:#6f6b60;}
+  .mt-item.done .mt-desc{text-decoration:line-through; color:var(--sub);}
+  .mt-flag{font-size:10px; font-weight:700; padding:0 6px; border-radius:8px; background:var(--tc-bg); color:var(--sub); white-space:nowrap;}
+  .mt-flag.late{background:var(--danger-bg); color:var(--danger);}
+  .mt-flag.ok{background:var(--ok-bg); color:var(--ok);}
+  .planner-maint{margin-top:10px;}
   .hp-row .hp-jobr{flex:none; font-size:11.5px; font-weight:700; color:#3f6a47; white-space:nowrap; padding-top:1px;}
   .hp-row .hp-jobr.cl{color:#6c8394;}
   .hp-sec-title{flex-wrap:wrap;} .hp-sec-title .hp-n{white-space:nowrap;}
@@ -2300,8 +2314,62 @@ async function loadMaintenance(){
   maintenancePlantSelect('logNewPlant');
   renderMaintenancePanel();
 }
-async function saveMaintenancePlan(){ try{ await storageSet('maintenance-plan', JSON.stringify(MAINTENANCE_PLAN)); }catch(e){} }
-async function saveMaintenanceLog(){ try{ await storageSet('maintenance-log', JSON.stringify(MAINTENANCE_LOG)); }catch(e){} }
+async function saveMaintenancePlan(){ try{ await storageSet('maintenance-plan', JSON.stringify(MAINTENANCE_PLAN)); }catch(e){} refreshPlannersSafe(); }
+async function saveMaintenanceLog(){ try{ await storageSet('maintenance-log', JSON.stringify(MAINTENANCE_LOG)); }catch(e){} refreshPlannersSafe(); }
+// gli interventi di manutenzione compaiono anche nel planner: dopo ogni modifica si ridisegna
+function refreshPlannersSafe(){ try{ if(typeof refreshPlanners==='function') refreshPlanners(); }catch(e){} }
+
+/* ---- Manutenzione nel planner ----
+   Gli interventi non vengono copiati nel planner: il planner li legge direttamente dalla manutenzione,
+   così modifiche, cancellazioni e interventi già registrati sono sempre allineati.
+   - scadenze da fare  → nel giorno previsto (con "scaduta" se la data è passata)
+   - scadenze fatte    → nel giorno in cui sono state segnate fatte
+   - interventi registrati nello storico → nel giorno dell'intervento */
+async function plannerMaintenanceItems(){
+  if(!canView('manutenzione')) return [];
+  let plan = [], log = [];
+  try{ const r = await storageGet('maintenance-plan'); plan = r ? JSON.parse(r.value) : []; }catch(e){}
+  try{ const r = await storageGet('maintenance-log'); log = r ? JSON.parse(r.value) : []; }catch(e){}
+  const today = todayStr();
+  const out = [];
+  (Array.isArray(plan)?plan:[]).forEach(i=>{
+    if(!i || !i.dueDate) return;
+    const done = i.status==='done';
+    const day = done ? (i.doneDate || i.dueDate) : i.dueDate;
+    const sub = [done ? 'fatta' : 'da fare', i.everyMonths ? everyLabel(i.everyMonths) : '',
+                 done && i.doneDate && i.doneDate!==i.dueDate ? 'prevista '+fmtDate(i.dueDate) : ''].filter(Boolean).join(' · ');
+    out.push({src:'plan', id:i.id, day, plant:plantLabelOf(i.plant), desc:i.description||'', sub, done,
+              late: !done && i.dueDate < today});
+  });
+  (Array.isArray(log)?log:[]).forEach(i=>{
+    if(!i || !i.date) return;
+    const sub = ['fatto', i.type, i.technician ? 'a cura di '+i.technician : '', i.downtimeHours ? i.downtimeHours+'h fermo' : ''].filter(Boolean).join(' · ');
+    out.push({src:'log', id:i.id, day:i.date, plant:plantLabelOf(i.plant), desc:i.description||'', sub, done:true, late:false});
+  });
+  return out;
+}
+function plannerMaintenanceHtml(items, day){
+  const list = items.filter(m=>m.day===day).sort((a,b)=>(a.done-b.done) || a.plant.localeCompare(b.plant));
+  if(!list.length) return '';
+  const edit = canEdit('manutenzione');
+  const open = list.filter(m=>!m.done).length;
+  return `<div class="hp-sec hp-sec-maint"><div class="hp-sec-title" onclick="showPage('panel-maintenance')">Manutenzione <span class="hp-n" title="da fare / totale">${open}/${list.length}</span></div>`
+    + list.map(m=>{
+      const box = m.src==='plan'
+        ? `<input type="checkbox" ${m.done?'checked':''} ${edit?'':'disabled'} title="${m.done?'Riapri':'Segna fatta'}" onchange="togglePlannerMaintenance('${escHtml(escJs(m.id))}')">`
+        : `<input type="checkbox" checked disabled title="Intervento registrato">`;
+      const flag = m.late ? '<span class="mt-flag late">scaduta</span>' : '';
+      return `<div class="mt-item ${m.done?'done':''}">${box}
+        <span class="mt-text" onclick="showPage('panel-maintenance')"><span class="mt-plant">${escHtml(m.plant)}</span> — <span class="mt-desc">${escHtml(m.desc)}</span> ${flag}
+        <span class="mt-sub">${escHtml(m.sub)}</span></span></div>`;
+    }).join('') + `</div>`;
+}
+// segna fatta / riapri una scadenza direttamente dal planner (stessa logica della pagina Manutenzione, ricorrenze comprese)
+async function togglePlannerMaintenance(id){
+  if(!canEdit('manutenzione')) return;
+  try{ const r = await storageGet('maintenance-plan'); MAINTENANCE_PLAN = r ? JSON.parse(r.value) : []; }catch(e){}
+  toggleMaintenanceStatus(id);
+}
 
 function addMaintenancePlanItem(){
   const plant = document.getElementById('maintNewPlant').value;
@@ -2598,9 +2666,11 @@ async function loadPlannerWeek(weekId){
 async function savePlannerWeek(weekId, data){
   try{ await storageSet('planner:'+weekId, JSON.stringify(data)); }catch(e){}
 }
+let plannerMaint = [];
 async function switchPlannerWeek(weekId){
   plannerWeek = weekId;
   plannerData = await loadPlannerWeek(weekId);
+  plannerMaint = await plannerMaintenanceItems();
   const lbl = document.getElementById('plannerWeekLabel');
   if(lbl) lbl.textContent = plannerWeekLabelText(weekId);
   renderPlannerGrid();
@@ -2632,8 +2702,8 @@ async function addPlannerTask(dayKey, view){
   refreshPlanners();
   if(home){ await renderHomePlanner(); const f = document.getElementById('hpText_'+dayKey); if(f) f.focus(); }
 }
-function refreshPlanners(){
-  if(plannerWeek) renderPlannerGrid();
+async function refreshPlanners(){
+  if(plannerWeek){ plannerMaint = await plannerMaintenanceItems(); renderPlannerGrid(); }
   renderHomePlanner();
   renderHomeBanner();
 }
@@ -2669,6 +2739,7 @@ function renderPlannerGrid(){
     return `<div class="planner-day" data-day="${d}">
       <div class="planner-day-head"><span>${DAY_NAMES_IT[i]}</span><span class="planner-day-date">${fmtDate(d)}</span></div>
       <div class="planner-tasks">${rows}</div>
+      ${plannerMaint.some(m=>m.day===d) ? `<div class="planner-maint">${plannerMaintenanceHtml(plannerMaint, d).replace('hp-sec hp-sec-maint','hp-sec-maint')}</div>` : ''}
       <div class="planner-add">
         <input type="time" id="plannerTime_${d}">
         <input type="text" id="plannerText_${d}" placeholder="Cosa devi fare..." onkeydown="if(event.key==='Enter') addPlannerTask('${d}')">
@@ -2715,6 +2786,10 @@ async function collectPlannerItems(){
       });
     });
   }
+  (await plannerMaintenanceItems()).forEach(m=>{
+    const text = `Manutenzione ${m.plant} — ${m.desc} (${m.sub})`;
+    items.push({kind:'maint', weekId:isoWeek(m.day), day:m.day, id:m.id, time:'', text, done:m.done, hay:psNorm(text+' manutenzione intervento')});
+  });
   if(canView('aggiuntivi')){
     let extras = [];
     try{ const r = await storageGet('extra-shifts'); extras = r ? JSON.parse(r.value) : []; }catch(e){}
@@ -2752,7 +2827,7 @@ async function runPlannerSearch(){
   const row = h => `<div class="ps-item ${h.done?'done':''}" onclick="openPlannerSearchHit('${h.weekId}','${h.day}','${escHtml(escJs(h.id||''))}','${h.kind}')">
       <span class="ps-date ${h.day===today?'today':''}">${h.day===today?'Oggi':longDate(h.day)}${h.time?' · '+escHtml(h.time):''}</span>
       <span class="ps-text">${psHighlight(h.text, words)}</span>
-      ${h.kind==='extra'?'<span class="ps-tag">turno aggiuntivo</span>':''}${h.done?'<span class="ps-tag">fatto</span>':''}
+      ${h.kind==='extra'?'<span class="ps-tag">turno aggiuntivo</span>':''}${h.kind==='maint'?'<span class="ps-tag">manutenzione</span>':''}${h.done?'<span class="ps-tag">fatto</span>':''}
     </div>`;
   let html = `<p class="note" style="margin:0;">${hits.length} risultat${hits.length===1?'o':'i'}</p>`;
   if(future.length) html += `<div class="ps-group">Da oggi in poi (${future.length})</div>` + future.map(row).join('');
@@ -2761,6 +2836,7 @@ async function runPlannerSearch(){
 }
 async function openPlannerSearchHit(weekId, day, id, kind){
   if(kind==='extra' && typeof openExtraShift==='function' && canView('aggiuntivi')){ openExtraShift(id); return; }
+  if(kind==='maint'){ showPage('panel-maintenance'); return; }
   await switchPlannerWeek(weekId);
   const grid = document.getElementById('plannerGrid');
   if(!grid) return;
@@ -3116,6 +3192,8 @@ async function renderHomePlanner(scrollToToday){
     if(!Array.isArray(extras)) extras = [];
     if(week!==homePlannerWeek) return;
   }
+  const maint = await plannerMaintenanceItems();
+  if(week!==homePlannerWeek) return;
   const extraHtml = d => extras.filter(x=>x.date===d).map(x=>{
     const ppl = extraSortedPeople(x);
     return `<div class="hp-sec hp-sec-extra"><div class="hp-sec-title" onclick="openExtraShift('${escHtml(escJs(x.id))}')">Turno aggiuntivo <span class="hp-n">${escHtml(extraHour(x.start))}–${escHtml(extraHour(x.end))}</span></div>`
@@ -3175,7 +3253,7 @@ async function renderHomePlanner(scrollToToday){
     return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
       <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
       <div class="hp-sec hp-sec-tasks"><div class="hp-sec-title">Impegni${tasks.length?` <span class="hp-n" title="da fare / totale">${tasks.filter(t=>!t.done).length}/${tasks.length}</span>`:''}</div>
-      <div class="hp-tasks">${rows}</div>${add}</div>${extraHtml(d)}${coverageHtml(d)}
+      <div class="hp-tasks">${rows}</div>${add}</div>${extraHtml(d)}${plannerMaintenanceHtml(maint, d)}${coverageHtml(d)}
     </div>`;
   }).join('');
   const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
@@ -7802,7 +7880,7 @@ const EDIT_FUNCTIONS = {
   impianti:  ['addPlant','deletePlant'],
   indumenti: ['setClothingSize'],
   competenze:['setSkill'],
-  manutenzione:['addMaintenancePlanItem','deleteMaintenancePlanItem','toggleMaintenanceStatus','setMaintenanceEvery','addMaintenanceLogEntry','deleteMaintenanceLogEntry'],
+  manutenzione:['togglePlannerMaintenance','addMaintenancePlanItem','deleteMaintenancePlanItem','toggleMaintenanceStatus','setMaintenanceEvery','addMaintenanceLogEntry','deleteMaintenanceLogEntry'],
   fermi:     ['addDowntime','deleteDowntime','addDowntimeCause','removeDowntimeCause','moveDowntimeCause','toggleEutrologBox','toggleEutPlant'],
   produzione:['importProductionFilesForced','mergeProductionPhase','deleteProductionPhase'],
   opstats:   ['importOperatorFiles']
