@@ -3791,7 +3791,8 @@ function renderVoceTable(fase, voce){
   const yearlyTotals = getYearlyTotals(fase, voce);
   const years = [...new Set(Object.keys(monthData).filter(k=>/^\d{4}-\d{2}$/.test(k)).map(k=>k.slice(0,4)))].sort();
   if(years.length===0){ el.innerHTML = '<p class="empty">Nessun dato disponibile.</p>'; return; }
-  let html = '<table><thead><tr><th>Anno</th>' + MONTH_NAMES_SHORT.map(m=>`<th>${m}</th>`).join('') + '<th>Totale</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Anno</th>' + MONTH_NAMES_SHORT.map(m=>`<th>${m}</th>`).join('') + '<th>Totale</th><th>Var. % anno prec.</th></tr></thead><tbody>';
+  let prevTotal = null;
   years.forEach(y=>{
     let sumFallback = 0;
     const cells = MONTH_NAMES_SHORT.map((_,i)=>{
@@ -3802,7 +3803,15 @@ function renderVoceTable(fase, voce){
     }).join('');
     // usa il "Totale complessivo" ufficiale del file per quell'anno; se assente (import vecchi), somma i mesi come riserva
     const total = yearlyTotals[y] != null ? yearlyTotals[y] : sumFallback;
-    html += `<tr><td><strong>${y}</strong></td>${cells}<td><strong>${formatProdNum(total)}</strong></td></tr>`;
+    // variazione % del totale rispetto all'anno precedente (vuota per il primo anno)
+    let varCell = '<td style="color:var(--sub);">—</td>';
+    if(prevTotal != null && prevTotal !== 0){
+      const d = (total - prevTotal) / Math.abs(prevTotal) * 100;
+      const col = d > 0 ? 'var(--ok)' : (d < 0 ? 'var(--danger)' : 'var(--ink)');
+      varCell = `<td style="font-weight:600; color:${col};">${d>0?'+':''}${d.toFixed(1).replace('.',',')}%</td>`;
+    }
+    prevTotal = total;
+    html += `<tr><td><strong>${y}</strong></td>${cells}<td><strong>${formatProdNum(total)}</strong></td>${varCell}</tr>`;
   });
   html += '</tbody></table>';
   el.innerHTML = html;
