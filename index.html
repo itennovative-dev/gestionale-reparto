@@ -202,23 +202,20 @@
   .ps-item.done .ps-text{text-decoration:line-through; color:var(--sub);}
   .ps-tag{font-size:10.5px; padding:1px 7px; border-radius:10px; background:var(--tc-bg); color:var(--sub); white-space:nowrap;}
   .ps-text mark{background:#f3e3a6; color:inherit; border-radius:2px; padding:0 1px;}
-  /* Note del planner: restano lì, senza spunta e senza data */
-  .pn-wrap{margin-top:18px; background:var(--card); border:1px solid var(--line); border-left:4px solid #b39c45; border-radius:12px; padding:12px 14px; box-shadow:var(--shadow);}
-  .pn-head{display:flex; align-items:baseline; gap:8px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; color:var(--ink); padding-bottom:6px; margin-bottom:6px; border-bottom:2px solid var(--ink);}
-  .pn-head .hp-n{font-size:10.5px; font-weight:700; background:var(--ink); color:#fff; border-radius:8px; padding:1px 6px; letter-spacing:.02em;}
-  .pn-head .pn-sub{font-size:10px; font-weight:500; color:var(--sub); text-transform:none; letter-spacing:0;}
-  .pn-list{display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:8px;}
-  .pn-item{display:flex; align-items:flex-start; gap:6px; background:#faf6e8; border:1px solid #e9e1c4; border-radius:8px; padding:7px 8px; min-width:0;}
+  /* Note del planner: giorno per giorno come gli impegni, ma senza spunta */
+  .pn-day{margin-top:8px;}
+  .pn-title{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; color:#8a7531; padding-bottom:3px; margin-bottom:3px; border-bottom:1.5px solid #e2d6a8;}
+  .pn-item{display:flex; align-items:flex-start; gap:6px; background:#faf6e8; border:1px solid #e9e1c4; border-left:3px solid #c9b061; border-radius:6px; padding:5px 6px; margin:4px 0; min-width:0;}
   .pn-item.ps-flash{outline:2px solid var(--steel); outline-offset:2px;}
-  .pn-text{flex:1; min-width:0; font-size:13px; line-height:1.4; color:var(--ink); white-space:pre-wrap; overflow-wrap:break-word;}
-  .pn-item textarea.pn-text{border:none; background:transparent; resize:none; padding:0; margin:0; font:inherit; font-size:13px; line-height:1.4; overflow:hidden; min-height:18px; width:100%; box-shadow:none;}
+  .pn-text{flex:1; min-width:0; font-size:12.5px; line-height:1.4; color:var(--ink); white-space:pre-wrap; overflow-wrap:break-word;}
+  .pn-item textarea.pn-text{border:none; background:transparent; resize:none; padding:0; margin:0; font:inherit; font-size:12.5px; line-height:1.4; overflow:hidden; min-height:17px; width:100%; box-shadow:none;}
   .pn-item textarea.pn-text:focus{outline:1px dashed #c9b878; outline-offset:2px;}
   .pn-del{border:none; background:none; color:var(--sub); cursor:pointer; padding:0 2px; font-size:15px; line-height:1; flex:none;}
   .pn-del:hover{color:var(--danger);}
-  .pn-add{display:flex; gap:6px; margin-top:8px; align-items:flex-start;}
-  .pn-add textarea{flex:1; min-width:0; resize:vertical; min-height:34px; font:inherit; font-size:13px;}
-  .pn-add button{flex:none; padding:6px 12px;}
-  .pn-empty{font-size:12px; color:var(--sub); font-style:italic; padding:4px 0;}
+  .pn-add{display:flex; gap:5px; margin-top:5px; align-items:flex-start;}
+  .pn-add textarea{flex:1; min-width:0; resize:vertical; min-height:30px; font:inherit; font-size:12.5px; padding:5px 7px;}
+  .pn-add button{flex:none; padding:5px 9px;}
+  .hp-day .pn-day{margin:8px 9px 0;}
   @media print{ .pn-add, .pn-del{display:none !important;} }
   .planner-task.ps-flash, .planner-day.ps-flash{outline:2px solid var(--steel); outline-offset:2px; border-radius:6px;}
   @media (max-width:600px){ .ps-item{flex-wrap:wrap; gap:4px 10px;} .ps-date{min-width:0; width:100%;} }
@@ -1262,7 +1259,6 @@
     </div>
     <div class="ps-results" id="plannerSearchResults"></div>
     <div class="planner-grid" id="plannerGrid" style="margin-top:16px;"></div>
-    <div class="pn-wrap" id="plannerNotes"></div>
   </div>
 </div>
 
@@ -1860,7 +1856,7 @@ const KEY_SECTION_RULES = [
   ['absences:','coperture'], ['proposal:','coperture'], ['manualfill:','coperture'], ['known-weeks','coperture'],
   ['sub-capacities','coperture'], ['fermo-order','coperture'], ['recipients-email','coperture'], ['nightshift-history','coperture'],
   ['teamturni:','turni'], ['team-rotation','turni'], ['turni-speciali','turni'],
-  ['planner:','planner'], ['planner-notes','planner'],
+  ['planner:','planner'], ['plannernotes:','planner'], ['planner-notes','planner'],
   ['extra-shifts','aggiuntivi'],
   ['roster-employees','operatori'], ['roster-substitutes','operatori'], ['schedule-official','operatori'],
   ['roster-plants','impianti'],
@@ -2686,14 +2682,16 @@ async function savePlannerWeek(weekId, data){
   try{ await storageSet('planner:'+weekId, JSON.stringify(data)); }catch(e){}
 }
 let plannerMaint = [];
+let plannerNotesData = {};
 async function switchPlannerWeek(weekId){
   plannerWeek = weekId;
+  await migrateLegacyPlannerNotes();
   plannerData = await loadPlannerWeek(weekId);
+  plannerNotesData = await loadPlannerNotesWeek(weekId);
   plannerMaint = await plannerMaintenanceItems();
   const lbl = document.getElementById('plannerWeekLabel');
   if(lbl) lbl.textContent = plannerWeekLabelText(weekId);
   renderPlannerGrid();
-  renderPlannerNotes();
 }
 function navigatePlannerWeek(delta){
   const monday = isoWeekMonday(plannerWeek);
@@ -2723,8 +2721,7 @@ async function addPlannerTask(dayKey, view){
   if(home){ await renderHomePlanner(); const f = document.getElementById('hpText_'+dayKey); if(f) f.focus(); }
 }
 async function refreshPlanners(){
-  if(plannerWeek){ plannerMaint = await plannerMaintenanceItems(); renderPlannerGrid(); }
-  renderPlannerNotes();
+  if(plannerWeek){ plannerMaint = await plannerMaintenanceItems(); plannerNotesData = await loadPlannerNotesWeek(plannerWeek); renderPlannerGrid(); }
   renderHomePlanner();
   renderHomeBanner();
 }
@@ -2748,6 +2745,7 @@ function renderPlannerGrid(){
   const el = document.getElementById('plannerGrid');
   if(!el || !plannerWeek) return;
   const days = plannerWeekDays(plannerWeek);
+  const restore = keepNoteDrafts(el);
   el.innerHTML = days.map((d,i)=>{
     const tasks = (plannerData[d] || []).slice().sort((a,b)=>(a.time||'').localeCompare(b.time||''));
     const rows = tasks.map(t=>`
@@ -2766,76 +2764,104 @@ function renderPlannerGrid(){
         <input type="text" id="plannerText_${d}" placeholder="Cosa devi fare..." onkeydown="if(event.key==='Enter') addPlannerTask('${d}')">
         <button class="btn-ghost" onclick="addPlannerTask('${d}')">+</button>
       </div>
+      ${plannerDayNotesHtml(plannerWeek, d, plannerNotesData[d]||[], 'page')}
     </div>`;
   }).join('');
+  restore();
 }
 
 /* ---- Note del planner ----
-   Promemoria fissi, non legati a un giorno né a una settimana: non si spuntano, restano finché non si eliminano.
-   Stanno in 'planner-notes' (sezione planner, quindi stessi permessi del planner) e compaiono sia nella pagina
-   del planner sia nel planner della home. */
-async function loadPlannerNotes(){
-  try{ const r = await storageGet('planner-notes'); const v = r ? JSON.parse(r.value) : []; return Array.isArray(v) ? v : []; }catch(e){ return []; }
+   Giorno per giorno come gli impegni, ma non si spuntano: restano lì finché non si eliminano.
+   Stanno in 'plannernotes:<settimana>' = {giorno:[{id,text}]} (sezione planner, stessi permessi degli impegni),
+   a parte dagli impegni così conteggi, banner e ricerca degli impegni non cambiano.
+   Compaiono nella pagina del planner e nel planner della home. */
+async function loadPlannerNotesWeek(weekId){
+  let data = {};
+  try{ const r = await storageGet('plannernotes:'+weekId); data = r ? JSON.parse(r.value) : {}; }catch(e){ data = {}; }
+  return (data && typeof data==='object' && !Array.isArray(data)) ? data : {};
 }
-async function savePlannerNotes(list){
-  try{ await storageSet('planner-notes', JSON.stringify(list)); }catch(e){}
+async function savePlannerNotesWeek(weekId, data){
+  try{ await storageSet('plannernotes:'+weekId, JSON.stringify(data)); }catch(e){}
 }
-function plannerNotesHtml(notes, view){
+// Prima versione: le note erano un elenco unico ('planner-notes'). Le sposto una volta sul giorno in cui erano state scritte.
+let plannerNotesMigrated = false;
+async function migrateLegacyPlannerNotes(){
+  if(plannerNotesMigrated) return; plannerNotesMigrated = true;
+  if(!canEdit('planner')) return;
+  let old = [];
+  try{ const r = await storageGet('planner-notes'); old = r ? JSON.parse(r.value) : []; }catch(e){ return; }
+  if(!Array.isArray(old) || !old.length) return;
+  const byWeek = {};
+  old.forEach(n=>{
+    if(!n || !n.text) return;
+    const day = String(n.created||'').slice(0,10) || todayStr();
+    const w = isoWeek(day);
+    (byWeek[w] = byWeek[w] || {});
+    (byWeek[w][day] = byWeek[w][day] || []).push({id:n.id, text:n.text});
+  });
+  for(const w of Object.keys(byWeek)){
+    const data = await loadPlannerNotesWeek(w);
+    Object.keys(byWeek[w]).forEach(d=>{ data[d] = (data[d]||[]).concat(byWeek[w][d].filter(n=>!(data[d]||[]).some(x=>x.id===n.id))); });
+    await savePlannerNotesWeek(w, data);
+  }
+  await storageSet('planner-notes', '[]');
+}
+function plannerDayNotesHtml(weekId, dayKey, notes, view){
   const edit = canEdit('planner');
-  const pre = view==='home' ? 'hp' : 'planner';
+  const home = view==='home';
+  const pre = home ? 'hp' : 'planner';
+  if(!edit && !notes.length) return '';
   const items = notes.map(n=>{
     const id = escHtml(escJs(n.id));
     const body = edit
-      ? `<textarea class="pn-text" rows="1" title="Clicca per modificare" oninput="autoGrowNote(this)" onchange="updatePlannerNote('${id}', this.value)">${escHtml(n.text)}</textarea>`
+      ? `<textarea class="pn-text" rows="1" title="Clicca per modificare" oninput="autoGrowNote(this)" onchange="updatePlannerNote('${weekId}','${dayKey}','${id}', this.value)">${escHtml(n.text)}</textarea>`
       : `<div class="pn-text">${escHtml(n.text)}</div>`;
-    return `<div class="pn-item" data-nid="${escHtml(n.id)}">${body}${edit?`<button class="pn-del" title="Elimina nota" onclick="deletePlannerNote('${id}')">×</button>`:''}</div>`;
+    return `<div class="pn-item" data-nid="${escHtml(n.id)}">${body}${edit?`<button class="pn-del" title="Elimina nota" onclick="deletePlannerNote('${weekId}','${dayKey}','${id}')">×</button>`:''}</div>`;
   }).join('');
   const add = edit ? `<div class="pn-add">
-      <textarea id="${pre}NoteText" rows="1" placeholder="Scrivi una nota da tenere sempre in vista… (Invio per aggiungere, Maiusc+Invio per andare a capo)" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); addPlannerNote('${view==='home'?'home':''}');}"></textarea>
-      <button class="btn-ghost" onclick="addPlannerNote('${view==='home'?'home':''}')">+ Nota</button>
+      <textarea id="${pre}Note_${dayKey}" rows="1" placeholder="Nota..." title="Invio per aggiungere, Maiusc+Invio per andare a capo" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); addPlannerNote('${dayKey}','${home?'home':''}');}"></textarea>
+      <button class="btn-ghost" title="Aggiungi nota" onclick="addPlannerNote('${dayKey}','${home?'home':''}')">+</button>
     </div>` : '';
-  return `<div class="pn-head">Note ${notes.length?`<span class="hp-n">${notes.length}</span>`:''}<span class="pn-sub">restano qui finché non le elimini</span></div>
-    ${notes.length ? `<div class="pn-list">${items}</div>` : `<div class="pn-empty">Nessuna nota.</div>`}${add}`;
+  return `<div class="pn-day"><div class="pn-title">Note</div>${items}${add}</div>`;
 }
 function autoGrowNote(ta){ ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
-function autoGrowNotesIn(el){ el.querySelectorAll('textarea.pn-text').forEach(autoGrowNote); }
-async function renderPlannerNotes(){
-  const el = document.getElementById('plannerNotes');
-  if(!el) return;
-  const notes = await loadPlannerNotes();
-  // se si sta scrivendo una nota nuova non la perdo al ridisegno
-  const draft = (document.getElementById('plannerNoteText')||{}).value || '';
-  el.innerHTML = plannerNotesHtml(notes, 'page');
-  const ta = document.getElementById('plannerNoteText'); if(ta && draft) ta.value = draft;
-  autoGrowNotesIn(el);
+function autoGrowNotesIn(el){ if(el) el.querySelectorAll('textarea.pn-text').forEach(autoGrowNote); }
+// al ridisegno non perdo una nota che si sta ancora scrivendo
+function keepNoteDrafts(el){
+  const drafts = {};
+  if(el) el.querySelectorAll('.pn-add textarea').forEach(t=>{ if(t.value) drafts[t.id] = t.value; });
+  return ()=>{ Object.entries(drafts).forEach(([id,v])=>{ const t = document.getElementById(id); if(t) t.value = v; }); autoGrowNotesIn(el); };
 }
-async function addPlannerNote(view){
-  const input = document.getElementById((view==='home'?'hp':'planner')+'NoteText');
+async function addPlannerNote(dayKey, view){
+  const home = view==='home';
+  const input = document.getElementById((home?'hp':'planner')+'Note_'+dayKey);
   const text = input ? input.value.trim() : '';
   if(!text){ toast('Scrivi la nota'); return; }
-  const notes = await loadPlannerNotes();
-  const now = new Date().toISOString();
-  notes.unshift({id: Date.now()+'-'+Math.random().toString(36).slice(2,6), text, created: now, updated: now});
+  const weekId = home ? homePlannerWeek : plannerWeek;
+  const data = await loadPlannerNotesWeek(weekId);
+  (data[dayKey] = data[dayKey] || []).push({id: Date.now()+'-'+Math.random().toString(36).slice(2,6), text});
   input.value = '';
-  await savePlannerNotes(notes);
+  await savePlannerNotesWeek(weekId, data);
   await refreshPlanners();
-  const f = document.getElementById((view==='home'?'hp':'planner')+'NoteText'); if(f) f.focus();
+  const f = document.getElementById((home?'hp':'planner')+'Note_'+dayKey); if(f) f.focus();
 }
-async function updatePlannerNote(id, value){
+async function updatePlannerNote(weekId, dayKey, id, value){
   const text = String(value||'').trim();
-  const notes = await loadPlannerNotes();
-  const n = notes.find(x=>x.id===id);
+  const data = await loadPlannerNotesWeek(weekId);
+  const n = (data[dayKey]||[]).find(x=>x.id===id);
   if(!n) return;
-  if(!text){ if(confirm('La nota è vuota: eliminarla?')) return deletePlannerNote(id, true); refreshPlanners(); return; }
+  if(!text){ if(confirm('La nota è vuota: eliminarla?')) return deletePlannerNote(weekId, dayKey, id, true); refreshPlanners(); return; }
   if(n.text===text) return;
-  n.text = text; n.updated = new Date().toISOString();
-  await savePlannerNotes(notes);
+  n.text = text;
+  await savePlannerNotesWeek(weekId, data);
   refreshPlanners();
 }
-async function deletePlannerNote(id, confirmed){
+async function deletePlannerNote(weekId, dayKey, id, confirmed){
   if(!confirmed && !confirm('Eliminare questa nota?')) return;
-  const notes = (await loadPlannerNotes()).filter(x=>x.id!==id);
-  await savePlannerNotes(notes);
+  const data = await loadPlannerNotesWeek(weekId);
+  data[dayKey] = (data[dayKey]||[]).filter(x=>x.id!==id);
+  if(!data[dayKey].length) delete data[dayKey];
+  await savePlannerNotesWeek(weekId, data);
   refreshPlanners();
 }
 
@@ -2876,11 +2902,18 @@ async function collectPlannerItems(){
       });
     });
   }
-  (await loadPlannerNotes()).forEach(n=>{
-    if(!n || !n.text) return;
-    const day = String(n.created||'').slice(0,10) || todayStr();
-    items.push({kind:'note', weekId:isoWeek(day), day, id:n.id, time:'', text:n.text, done:false, hay:psNorm(n.text+' nota note')});
-  });
+  const noteKeys = ((await storageList('plannernotes:')) || {}).keys || [];
+  for(const key of noteKeys){
+    const weekId = key.slice('plannernotes:'.length);
+    let data = {};
+    try{ const r = await storageGet(key); data = r ? JSON.parse(r.value) : {}; }catch(e){ continue; }
+    Object.keys(data||{}).forEach(day=>{
+      (data[day]||[]).forEach(n=>{
+        if(!n || !n.text) return;
+        items.push({kind:'note', weekId, day, id:n.id, time:'', text:n.text, done:false, hay:psNorm(n.text+' nota note')});
+      });
+    });
+  }
   (await plannerMaintenanceItems()).forEach(m=>{
     const text = `Manutenzione ${m.plant} — ${m.desc} (${m.sub})`;
     items.push({kind:'maint', weekId:isoWeek(m.day), day:m.day, id:m.id, time:'', text, done:m.done, hay:psNorm(text+' manutenzione intervento')});
@@ -2909,26 +2942,22 @@ async function runPlannerSearch(){
   const all = await collectPlannerItems();
   // nel frattempo il testo potrebbe essere cambiato: mostra solo l'ultima ricerca
   if((document.getElementById('plannerSearchText').value || '').trim() !== q) return;
-  // le note non hanno una data: valgono sempre, qualunque periodo si scelga
   const hits = all.filter(it=>
     words.every(w=>it.hay.includes(w)) &&
-    (it.kind==='note' || scope==='all' || (scope==='future' ? it.day>=today : it.day<today)) &&
+    (scope==='all' || (scope==='future' ? it.day>=today : it.day<today)) &&
     (!onlyOpen || !it.done)
   );
   if(!hits.length){ box.innerHTML = '<p class="empty" style="padding:8px 0;">Nessun impegno trovato.</p>'; return; }
   const byTime = (a,b)=>a.day.localeCompare(b.day) || (a.time||'').localeCompare(b.time||'');
-  const notes = hits.filter(h=>h.kind==='note');
-  const dated = hits.filter(h=>h.kind!=='note');
-  const future = dated.filter(h=>h.day>=today).sort(byTime);          // dal più vicino
-  const past = dated.filter(h=>h.day<today).sort(byTime).reverse();   // dal più recente
+  const future = hits.filter(h=>h.day>=today).sort(byTime);          // dal più vicino
+  const past = hits.filter(h=>h.day<today).sort(byTime).reverse();   // dal più recente
   const longDate = d => new Date(d+'T00:00:00').toLocaleDateString('it-IT',{weekday:'short', day:'2-digit', month:'short', year:'numeric'});
   const row = h => `<div class="ps-item ${h.done?'done':''}" onclick="openPlannerSearchHit('${h.weekId}','${h.day}','${escHtml(escJs(h.id||''))}','${h.kind}')">
-      <span class="ps-date ${h.day===today&&h.kind!=='note'?'today':''}">${h.kind==='note'?'Nota':(h.day===today?'Oggi':longDate(h.day))}${h.time?' · '+escHtml(h.time):''}</span>
+      <span class="ps-date ${h.day===today?'today':''}">${h.day===today?'Oggi':longDate(h.day)}${h.time?' · '+escHtml(h.time):''}</span>
       <span class="ps-text">${psHighlight(h.text, words)}</span>
-      ${h.kind==='extra'?'<span class="ps-tag">turno aggiuntivo</span>':''}${h.kind==='maint'?'<span class="ps-tag">manutenzione</span>':''}${h.done?'<span class="ps-tag">fatto</span>':''}
+      ${h.kind==='extra'?'<span class="ps-tag">turno aggiuntivo</span>':''}${h.kind==='maint'?'<span class="ps-tag">manutenzione</span>':''}${h.kind==='note'?'<span class="ps-tag">nota</span>':''}${h.done?'<span class="ps-tag">fatto</span>':''}
     </div>`;
   let html = `<p class="note" style="margin:0;">${hits.length} risultat${hits.length===1?'o':'i'}</p>`;
-  if(notes.length) html += `<div class="ps-group">Note (${notes.length})</div>` + notes.map(row).join('');
   if(future.length) html += `<div class="ps-group">Da oggi in poi (${future.length})</div>` + future.map(row).join('');
   if(past.length) html += `<div class="ps-group">Passati (${past.length})</div>` + past.map(row).join('');
   box.innerHTML = html;
@@ -2936,16 +2965,10 @@ async function runPlannerSearch(){
 async function openPlannerSearchHit(weekId, day, id, kind){
   if(kind==='extra' && typeof openExtraShift==='function' && canView('aggiuntivi')){ openExtraShift(id); return; }
   if(kind==='maint'){ showPage('panel-maintenance'); return; }
-  if(kind==='note'){
-    const box = document.getElementById('plannerNotes');
-    const t = box && box.querySelector(`[data-nid="${CSS.escape(id)}"]`);
-    if(t){ t.scrollIntoView({behavior:'smooth', block:'center'}); t.classList.add('ps-flash'); setTimeout(()=>t.classList.remove('ps-flash'), 1800); }
-    return;
-  }
   await switchPlannerWeek(weekId);
   const grid = document.getElementById('plannerGrid');
   if(!grid) return;
-  const target = (id && grid.querySelector(`[data-tid="${CSS.escape(id)}"]`)) || grid.querySelector(`[data-day="${day}"]`);
+  const target = (id && grid.querySelector(kind==='note' ? `[data-nid="${CSS.escape(id)}"]` : `[data-tid="${CSS.escape(id)}"]`)) || grid.querySelector(`[data-day="${day}"]`);
   if(!target) return;
   target.scrollIntoView({behavior:'smooth', block:'center'});
   target.classList.add('ps-flash');
@@ -3298,7 +3321,8 @@ async function renderHomePlanner(scrollToToday){
     if(week!==homePlannerWeek) return;
   }
   const maint = await plannerMaintenanceItems();
-  const notes = await loadPlannerNotes();
+  await migrateLegacyPlannerNotes();
+  const notes = await loadPlannerNotesWeek(week);
   if(week!==homePlannerWeek) return;
   const extraHtml = d => extras.filter(x=>x.date===d).map(x=>{
     const ppl = extraSortedPeople(x);
@@ -3359,12 +3383,12 @@ async function renderHomePlanner(scrollToToday){
     return `<div class="hp-day ${d===today?'today':''} ${d<today?'past':''}" data-day="${d}">
       <div class="hp-head"><b>${DAY_NAMES_IT[i]}${d===today?'<span class="hp-today">oggi</span>':''}</b><span>${dd}</span></div>
       <div class="hp-sec hp-sec-tasks"><div class="hp-sec-title">Impegni${tasks.length?` <span class="hp-n" title="da fare / totale">${tasks.filter(t=>!t.done).length}/${tasks.length}</span>`:''}</div>
-      <div class="hp-tasks">${rows}</div>${add}</div>${extraHtml(d)}${plannerMaintenanceHtml(maint, d)}${coverageHtml(d)}
+      <div class="hp-tasks">${rows}</div>${add}</div>${plannerDayNotesHtml(week, d, notes[d]||[], 'home')}${extraHtml(d)}${plannerMaintenanceHtml(maint, d)}${coverageHtml(d)}
     </div>`;
   }).join('');
   const count = tot ? (open ? `${open} da fare su ${tot}` : `tutti fatti (${tot})`) : 'nessun impegno';
   el.style.display = '';
-  const noteDraft = (document.getElementById('hpNoteText')||{}).value || '';
+  const restoreNotes = keepNoteDrafts(el);
   el.innerHTML = `<div class="today-head"><h2>Planner della settimana</h2>
       <div class="hp-nav">
         <button class="btn-ghost" onclick="navigateHomePlanner(-1)" title="Settimana precedente">‹</button>
@@ -3373,10 +3397,8 @@ async function renderHomePlanner(scrollToToday){
         ${week!==curWeek?`<button class="btn-ghost" onclick="navigateHomePlanner(0)">questa settimana</button>`:''}
         <span class="hp-count">${count}</span>
       </div></div>
-    <div class="hp-grid">${cols}</div>
-    <div class="pn-wrap" id="homePlannerNotes">${plannerNotesHtml(notes, 'home')}</div>`;
-  { const ta = document.getElementById('hpNoteText'); if(ta && noteDraft) ta.value = noteDraft; }
-  autoGrowNotesIn(el);
+    <div class="hp-grid">${cols}</div>`;
+  restoreNotes();
   // su telefono i giorni scorrono di lato: porto in vista oggi
   if(scrollToToday===true && window.innerWidth<1000){
     const t = el.querySelector('.hp-day.today'), g = el.querySelector('.hp-grid');
