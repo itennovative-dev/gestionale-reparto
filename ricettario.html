@@ -310,7 +310,7 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
           <label for="struct">Struttura</label>
           <input type="text" id="struct" value="PET 12 + AL 9 + PE 50">
           <div class="chips" id="chips" aria-live="polite"></div>
-          <div class="hint">Separa gli strati con + o /. Film in µm, carta e adesivo in g/m² (es. CARTA 40). Metallizzati: PET MET 12, BOPP MET 20.</div>
+          <div class="hint">Separa gli strati con + o /. Film in µm, carta e adesivo in g/m² (es. CARTA 40). Metallizzati: PET MET 12, BOPP MET 20. PE estruso: PE/EST 20 (non aggiunge adesivo sulle sue giunzioni).</div>
         </div>
         <div class="row2">
           <div class="field"><label for="w">Larghezza fascia (mm)</label><input type="number" id="w" value="150" min="1" step="0.5"></div>
@@ -454,6 +454,7 @@ const DEFAULT_MATS = {
   PERL: {label:'OPP perlato',    dens:0.65,  sigma:2.0, v:400, cls:'medio',       unit:'um'},
   CPP:  {label:'CPP',            dens:0.90,  sigma:2.0, v:380, cls:'estensibile', unit:'um'},
   PE:   {label:'PE (LD / LLD)',  dens:0.925, sigma:1.8, v:350, cls:'estensibile', unit:'um'},
+  PEEST:{label:'PE/EST (estruso)', dens:0.92, sigma:1.4, v:330, cls:'estensibile', unit:'um'},
   HDPE: {label:'HDPE',           dens:0.95,  sigma:2.2, v:370, cls:'estensibile', unit:'um'},
   OPA:  {label:'OPA / nylon',    dens:1.14,  sigma:2.5, v:420, cls:'medio',       unit:'um'},
   ALU:  {label:'Alluminio',      dens:2.71,  sigma:5.0, v:400, cls:'alluminio',   unit:'um'},
@@ -469,6 +470,7 @@ const ALIAS = {
   PERLATO:'PERL',OPPPERLATO:'PERL',BOPPPERLATO:'PERL',OPPPERL:'PERL',PERL:'PERL',OPPW:'PERL',
   CPP:'CPP',PPC:'CPP',PP:'CPP',
   PE:'PE',LDPE:'PE',LLDPE:'PE',MDPE:'PE',PEBD:'PE',PEB:'PE',PEBIANCO:'PE',PETRASP:'PE',POLIETILENE:'PE',
+  PEEST:'PEEST',PEESTR:'PEEST',PEESTRUSO:'PEEST',LDPEEST:'PEEST',LLDPEEST:'PEEST',PEEXT:'PEEST',EXTPE:'PEEST',PEESTRUSIONE:'PEEST',
   HDPE:'HDPE',PEAD:'HDPE',
   OPA:'OPA',PA:'OPA',BOPA:'OPA',NYLON:'OPA',
   AL:'ALU',ALU:'ALU',ALL:'ALU',ALLU:'ALU',ALLUMINIO:'ALU',
@@ -481,7 +483,7 @@ const DEFAULT_CFG = {
   coreWall:6, motherCoreOD:170, air:2, adh:2.5, kRew:1.10, corr:1.00, change:6, rampUp:200, rampDn:80, rollVel:0, rollDiam:10,
   fW25:0.75, fW50:0.90, fW100:1.00, fBig:0.95, fThick:0.90,
   tp3:10, tp5:15, tp8:20, tp12:25, tpMax:30, tpStretch:5, tpPaper:-5,
-  q25:60, q50:90, q100:130, q200:170, qMax:220, qStretch:0.80, qMet:0.85, qFast:1.15, qFastV:350,
+  q25:60, q50:90, q100:130, q200:170, qMax:220, qStretch:0.80, qMet:0.85, qFast:1.15, qFastV:350, qEst:0.90,
   shearT:120, stretchShare:85, rollNperBar:0, rollChar:100, periShare:50, cpStart:0, cpChar:0
 };
 const CFG_GROUPS = [
@@ -504,6 +506,7 @@ const CFG_GROUPS = [
   ['Rullatura: carico lineare (N/m) per spessore totale', [
     ['q25','Sotto 25 µm'],['q50','25–50 µm'],['q100','50–100 µm'],['q200','100–200 µm'],['qMax','Oltre 200 µm'],
     ['qStretch','Fattore materiale estensibile'],['qMet','Fattore metallizzato'],
+    ['qEst','Fattore PE/EST in faccia esterna (più grip tra le spire)'],
     ['qFast','Fattore alta velocità'],['qFastV','Soglia alta velocità (m/min)'],
     ['rollVel','Rullatura Vel% predefinito'],['rollDiam','Rullatura Diam% predefinito']]],
   ['Velocità', [
@@ -691,9 +694,14 @@ function lookup(raw){
   return null;
 }
 
+// "PE/EST" contiene la barra che separa gli strati: la tolgo prima di dividere
+function normStruct(str){ return String(str).replace(/((?:LL|LD)?PE)\s*\/\s*(EST(?:R(?:USO|USIONE)?)?)(?![A-Z])/gi, '$1 $2'); }
+// giunzioni con adesivo: quelle tra due strati senza PE/EST (lo strato estruso fa già da legante)
+function adhJoints(keys){ let n=0; for(let i=0;i<keys.length-1;i++) if(keys[i]!=='PEEST' && keys[i+1]!=='PEEST') n++; return n; }
+
 function parseStruct(str){
   const layers=[], errors=[];
-  str.split(/[+\/]/).map(s=>s.trim()).filter(Boolean).forEach(tok=>{
+  normStruct(str).split(/[+\/]/).map(s=>s.trim()).filter(Boolean).forEach(tok=>{
     const m = tok.match(/^(.*?)(\d+(?:[.,]\d+)?)\s*(µm|um|my|mic|micron|g\/m2|g\/m²|gsm|gr|g)?\s*$/i);
     if(!m || !m[1].trim()){ errors.push(tok); return; }
     const L = lookup(m[1]); if(!L){ errors.push(tok); return; }
@@ -705,8 +713,9 @@ function parseStruct(str){
     layers.push({key:L.key, met:L.met, name:m[1].trim().toUpperCase(), val, t, g, gsmIn});
   });
   const structural = layers.filter(l=>l.key!=='ADH');
-  if(structural.length>=2 && !layers.some(l=>l.key==='ADH') && CFG.adh>0){
-    const g = CFG.adh*(structural.length-1);
+  const nJ = adhJoints(structural.map(l=>l.key));
+  if(nJ>0 && !layers.some(l=>l.key==='ADH') && CFG.adh>0){
+    const g = CFG.adh*nJ;
     layers.push({key:'ADH', auto:true, name:'ADESIVO', val:g, t:g/MATS.ADH.dens, g, gsmIn:true});
   }
   return {layers, errors};
@@ -731,6 +740,7 @@ function contactLoad(ctx, v){
   let q = ctx.T<25?CFG.q25 : ctx.T<50?CFG.q50 : ctx.T<100?CFG.q100 : ctx.T<200?CFG.q200 : CFG.qMax;
   if(ctx.stretchDom) q *= CFG.qStretch;
   if(ctx.hasMet) q *= CFG.qMet;
+  if(ctx.estOuter) q *= CFG.qEst;
   if(v>CFG.qFastV) q *= CFG.qFast;
   return Math.round(q/5)*5;
 }
@@ -759,7 +769,9 @@ function compute(){
   const ctx = {
     T, G, stretchDom: share('estensibile')>=CFG.stretchShare/100,
     hasAlu: structural.some(l=>l.key==='ALU'), hasPaper: structural.some(l=>l.key==='CARTA'),
-    hasMet: structural.some(l=>l.met), isLam: structural.length>1
+    hasMet: structural.some(l=>l.met), isLam: structural.length>1,
+    hasEst: structural.some(l=>l.key==='PEEST'),
+    estOuter: structural[0].key==='PEEST' || structural[structural.length-1].key==='PEEST'
   };
   const S = structural.reduce((s,l)=>s+MATS[l.key].sigma*l.t,0);
   const nPerMm = S/1000*CFG.corr;
@@ -891,6 +903,9 @@ function compute(){
   if(R > 12) A.push(['warn',`Rapporto di avvolgimento alto (${nf(R,1)}): controlla la durezza a metà bobina, il taper conta più del solito.`]);
   if(ctx.stretchDom) A.push(['warn','Materiale estensibile: non superare la tensione indicata. Troppa tensione restringe la fascia e fa bobine dure che si incollano.']);
   if(ctx.hasAlu) A.push(['info','Alluminio in struttura: lame affilate, controlla bave e polvere ogni cambio. Evita strappi di tensione in partenza.']);
+  if(ctx.hasEst) A.push(['info','PE estruso in struttura: i bordi della madre sono più spessi (restringimento del film estruso). Controlla che il rifilo tolga tutto il cordolo, altrimenti le fasce esterne avvolgono più dure.']);
+  if(ctx.estOuter) A.push(['warn', `PE estruso in faccia esterna: fa più presa tra le spire e tende a incollarsi. Rullatura ridotta del ${nf((1-CFG.qEst)*100)}%; non alzare tensione e taper oltre il calcolato.`]);
+  if(ctx.estOuter && knife.type.startsWith('Rasoio')) A.push(['info','PE estruso morbido sul bordo: con il rasoio controlla capelli d\'angelo e bave a inizio bobina; lama affilata.']);
   if(ctx.hasMet) A.push(['info','Strato metallizzato: tensioni e pressione del rullo contenute, per non criccare il metallo.']);
   if(printed) A.push(['info','Prima di avviare verifica sulla scheda cliente il lato stampa e il senso di avvolgimento.']);
   if(Lmother>0 && sets<1) A.push(['crit','La bobina madre non basta per una tiratura completa.']);
@@ -923,7 +938,7 @@ function render(){
     $('outActions').hidden = true;
     renderDiag();
     renderLaserSide();
-    out.innerHTML = `<div class="panel err-box">${r.errors.length ? 'Correggi gli strati non riconosciuti nella struttura. Materiali accettati: PET, BOPP/OPP, OPP perlato, CPP, PE, HDPE, OPA, AL, PVC, PS, EVOH, CARTA, ADH.' : 'Completa struttura, larghezza fascia, numero fasce e obiettivo bobina.'}</div>`;
+    out.innerHTML = `<div class="panel err-box">${r.errors.length ? 'Correggi gli strati non riconosciuti nella struttura. Materiali accettati: PET, BOPP/OPP, OPP perlato, CPP, PE, PE/EST, HDPE, OPA, AL, PVC, PS, EVOH, CARTA, ADH.' : 'Completa struttura, larghezza fascia, numero fasce e obiettivo bobina.'}</div>`;
     return;
   }
   const U = CFG.unit;

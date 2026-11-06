@@ -25,6 +25,9 @@ jobs:
       - name: Test del ricettario laser (se fallisce, il sito non viene aggiornato)
         run: node tests/ricettario-laser.test.mjs
 
+      - name: Test della struttura del ricettario (se fallisce, il sito non viene aggiornato)
+        run: node tests/ricettario-struttura.test.mjs
+
       - name: Prepara la cartella del sito (solo le pagine, nessun documento)
         run: |
           mkdir -p public
