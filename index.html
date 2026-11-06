@@ -212,6 +212,9 @@
   .pn-item textarea.pn-text:focus{outline:1px dashed #c9b878; outline-offset:2px;}
   .pn-del{border:none; background:none; color:var(--sub); cursor:pointer; padding:0 2px; font-size:15px; line-height:1; flex:none;}
   .pn-del:hover{color:var(--danger);}
+  .pl-move{border:none; background:none; color:#2f5fa7; cursor:pointer; padding:0 3px; font-size:16px; font-weight:700; line-height:1; flex:none; width:auto;}
+  .pl-move:hover{color:#163f7a; transform:translateX(2px);}
+  @media print{ .pl-move{display:none !important;} }
   .pn-add{display:flex; gap:5px; margin-top:5px; align-items:flex-start;}
   .pn-add textarea{flex:1; min-width:0; resize:vertical; min-height:30px; font:inherit; font-size:12.5px; padding:5px 7px;}
   .pn-add button{flex:none; padding:5px 9px;}
@@ -2741,6 +2744,31 @@ async function deletePlannerTask(weekId, dayKey, id){
   if(plannerWeek===weekId) plannerData = data;
   refreshPlanners();
 }
+/* ---- Sposta impegno o nota al giorno dopo (anche da domenica al lunedì della settimana dopo) ---- */
+function plannerNextDay(d){ const x = new Date(d+'T00:00:00'); x.setDate(x.getDate()+1); return toLocalDateStr(x); }
+function plannerDayLabel(d){ return new Date(d+'T00:00:00').toLocaleDateString('it-IT',{weekday:'long', day:'2-digit', month:'2-digit'}); }
+async function plannerMoveNext(kind, weekId, dayKey, id){
+  if(!canEdit('planner')) return;
+  const load = kind==='note' ? loadPlannerNotesWeek : loadPlannerWeek;
+  const save = kind==='note' ? savePlannerNotesWeek : savePlannerWeek;
+  const next = plannerNextDay(dayKey), nextWeek = isoWeek(next);
+  const src = await load(weekId);
+  const item = (src[dayKey]||[]).find(x=>x.id===id);
+  if(!item) return;
+  src[dayKey] = src[dayKey].filter(x=>x.id!==id);
+  if(!src[dayKey].length) delete src[dayKey];
+  const dst = nextWeek===weekId ? src : await load(nextWeek);
+  (dst[next] = dst[next] || []).push(item);
+  // prima scrivo la destinazione, poi tolgo dall'origine: se una scrittura salta, l'elemento non si perde
+  if(dst!==src) await save(nextWeek, dst);
+  await save(weekId, src);
+  if(kind!=='note' && plannerWeek===weekId) plannerData = src;
+  toast(`${kind==='note'?'Nota spostata':'Impegno spostato'} a ${plannerDayLabel(next)}`);
+  refreshPlanners();
+}
+function plannerMoveBtn(kind, weekId, dayKey, id, cls){
+  return `<button class="${cls}" title="Sposta al giorno dopo" aria-label="Sposta al giorno dopo" onclick="plannerMoveNext('${kind}','${weekId}','${dayKey}','${id}')">→</button>`;
+}
 function renderPlannerGrid(){
   const el = document.getElementById('plannerGrid');
   if(!el || !plannerWeek) return;
@@ -2753,6 +2781,7 @@ function renderPlannerGrid(){
         <input type="checkbox" ${t.done?'checked':''} onchange="togglePlannerTask('${plannerWeek}','${d}','${t.id}')">
         ${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span>`:''}
         <span class="planner-task-text">${escHtml(t.text)}</span>
+        ${canEdit('planner') ? plannerMoveBtn('task', plannerWeek, d, escHtml(escJs(t.id)), 'pl-move') : ''}
         <button class="btn-danger" onclick="deletePlannerTask('${plannerWeek}','${d}','${t.id}')">×</button>
       </div>`).join('') || '<p class="empty" style="padding:6px 0; font-size:12px;">Nessun impegno.</p>';
     return `<div class="planner-day" data-day="${d}">
@@ -2816,7 +2845,7 @@ function plannerDayNotesHtml(weekId, dayKey, notes, view){
     const body = edit
       ? `<textarea class="pn-text" rows="1" title="Clicca per modificare" oninput="autoGrowNote(this)" onchange="updatePlannerNote('${weekId}','${dayKey}','${id}', this.value)">${escHtml(n.text)}</textarea>`
       : `<div class="pn-text">${escHtml(n.text)}</div>`;
-    return `<div class="pn-item" data-nid="${escHtml(n.id)}">${body}${edit?`<button class="pn-del" title="Elimina nota" onclick="deletePlannerNote('${weekId}','${dayKey}','${id}')">×</button>`:''}</div>`;
+    return `<div class="pn-item" data-nid="${escHtml(n.id)}">${body}${edit?plannerMoveBtn('note', weekId, dayKey, id, 'pl-move'):''}${edit?`<button class="pn-del" title="Elimina nota" onclick="deletePlannerNote('${weekId}','${dayKey}','${id}')">×</button>`:''}</div>`;
   }).join('');
   const add = edit ? `<div class="pn-add">
       <textarea id="${pre}Note_${dayKey}" rows="1" placeholder="Nota..." title="Invio per aggiungere, Maiusc+Invio per andare a capo" onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); addPlannerNote('${dayKey}','${home?'home':''}');}"></textarea>
@@ -3372,6 +3401,7 @@ async function renderHomePlanner(scrollToToday){
     const rows = tasks.map(t=>`<div class="hp-task ${t.done?'done':''}">
         <input type="checkbox" ${t.done?'checked':''} title="Fatto" onchange="togglePlannerTask('${week}','${d}','${escHtml(escJs(t.id))}')">
         <span class="hp-text">${t.time?`<span class="planner-task-time">${escHtml(t.time)}</span> `:''}${escHtml(t.text)}</span>
+        ${edit?plannerMoveBtn('task', week, d, escHtml(escJs(t.id)), 'pl-move'):''}
         ${edit?`<button class="hp-del" title="Elimina" onclick="deletePlannerTask('${week}','${d}','${escHtml(escJs(t.id))}')">×</button>`:''}
       </div>`).join('') || `<div class="hp-empty">Nessun impegno</div>`;
     const add = edit ? `<div class="hp-add">
