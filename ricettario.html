@@ -343,7 +343,8 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
     <div class="rcol">
       <section class="out" id="out" aria-live="polite"></section>
       <div class="actions" id="outActions">
-        <button type="button" id="pdfBtn" hidden>Scheda A4 (PDF)</button>
+        <button type="button" id="printBtn">Stampa scheda</button>
+        <button type="button" id="pdfBtn" class="ghost" hidden>Scheda A4 (PDF)</button>
         <button type="button" id="xlsBtn" class="ghost" hidden>Scarica Excel</button>
         <button type="button" id="copyBtn">Copia ricetta</button>
         <span class="toast" id="copyToast"></span>
@@ -427,7 +428,7 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
         <h3>Storico interventi impianto <span class="calMach">116</span></h3>
         <div class="logform">
           <input type="date" id="logDate" aria-label="Data intervento">
-          <input type="text" id="logText" placeholder="Es. tarate celle di carico, sostituiti feltri albero A" aria-label="Descrizione intervento">
+          <input type="text" id="logText" placeholder="Es. tarate celle di carico, sostituiti feltri albero superiore" aria-label="Descrizione intervento">
           <button type="button" id="logAdd">Aggiungi</button>
         </div>
         <ul class="loglist" id="logList"></ul>
@@ -529,7 +530,7 @@ const LZ_TIPI = {scoring:'Scoring (longitudinale)', trasversale:'Incisione trasv
 const LZ_STATI = {prova:'in prova', validata:'validata'};
 // Parametri di avvolgimento della ricetta laser, nelle unità del pannello LAEM TR 415: [chiave, nome, unità, decimali]
 const LZ_KEYS = [
-  ['unw','Svolgitore · Tensione Set','',1], ['rewA','Albero A · Set','N/cm',2], ['rewB','Albero B · Set','N/cm',2],
+  ['unw','Svolgitore · Tensione Set','',1], ['rewA','Albero superiore · Set','N/cm',2], ['rewB','Albero inferiore · Set','N/cm',2],
   ['taper','Taper','%',0], ['rollA','Rullatura A','N',0], ['rollB','Rullatura B','N',0],
   ['rollVel','Rullatura Vel%','%',0], ['rollDiam','Rullatura Diam%','%',0],
   ['v','Velocità Set','m/min',0], ['rup','Ramp+','s',0], ['rdn','Ramp−','s',0]
@@ -1112,8 +1113,8 @@ function render(){
     <div class="st">
       <div class="st-h"><h3>3 · Controllo della tensione</h3><span class="tag">riavvolgimento</span></div>
       <dl>
-        <dt>Albero A · Set<span class="dsub">${r.nA} fasce · ${nf(r.wA)} mm</span></dt><dd>${ov('rewA', r.calc.rewA, 2, 'N/cm', 'Set albero A')}<span class="sub">Calc ${nf(r.rewA)} N · a fine bobina ${nf(endA)} N</span></dd>
-        <dt>Albero B · Set<span class="dsub">${r.nB} fasce · ${nf(r.wB)} mm</span></dt><dd>${r.nB?`${ov('rewB', r.calc.rewB, 2, 'N/cm', 'Set albero B')}<span class="sub">Calc ${nf(r.rewB)} N · a fine bobina ${nf(endB)} N</span>`:'—'}</dd>
+        <dt>Albero superiore · Set<span class="dsub">${r.nA} fasce · ${nf(r.wA)} mm</span></dt><dd>${ov('rewA', r.calc.rewA, 2, 'N/cm', 'Set albero superiore')}<span class="sub">Calc ${nf(r.rewA)} N · a fine bobina ${nf(endA)} N</span></dd>
+        <dt>Albero inferiore · Set<span class="dsub">${r.nB} fasce · ${nf(r.wB)} mm</span></dt><dd>${r.nB?`${ov('rewB', r.calc.rewB, 2, 'N/cm', 'Set albero inferiore')}<span class="sub">Calc ${nf(r.rewB)} N · a fine bobina ${nf(endB)} N</span>`:'—'}</dd>
         <dt>Taper %<span class="dsub">uguale sui due alberi · Ø ${nf(r.Dco)} → ${nf(r.D)} mm</span></dt><dd>${ov('taper', r.calc.taper, 0, '%', 'Taper')}</dd>
       </dl>
       <p class="why"><b>Controllo:</b> il Calc [N] sul pannello deve coincidere con quello qui sopra. Se è diverso, le larghezze impostate in macchina non corrispondono al lavoro.</p>
@@ -1121,8 +1122,8 @@ function render(){
     <div class="st">
       <div class="st-h"><h3>4 · Rullatura [N]</h3><span class="tag">${nf(r.q)} N/m di carico</span></div>
       <dl>
-        <dt>Albero A · Set</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero A')}</dd>
-        <dt>Albero B · Set</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero B'):'—'}</dd>
+        <dt>Albero superiore · Set</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero superiore')}</dd>
+        <dt>Albero inferiore · Set</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero inferiore'):'—'}</dd>
         <dt>Vel%</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
         <dt>Diam%</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>
       </dl>
@@ -1167,8 +1168,8 @@ function render(){
     <div class="plan">
       <div class="plan-bar" role="img" aria-label="Piano di taglio: ${r.n} fasce da ${r.w} mm, rifilo ${nf(trimW,1)} mm per lato">${segs}</div>
       <div class="plan-legend">
-        <span><i class="sw" style="background:var(--shaft-a)"></i>${PANEL[CUR]==='tb306'?'Albero superiore':PANEL[CUR]==='tb610'?'Stazioni destre':'Albero A'} · ${r.nA} fasce</span>
-        <span><i class="sw" style="background:var(--shaft-b)"></i>${PANEL[CUR]==='tb306'?'Albero inferiore':PANEL[CUR]==='tb610'?'Stazioni sinistre':'Albero B'} · ${r.nB} fasce</span>
+        <span><i class="sw" style="background:var(--shaft-a)"></i>${PANEL[CUR]==='tb306'?'Albero superiore':PANEL[CUR]==='tb610'?'Stazioni destre':'Albero superiore'} · ${r.nA} fasce</span>
+        <span><i class="sw" style="background:var(--shaft-b)"></i>${PANEL[CUR]==='tb306'?'Albero inferiore':PANEL[CUR]==='tb610'?'Stazioni sinistre':'Albero inferiore'} · ${r.nB} fasce</span>
         <span><i class="sw" style="background:repeating-linear-gradient(45deg,var(--trim) 0 3px,transparent 3px 6px);border:1px solid var(--line)"></i>Rifilo ${nf(trimW,1)} mm/lato${r.motherKnown?'':' (ipotizzato)'}</span>
       </div>
     </div>
@@ -1205,20 +1206,20 @@ function recipeRows(r){
     R('Piano di taglio','Larghezza bobina madre',r0(r.Wm),'mm', null),
     R('Piano di taglio','Fasce',`${r.n} × ${r1(r.w)} mm`),
     R('Piano di taglio','Rifilo per lato',r1(Math.max(0,r.trim)),'mm'),
-    R('Piano di taglio','Albero A',`${r.nA} fasce · ${r0(r.wA)} mm`),
-    R('Piano di taglio','Albero B',`${r.nB} fasce · ${r0(r.wB)} mm`),
+    R('Piano di taglio','Albero superiore',`${r.nA} fasce · ${r0(r.wA)} mm`),
+    R('Piano di taglio','Albero inferiore',`${r.nB} fasce · ${r0(r.wB)} mm`),
     R('Taglio','Sistema di taglio',r.knife.type,'','knife',r.calc.knife),
     R('Svolgitore','Tensione Set',+unwToPanel(r.unw,r.Wm).toFixed(unwDec()),U,'unw',r.calc.unw!=null?+r.calc.unw.toFixed(unwDec()):null),
     R('Svolgitore','Tensione totale',r0(r.unw),'N'),
-    R('Controllo tensione','Albero A · Set',r2(r.rewSetA),'N/cm','rewA',r2(r.calc.rewA)),
-    R('Controllo tensione','Albero A · Calc',r0(r.rewA),'N'),
-    R('Controllo tensione','Albero A · a fine bobina',r0(r.rewA*(1-r.taper/100)),'N'),
-    r.nB ? R('Controllo tensione','Albero B · Set',r2(r.rewSetB),'N/cm','rewB',r2(r.calc.rewB)) : null,
-    r.nB ? R('Controllo tensione','Albero B · Calc',r0(r.rewB),'N') : null,
-    r.nB ? R('Controllo tensione','Albero B · a fine bobina',r0(r.rewB*(1-r.taper/100)),'N') : null,
+    R('Controllo tensione','Albero superiore · Set',r2(r.rewSetA),'N/cm','rewA',r2(r.calc.rewA)),
+    R('Controllo tensione','Albero superiore · Calc',r0(r.rewA),'N'),
+    R('Controllo tensione','Albero superiore · a fine bobina',r0(r.rewA*(1-r.taper/100)),'N'),
+    r.nB ? R('Controllo tensione','Albero inferiore · Set',r2(r.rewSetB),'N/cm','rewB',r2(r.calc.rewB)) : null,
+    r.nB ? R('Controllo tensione','Albero inferiore · Calc',r0(r.rewB),'N') : null,
+    r.nB ? R('Controllo tensione','Albero inferiore · a fine bobina',r0(r.rewB*(1-r.taper/100)),'N') : null,
     R('Controllo tensione','Taper',r1(r.taper),'%','taper',r1(r.calc.taper)),
-    R('Rullatura','Albero A · Set',r0(r.rollA),'N','rollA',r.calc.rollA),
-    r.nB ? R('Rullatura','Albero B · Set',r0(r.rollB),'N','rollB',r.calc.rollB) : null,
+    R('Rullatura','Albero superiore · Set',r0(r.rollA),'N','rollA',r.calc.rollA),
+    r.nB ? R('Rullatura','Albero inferiore · Set',r0(r.rollB),'N','rollB',r.calc.rollB) : null,
     R('Rullatura','Vel%',r.rollVel,'%','rollVel',r.calc.rollVel),
     R('Rullatura','Diam%',r.rollDiam,'%','rollDiam',r.calc.rollDiam),
     R('Velocità','Set',r0(r.v),'m/min','v',r.calc.v),
@@ -1258,17 +1259,17 @@ function recipeRows(r){
   }
   if(PANEL[CUR]==='tb306'){
     const car = carFromTaper(r.taper, r.Dco, r.D);
-    const ren = {'Svolgitore|Tensione Set':['Svolgitore (PU3)','Tensione'], 'Controllo tensione|Albero A · Set':null, 'Controllo tensione|Albero B · Set':null,
-      'Controllo tensione|Albero A · Calc':['Avvolgimento (F2)','Tiro superiore'], 'Controllo tensione|Albero B · Calc':['Avvolgimento (F2)','Tiro inferiore'],
-      'Controllo tensione|Albero A · a fine bobina':['Avvolgimento (F2)','Tiro superiore a fine bobina'], 'Controllo tensione|Albero B · a fine bobina':['Avvolgimento (F2)','Tiro inferiore a fine bobina'],
-      'Rullatura|Albero A · Set':['Rulli di contatto (F3)','Forza rullo superiore'], 'Rullatura|Albero B · Set':['Rulli di contatto (F3)','Forza rullo inferiore'],
+    const ren = {'Svolgitore|Tensione Set':['Svolgitore (PU3)','Tensione'], 'Controllo tensione|Albero superiore · Set':null, 'Controllo tensione|Albero inferiore · Set':null,
+      'Controllo tensione|Albero superiore · Calc':['Avvolgimento (F2)','Tiro superiore'], 'Controllo tensione|Albero inferiore · Calc':['Avvolgimento (F2)','Tiro inferiore'],
+      'Controllo tensione|Albero superiore · a fine bobina':['Avvolgimento (F2)','Tiro superiore a fine bobina'], 'Controllo tensione|Albero inferiore · a fine bobina':['Avvolgimento (F2)','Tiro inferiore a fine bobina'],
+      'Rullatura|Albero superiore · Set':['Rulli di contatto (F3)','Forza rullo superiore'], 'Rullatura|Albero inferiore · Set':['Rulli di contatto (F3)','Forza rullo inferiore'],
       'Rullatura|Vel%':null, 'Rullatura|Diam%':null, 'Velocità|Set':['Velocità (F1)','Set velocità'], 'Velocità|Ramp+':['Velocità (F1)','Rampa accelera'], 'Velocità|Ramp−':['Velocità (F1)','Rampa rallenta'],
       'Contametri|Contametri Set':['Metri (F1)','Set metri'], 'Contametri|Diametro Set':null, 'Contametri|Scelta assi':null};
     const res = [];
     for(const row of out){
       const key = row[0]+'|'+row[1];
       if(key==='Controllo tensione|Taper'){ res.push(['Avvolgimento (F2)','Caratteristica',Math.round(car),'%',row[4],'']); res.push(['Avvolgimento (F2)','Avvolgimento','frizioni (alberi TIF)','','','']); continue; }
-      if(key in ren){ if(ren[key]) res.push([ren[key][0], ren[key][1], row[2], row[3], row[4], row[5]]); if(key==='Rullatura|Albero A · Set'){ res.push(['Rulli di contatto (F3)','Caratteristica rulli',Math.round(r.rollChar),'%',OV.rollChar!=null?'manuale':'calcolato','']); } continue; }
+      if(key in ren){ if(ren[key]) res.push([ren[key][0], ren[key][1], row[2], row[3], row[4], row[5]]); if(key==='Rullatura|Albero superiore · Set'){ res.push(['Rulli di contatto (F3)','Caratteristica rulli',Math.round(r.rollChar),'%',OV.rollChar!=null?'manuale':'calcolato','']); } continue; }
       res.push(row);
     }
     res.push(['Metri e tagli (F7)','Larghezza nastro',Math.round(r.Wm),'mm','',''], ['Metri e tagli (F7)',`Taglio 1-${r.n}`,Math.round(r.w*10)/10,'mm','',''], ['Metri (F1)','Arresto preselezione',r.mode==='D'?'diametro':'metri','','','']);
@@ -1435,8 +1436,8 @@ function recipeText(r){
     `Taglio: ${r.n} × ${nf(r.w,1)} mm su madre ${nf(r.Wm)} mm, rifilo ${nf(Math.max(0,r.trim),1)} mm/lato · ${r.knife.type}${m('knife')}`,
     lzab && LASER_UNITS[CUR] ? `LASER       ${LASER_UNITS[CUR]} · ${LZ_TIPI[lzab.tipo]||''} · programma n° ${lzab.prog||'—'}${lzab.posizione?` · ${lzab.posizione}`:''} · ricetta ${LZ_STATI[lzab.stato]||'in prova'} v${lzab.versione||1}` : '',
     `SVOLGITORE  Tensione Set ${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${U}${m('unw')}`,
-    `TENSIONE    Albero A Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
-    r.nB ? `            Albero B Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
+    `TENSIONE    Albero superiore Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
+    r.nB ? `            Albero inferiore Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
     `            Taper ${nf(r.taper)}%${m('taper')}`,
     `RULLATURA   A ${nf(r.rollA)} N${m('rollA')}${r.nB?` · B ${nf(r.rollB)} N${m('rollB')}`:''} · Vel% ${nf(r.rollVel)}${m('rollVel')} · Diam% ${nf(r.rollDiam)}${m('rollDiam')}`,
     `VELOCITÀ    Set ${nf(r.v)} m/min${m('v')} · Ramp+ ${nf(r.rup)} s${m('rup')} · Ramp− ${nf(r.rdn)} s${m('rdn')}`,
@@ -1584,6 +1585,7 @@ const showDl = () => { if(!DL) return; $('pdfBtn').hidden = false; $('xlsBtn').h
 showDl();
 $('xlsBtn').onclick = () => { if(LAST && !LAST.invalid) downloadXlsx(LAST); };
 $('pdfBtn').onclick = () => { if(LAST && !LAST.invalid) downloadPdf(LAST); };
+$('printBtn').onclick = () => { if(LAST && !LAST.invalid) printPdf(LAST); };
 $('copyBtn').onclick = () => {
   if(!LAST || LAST.invalid) return;
   const txt = recipeText(LAST), fb = $('copyFallback');
@@ -1620,8 +1622,8 @@ function diagChanges(d, r){
       rows.push({label:'Tiro superiore', unit:'N', cur:r.rewA, next:r.rewA*(1+c.rew/100), dec:0, delta:sgn(c.rew)}); ov.rewA = +(r.rewSetA*(1+c.rew/100)).toFixed(4);
       if(r.nB){ rows.push({label:'Tiro inferiore', unit:'N', cur:r.rewB, next:r.rewB*(1+c.rew/100), dec:0, delta:sgn(c.rew)}); ov.rewB = +(r.rewSetB*(1+c.rew/100)).toFixed(4); }
     } else {
-      add('rewA','Albero A · Set','N/cm',r.rewSetA,+(r.rewSetA*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
-      if(r.nB) add('rewB','Albero B · Set','N/cm',r.rewSetB,+(r.rewSetB*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
+      add('rewA','Albero superiore · Set','N/cm',r.rewSetA,+(r.rewSetA*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
+      if(r.nB) add('rewB','Albero inferiore · Set','N/cm',r.rewSetB,+(r.rewSetB*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
     }
   }
   if(c.taper){
@@ -1637,7 +1639,7 @@ function diagChanges(d, r){
     if(r.nB){ rows.push({label:'Spinta leve sinistre', unit:u, cur:pl(r.rollB, r.nB), next:pl(Math.round(r.rollB*(1+c.roll/100)), r.nB), dec:dd, delta:sgn(c.roll)}); ov.rollB = Math.round(r.rollB*(1+c.roll/100)); }
   } else if(c.roll){
     const nb = TB && CFG.rollNperBar > 0, f = nb ? CFG.rollNperBar : 1, u = nb ? 'bar' : 'N', dd = nb ? 1 : 0;
-    const la = TB ? 'Rullo di contatto superiore' : 'Rullatura albero A', lb = TB ? 'Rullo di contatto inferiore' : 'Rullatura albero B';
+    const la = TB ? 'Rullo di contatto superiore' : 'Rullatura albero superiore', lb = TB ? 'Rullo di contatto inferiore' : 'Rullatura albero inferiore';
     rows.push({label:la, unit:u, cur:r.rollA/f, next:Math.round(r.rollA*(1+c.roll/100))/f, dec:dd, delta:sgn(c.roll)}); ov.rollA = Math.round(r.rollA*(1+c.roll/100));
     if(r.nB){ rows.push({label:lb, unit:u, cur:r.rollB/f, next:Math.round(r.rollB*(1+c.roll/100))/f, dec:dd, delta:sgn(c.roll)}); ov.rollB = Math.round(r.rollB*(1+c.roll/100)); }
   }
@@ -1743,7 +1745,33 @@ function MiniPDF(){
 function pdfSafe(s){ return String(s).replace(/µm/g,' micron').replace(/µ/g,'u').replace(/²/g,'2').replace(/ {2,}/g,' ').replace(/[−–—]/g,'-').replace(/→/g,'>').replace(/[’‘]/g,"'").replace(/[“”]/g,'"').replace(/…/g,'...').replace(/[^\x00-\xFF]/g,''); }
 async function downloadPdf(r){
   const t = $('copyToast');
-  if(!DL){ t.textContent = 'Download non disponibile qui: usa Copia ricetta.'; return; }
+  if(!DL){ t.textContent = 'Download non disponibile qui: usa Stampa scheda.'; return; }
+  const {doc, fn} = buildPdf(r);
+  try{ await DL.save({filename: fn, data: doc.output()}); t.textContent = 'Scheda PDF pronta'; setTimeout(()=>t.textContent='',2500); }
+  catch(e){ const c = e && e.code; t.textContent = c==='declined' ? '' : c==='rate_limited' ? 'Attendi un momento e riprova.' : 'Download non disponibile qui.'; }
+}
+// Stampa diretta: la scheda si apre nella finestra di stampa del browser, senza scaricare nulla
+let PRINT_FRAME = null, PRINT_URL = null;
+function printPdf(r){
+  const t = $('copyToast');
+  const {doc} = buildPdf(r);
+  if(PRINT_URL) URL.revokeObjectURL(PRINT_URL);
+  PRINT_URL = URL.createObjectURL(doc.output());
+  if(PRINT_FRAME) PRINT_FRAME.remove();
+  const f = PRINT_FRAME = document.createElement('iframe');
+  f.setAttribute('aria-hidden','true'); f.tabIndex = -1;
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+  let done = false;
+  const fallback = () => { if(done) return; done = true; const w = window.open(PRINT_URL, '_blank'); t.textContent = w ? 'Scheda aperta in una nuova scheda: stampala da lì.' : 'Il browser ha bloccato la stampa: consenti i pop-up per questo sito.'; };
+  f.onload = () => setTimeout(() => {
+    try{ f.contentWindow.focus(); f.contentWindow.print(); done = true; t.textContent = ''; }catch(e){ fallback(); }
+  }, 400);
+  f.src = PRINT_URL;
+  document.body.appendChild(f);
+  t.textContent = 'Preparo la stampa…';
+  setTimeout(() => { if(!done) fallback(); }, 6000);
+}
+function buildPdf(r){
   const doc = MiniPDF();
   const W = 210, M = 14, CW = (W - 2*M - 8)/2;
   const T = (txt, x, y, o) => doc.text(pdfSafe(txt), x, y, o);
@@ -1753,13 +1781,13 @@ async function downloadPdf(r){
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(16);
   T(`RICETTA TAGLIO · IMPIANTO ${CUR}`, M, 11);
   doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
-  T(`${MACH[CUR].model} · stampata il ${new Date().toLocaleDateString('it-IT')}${LOADED?` · archivio: ${ESITI[LOADED.esito]||'da provare'}`:''}${lzCurAb()?` · ricetta laser ${LZ_STATI[lzCurAb().stato]||'in prova'} v${lzCurAb().versione||1}`:''}`, M, 18);
+  T(`${MACH[CUR].model}`, M, 18);
   // lavoro
   let y = 33; ink(); doc.setFont('helvetica','bold'); doc.setFontSize(13);
   T($('jobCode').value || 'Lavoro', M, y); y += 6;
   doc.setFont('helvetica','normal'); doc.setFontSize(9.5); grey();
   T(`Struttura: ${$('struct').value}  (${nf(r.T,1)} µm · ${nf(r.G,1)} g/m²)`, M, y); y += 5;
-  T(`Taglio: ${r.n} × ${nf(r.w,1)} mm su madre ${nf(r.Wm)} mm · rifilo ${nf(Math.max(0,r.trim),1)} mm per lato · anima ${r.coreID} mm`, M, y); y += 5;
+  T(`Taglio: ${r.n} × ${nf(r.w,1)} mm · anima ${r.coreID} mm`, M, y); y += 5;
   T(`Bobina finita: ${nf(r.L)} m · Ø ${nf(r.D)} mm · ${nf(r.weight,1)} kg`, M, y); y += 6;
   // piano di taglio in scala
   const barW = W - 2*M, sc = barW / Math.max(r.Wm, r.used), trimW = Math.max(0, r.trim);
@@ -1775,7 +1803,7 @@ async function downloadPdf(r){
   if(trimW>0){ doc.setFillColor(222,228,226); doc.rect(x, y, trimW*sc, 9, 'F'); }
   y += 13; grey(); doc.setFontSize(8);
   const tbN = PANEL[CUR]==='tb306', t6N = PANEL[CUR]==='tb610';
-  T(`${tbN?'Albero superiore':t6N?'Stazioni destre':'Albero A'}: ${r.nA} fasce (scuro) · ${tbN?'Albero inferiore':t6N?'Stazioni sinistre':'Albero B'}: ${r.nB} fasce (chiaro) · rifilo ${nf(trimW,1)} mm per lato`, M, y); y += 7;
+  T(`${tbN?'Albero superiore':t6N?'Stazioni destre':'Albero superiore'}: ${r.nA} fasce (scuro) · ${tbN?'Albero inferiore':t6N?'Stazioni sinistre':'Albero inferiore'}: ${r.nB} fasce (chiaro)`, M, y); y += 7;
   // stazioni nell'ordine del pannello
   const man = k => OV[k]!=null && lzOvWord(k)==='manuale' ? ' (man.)' : '', lzab = lzCurAb() && LASER_UNITS[CUR] ? lzCurAb() : null;
   let L, R;
@@ -1815,12 +1843,12 @@ async function downloadPdf(r){
     ...(lzab ? [[`0 · LASER IN LINEA · ${LASER_UNITS[CUR]}`, [['Programma da richiamare', `n° ${lzab.prog||'—'}`], ['Incisione', LZ_TIPI[lzab.tipo]||'—', lzab.posizione ? String(lzab.posizione).slice(0,60) : '']]]] : []),
     ['1 · SVOLGITORE', [['Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
     ['2 · TAGLIO', [['Sistema', `${r.knife.type}${man('knife')}`], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
-    ['3 · CONTROLLO DELLA TENSIONE', [['Albero A · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
-      ...(r.nB?[['Albero B · Set', `${nf(r.rewSetB,2)} N/cm${man('rewB')}`, `Calc ${nf(r.rewB)} N · fine bobina ${nf(r.rewB*(1-r.taper/100))} N`]]:[]),
+    ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
+      ...(r.nB?[['Albero inferiore · Set', `${nf(r.rewSetB,2)} N/cm${man('rewB')}`, `Calc ${nf(r.rewB)} N · fine bobina ${nf(r.rewB*(1-r.taper/100))} N`]]:[]),
       ['Taper', `${nf(r.taper)} %${man('taper')}`]]]
   ];
   R = [
-    ['4 · RULLATURA', [['Albero A · Set', `${nf(r.rollA)} N${man('rollA')}`], ...(r.nB?[['Albero B · Set', `${nf(r.rollB)} N${man('rollB')}`]]:[]), ['Vel%', `${nf(r.rollVel)} %${man('rollVel')}`], ['Diam%', `${nf(r.rollDiam)} %${man('rollDiam')}`]]],
+    ['4 · RULLATURA', [['Albero superiore · Set', `${nf(r.rollA)} N${man('rollA')}`], ...(r.nB?[['Albero inferiore · Set', `${nf(r.rollB)} N${man('rollB')}`]]:[]), ['Vel%', `${nf(r.rollVel)} %${man('rollVel')}`], ['Diam%', `${nf(r.rollDiam)} %${man('rollDiam')}`]]],
     ['5 · VELOCITÀ', [['Set', `${nf(r.v)} m/min${man('v')}`], ['Ramp+', `${nf(r.rup)} s${man('rup')}`], ['Ramp-', `${nf(r.rdn)} s${man('rdn')}`]]],
     ['6 · CONTAMETRI', [['Contametri Set', `${nf(r.L)} m`], ['Diametro Set', r.mode==='D' ? `${nf(r.D)} mm` : '0 mm (fermata a metri)'], ['Scelta assi', assiLabel(r.coreID)]]]
   ];
@@ -1841,19 +1869,6 @@ async function downloadPdf(r){
     return yy;
   };
   y = Math.max(col(M, y, L), col(M+CW+8, y, R)) + 1;
-  // avvisi
-  const al = r.alerts.filter(a=>a[0]!=='ok');
-  if(al.length){
-    ink(); doc.setFont('helvetica','bold'); doc.setFontSize(9); T('CONTROLLI E AVVISI', M, y); y += 5;
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-    for(const [lv, txt] of al){
-      const tag = {crit:'BLOCCO',warn:'ATTENZIONE',info:'NOTA'}[lv];
-      const lines = doc.splitTextToSize(pdfSafe(txt), W - 2*M - 24);
-      if(y + lines.length*3.8 > 262){ doc.addPage(); y = 18; }
-      doc.setTextColor(...(lv==='crit'?[180,35,24]:lv==='warn'?[154,98,18]:[95,108,105])); doc.setFont('helvetica','bold'); T(tag, M, y);
-      ink(); doc.setFont('helvetica','normal'); doc.text(lines, M+24, y); y += lines.length*3.8 + 1.5;
-    }
-  }
   // riquadro per la prova a bordo macchina
   let yb = Math.max(y + 4, 250); if(yb > 262){ doc.addPage(); yb = 20; }
   doc.setDrawColor(21,32,31); doc.setLineWidth(0.3); doc.rect(M, yb, W-2*M, 30);
@@ -1866,8 +1881,7 @@ async function downloadPdf(r){
   T('Valori di partenza calcolati dal materiale: confermali con la prova e riporta le correzioni nell\'archivio ricette.', M, 290);
   const safe = ($('jobCode').value || 'lavoro').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9 _.-]+/g,' ').replace(/\s+/g,' ').trim().slice(0,60) || 'lavoro';
   const fn = `Scheda impianto ${CUR} - ${safe} - ${new Date().toLocaleDateString('it-IT').replace(/\//g,'-')}.pdf`;
-  try{ await DL.save({filename: fn, data: doc.output()}); t.textContent = 'Scheda PDF pronta'; setTimeout(()=>t.textContent='',2500); }
-  catch(e){ const c = e && e.code; t.textContent = c==='declined' ? '' : c==='rate_limited' ? 'Attendi un momento e riprova.' : 'Download non disponibile qui.'; }
+  return {doc, fn};
 }
 
 // ================= ARCHIVIO RICETTE =================
