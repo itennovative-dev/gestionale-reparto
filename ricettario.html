@@ -148,7 +148,7 @@ button.danger{color:var(--crit);border-color:var(--crit)}
 @media (max-width:640px){.saverow{grid-template-columns:minmax(0,1fr)}}
 /* archivio */
 .arch{margin-top:20px}
-.archbar{display:grid;grid-template-columns:minmax(0,1fr) 200px;gap:8px}
+.archbar{display:grid;grid-template-columns:minmax(0,1fr) 200px auto;gap:8px}
 @media (max-width:640px){.archbar{grid-template-columns:minmax(0,1fr)}}
 .archlist{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:4px}
 .archlist li{display:grid;grid-template-columns:minmax(0,1fr) 44px auto 88px auto;gap:6px 12px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line-2);font-size:14px}
@@ -387,7 +387,9 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
       <div class="archbar">
         <input type="text" id="archQ" placeholder="Cerca per codice, struttura o note" aria-label="Cerca nell'archivio">
         <select id="archMach" aria-label="Filtra per impianto"></select>
+        <button type="button" id="archAllPdf" class="ghost">Scarica tutte (PDF)</button>
       </div>
+      <p class="hint" id="archAllMsg">Scarica in un unico PDF tutte le ricette dell'impianto scelto nel filtro (se è su "Tutti", quelle dell'impianto attuale).</p>
       <p class="note" id="archState">Caricamento archivio…</p>
       <ul class="archlist" id="archList"></ul>
       <p class="hint">Archivio, taratura e limiti degli impianti sono visibili solo a chi ha accesso al ricettario nel gestionale.</p>
@@ -1771,8 +1773,9 @@ function printPdf(r){
   t.textContent = 'Preparo la stampa…';
   setTimeout(() => { if(!done) fallback(); }, 6000);
 }
-function buildPdf(r){
-  const doc = MiniPDF();
+function buildPdf(r, into){
+  const doc = into || MiniPDF();
+  if(into) doc.addPage();
   const W = 210, M = 14, CW = (W - 2*M - 8)/2;
   const T = (txt, x, y, o) => doc.text(pdfSafe(txt), x, y, o);
   const ink = () => doc.setTextColor(21,32,31), grey = () => doc.setTextColor(95,108,105);
@@ -1805,15 +1808,14 @@ function buildPdf(r){
   const tbN = PANEL[CUR]==='tb306', t6N = PANEL[CUR]==='tb610';
   T(`${tbN?'Albero superiore':t6N?'Stazioni destre':'Albero superiore'}: ${r.nA} fasce (scuro) · ${tbN?'Albero inferiore':t6N?'Stazioni sinistre':'Albero inferiore'}: ${r.nB} fasce (chiaro)`, M, y); y += 7;
   // stazioni nell'ordine del pannello
-  const man = k => OV[k]!=null && lzOvWord(k)==='manuale' ? ' (man.)' : '', lzab = lzCurAb() && LASER_UNITS[CUR] ? lzCurAb() : null;
+  const man = () => '', cutKind = r.knife.type.startsWith('Lame circolari') ? 'COLTELLI' : 'LAMETTE', lzab = lzCurAb() && LASER_UNITS[CUR] ? lzCurAb() : null;
   let L, R;
   if(PANEL[CUR]==='tb610'){
     const sh = Math.max(0, Math.min(0.95, CFG.periShare/100)), car = carFromTaper(r.taper, r.Dco, r.D), nb = CFG.rollNperBar > 0;
     const lv = (tot, k) => k ? tot/k/2 : 0, fmtLv = N => nb ? `${nf(N/CFG.rollNperBar,1)} bar` : `${nf(N)} N (da convertire in bar)`;
-    const cut = r.knife.type.startsWith('Lame circolari') ? 'COLTELLI' : 'LAMETTE';
     L = [
       ['1 · SVOLGITORE', [['Tensione svolgimento', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`]]],
-      ['2 · TAGLIO', [['Sistema', `${r.knife.type}${man('knife')}`], ['Tipo taglio (pannello)', cut]]],
+      ['2 · TAGLIO', [['Sistema', cutKind]]],
       ['3 · AVVOLGIMENTO', [['Tensione stazione destra', `${nf((1-sh)*r.rewSetA*r.w/10)} N${man('rewA')}`, `ogni stazione · ${r.nA} destre`],
         ...(r.nB?[['Tensione stazione sinistra', `${nf((1-sh)*r.rewSetB*r.w/10)} N${man('rewB')}`, `ogni stazione · ${r.nB} sinistre`]]:[]),
         ['Tiro periferico dx / sx', `${nf(sh*r.rewSetA*r.wA/10)} / ${nf(sh*r.rewSetB*r.wB/10)} N`], ['Caratteristica', `${nf(car)} %${man('taper')}`]]]
@@ -1829,7 +1831,7 @@ function buildPdf(r){
     const rb = N => nb ? `${nf(N/CFG.rollNperBar,1)} bar` : `${nf(N)} N (da convertire in bar)`;
     L = [
       ['1 · SVOLGITORE (display PU3)', [['Tensione', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`]]],
-      ['2 · TAGLIO', [['Sistema', `${r.knife.type}${man('knife')}`], ['Lame', `${r.n+1}`]]],
+      ['2 · TAGLIO', [['Sistema', cutKind], ['Lame', `${r.n+1}`]]],
       ['3 · AVVOLGIMENTO (F2)', [['Tiro superiore', `${nf(r.rewA)} N${man('rewA')}`], ...(r.nB?[['Tiro inferiore', `${nf(r.rewB)} N${man('rewB')}`]]:[]),
         ['Caratteristica', `${nf(car)} %${man('taper')}`, `tiro finale a Ø 600: ${nf(tiroAt(r.rewA, car, r.Dco, 600))}${r.nB?' / '+nf(tiroAt(r.rewB, car, r.Dco, 600)):''} N`], ['Avvolgimento', 'frizioni (TIF)']]]
     ];
@@ -1842,7 +1844,7 @@ function buildPdf(r){
   L = [
     ...(lzab ? [[`0 · LASER IN LINEA · ${LASER_UNITS[CUR]}`, [['Programma da richiamare', `n° ${lzab.prog||'—'}`], ['Incisione', LZ_TIPI[lzab.tipo]||'—', lzab.posizione ? String(lzab.posizione).slice(0,60) : '']]]] : []),
     ['1 · SVOLGITORE', [['Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
-    ['2 · TAGLIO', [['Sistema', `${r.knife.type}${man('knife')}`], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
+    ['2 · TAGLIO', [['Sistema', cutKind], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
     ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
       ...(r.nB?[['Albero inferiore · Set', `${nf(r.rewSetB,2)} N/cm${man('rewB')}`, `Calc ${nf(r.rewB)} N · fine bobina ${nf(r.rewB*(1-r.taper/100))} N`]]:[]),
       ['Taper', `${nf(r.taper)} %${man('taper')}`]]]
@@ -1911,6 +1913,41 @@ async function saveToArchive(){
   }catch(e){ say(e && e.code==='quota_exceeded' ? 'Archivio pieno: elimina qualche ricetta vecchia.' : 'Salvataggio non riuscito, riprova.'); }
   $('saveArch').disabled = false;
 }
+function fillJobForm(x){
+  const set = (i,v) => { $(i).value = v==null ? '' : v; };
+  set('jobCode', x.codice); set('struct', x.struttura); set('w', x.w); set('n', x.n); set('target', x.target);
+  const cs = $('core'); if(![...cs.options].some(o=>+o.value===+x.core)) cs.add(new Option(`${x.core} mm`, x.core)); cs.value = String(x.core);
+  $(x.mode==='D'?'modeD':'modeL').checked = true; $('printed').checked = !!x.printed;
+  set('mw', x.mw); set('ml', x.ml); set('md', x.md);
+  OV = x.ov && typeof x.ov==='object' ? clone(x.ov) : {};
+}
+// Tutte le ricette in archivio dell'impianto scelto, in un unico PDF (una scheda per pagina)
+async function downloadAllPdf(){
+  const say = m => { $('archAllMsg').textContent = m; };
+  if(!DL){ say('Download non disponibile qui.'); return; }
+  if(!ARCH){ say('Archivio non ancora caricato.'); return; }
+  const id = $('archMach').value || CUR;
+  if(!MACH[id]){ say('Scegli un impianto.'); return; }
+  const list = ARCH.filter(x => x.impianto===id).sort((a,b) => String(a.codice||'').localeCompare(String(b.codice||''), 'it', {numeric:true}));
+  if(!list.length){ say(`Nessuna ricetta in archivio per l'impianto ${id}.`); return; }
+  const keep = {job:jobState(), cur:CUR, cfg:CFG, loaded:LOADED, lz:LZ_LOADED};
+  let doc = null, done = 0, skip = [];
+  try{
+    CUR = id; CFG = MACH[id].cfg; LOADED = null; LZ_LOADED = null;
+    for(const x of list){
+      fillJobForm(x);
+      let r; try{ r = compute(); }catch(e){ r = null; }
+      if(!r || r.invalid){ skip.push(x.codice || '(senza codice)'); continue; }
+      doc = buildPdf(r, doc).doc; done++;
+    }
+  } finally {
+    CUR = keep.cur; CFG = keep.cfg; fillJobForm(keep.job); LOADED = keep.loaded; LZ_LOADED = keep.lz; render();
+  }
+  if(!doc){ say('Nessuna ricetta valida da stampare.'); return; }
+  const fn = `Ricette impianto ${id} - ${new Date().toLocaleDateString('it-IT').replace(/\//g,'-')}.pdf`;
+  try{ await DL.save({filename: fn, data: doc.output()}); say(`${done} ${done===1?'ricetta scaricata':'ricette scaricate'} in un PDF${skip.length?` · saltate perché incomplete: ${skip.join(', ')}`:''}`); }
+  catch(e){ say('Download non riuscito, riprova.'); }
+}
 function openRecipe(id){
   const x = (ARCH||[]).find(d=>d.id===id); if(!x) return;
   if(MACH[x.impianto] && x.impianto!==CUR){ CUR = x.impianto; CFG = MACH[CUR].cfg; save(true); renderMachUI(); renderCalib(); }
@@ -1948,6 +1985,7 @@ function renderArchive(){
 $('saveArch').addEventListener('click', saveToArchive);
 $('archQ').addEventListener('input', renderArchive);
 $('archMach').addEventListener('change', renderArchive);
+$('archAllPdf').onclick = () => downloadAllPdf();
 $('archList').addEventListener('click', async e => {
   const o = e.target.closest('[data-open]'); if(o){ openRecipe(o.dataset.open); return; }
   const d = e.target.closest('[data-del]'); if(!d || !DB || !CAN_EDIT) return;
