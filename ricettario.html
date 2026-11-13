@@ -389,7 +389,7 @@ window.RICETTARIO_ACCESS = new Promise(resolve => {
         <select id="archMach" aria-label="Filtra per impianto"></select>
         <button type="button" id="archAllPdf" class="ghost">Scarica tutte (PDF)</button>
       </div>
-      <p class="hint" id="archAllMsg">Scarica in un unico PDF tutte le ricette dell'impianto scelto nel filtro (se è su "Tutti", quelle dell'impianto attuale).</p>
+      <p class="hint" id="archAllMsg">Scarica un PDF per ogni ricetta dell'impianto scelto nel filtro (se è su "Tutti", quelle dell'impianto attuale).</p>
       <p class="note" id="archState">Caricamento archivio…</p>
       <ul class="archlist" id="archList"></ul>
       <p class="hint">Archivio, taratura e limiti degli impianti sono visibili solo a chi ha accesso al ricettario nel gestionale.</p>
@@ -1921,7 +1921,7 @@ function fillJobForm(x){
   set('mw', x.mw); set('ml', x.ml); set('md', x.md);
   OV = x.ov && typeof x.ov==='object' ? clone(x.ov) : {};
 }
-// Tutte le ricette in archivio dell'impianto scelto, in un unico PDF (una scheda per pagina)
+// Tutte le ricette in archivio dell'impianto scelto: un PDF separato per ogni ricetta
 async function downloadAllPdf(){
   const say = m => { $('archAllMsg').textContent = m; };
   if(!DL){ say('Download non disponibile qui.'); return; }
@@ -1931,22 +1931,33 @@ async function downloadAllPdf(){
   const list = ARCH.filter(x => x.impianto===id).sort((a,b) => String(a.codice||'').localeCompare(String(b.codice||''), 'it', {numeric:true}));
   if(!list.length){ say(`Nessuna ricetta in archivio per l'impianto ${id}.`); return; }
   const keep = {job:jobState(), cur:CUR, cfg:CFG, loaded:LOADED, lz:LZ_LOADED};
-  let doc = null, done = 0, skip = [];
+  const files = [], skip = [];
   try{
     CUR = id; CFG = MACH[id].cfg; LOADED = null; LZ_LOADED = null;
     for(const x of list){
       fillJobForm(x);
       let r; try{ r = compute(); }catch(e){ r = null; }
       if(!r || r.invalid){ skip.push(x.codice || '(senza codice)'); continue; }
-      doc = buildPdf(r, doc).doc; done++;
+      const {doc, fn} = buildPdf(r); files.push({fn, data: doc.output()});
     }
   } finally {
     CUR = keep.cur; CFG = keep.cfg; fillJobForm(keep.job); LOADED = keep.loaded; LZ_LOADED = keep.lz; render();
   }
-  if(!doc){ say('Nessuna ricetta valida da stampare.'); return; }
-  const fn = `Ricette impianto ${id} - ${new Date().toLocaleDateString('it-IT').replace(/\//g,'-')}.pdf`;
-  try{ await DL.save({filename: fn, data: doc.output()}); say(`${done} ${done===1?'ricetta scaricata':'ricette scaricate'} in un PDF${skip.length?` · saltate perché incomplete: ${skip.join(', ')}`:''}`); }
-  catch(e){ say('Download non riuscito, riprova.'); }
+  if(!files.length){ say('Nessuna ricetta valida da scaricare.'); return; }
+  // stesso nome in due ricette: aggiungo un numero per non sovrascrivere
+  const seen = {};
+  files.forEach(f => { const k = f.fn.toLowerCase(); if(seen[k]){ seen[k]++; f.fn = f.fn.replace(/\.pdf$/i, ` (${seen[k]}).pdf`); } else seen[k] = 1; });
+  const btn = $('archAllPdf'); btn.disabled = true;
+  let done = 0;
+  try{
+    for(const f of files){
+      say(`Scarico ${done+1} di ${files.length}…`);
+      await DL.save({filename: f.fn, data: f.data}); done++;
+      await new Promise(res => setTimeout(res, 450)); // pausa tra un file e l'altro, altrimenti il browser ne scarta qualcuno
+    }
+    say(`${done} ${done===1?'scheda scaricata':'schede scaricate'}, un PDF per ricetta${skip.length?` · saltate perché incomplete: ${skip.join(', ')}`:''}. Se ne vedi meno, consenti al browser i download multipli per questo sito e riprova.`);
+  }catch(e){ say(`Download interrotto dopo ${done} di ${files.length}: riprova.`); }
+  finally{ btn.disabled = false; }
 }
 function openRecipe(id){
   const x = (ARCH||[]).find(d=>d.id===id); if(!x) return;
