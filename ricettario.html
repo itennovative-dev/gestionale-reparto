@@ -533,11 +533,12 @@ const LZ_STATI = {prova:'in prova', validata:'validata'};
 // Parametri di avvolgimento della ricetta laser, nelle unità del pannello LAEM TR 415: [chiave, nome, unità, decimali]
 const LZ_KEYS = [
   ['unw','Svolgitore · Tensione Set','',1], ['rewA','Albero superiore · Set','N/cm',2], ['rewB','Albero inferiore · Set','N/cm',2],
-  ['taper','Taper','%',0], ['rollA','Rullatura A','N',0], ['rollB','Rullatura B','N',0],
+  ['finA','Albero superiore · Tiro finale','N/cm',2], ['finB','Albero inferiore · Tiro finale','N/cm',2],
+  ['taper','Taper','%',0], ['rollA','Rullatura albero superiore','N',0], ['rollB','Rullatura albero inferiore','N',0],
   ['rollVel','Rullatura Vel%','%',0], ['rollDiam','Rullatura Diam%','%',0],
   ['v','Velocità Set','m/min',0], ['rup','Ramp+','s',0], ['rdn','Ramp−','s',0]
 ];
-const LZ_CALC_KEYS = ['unw','rewA','rewB','taper','rollA','rollB','v']; // quelli che il programma calcola dal materiale
+const LZ_CALC_KEYS = ['unw','rewA','rewB','finA','finB','taper','rollA','rollB','v']; // quelli che il programma calcola dal materiale
 const LZ_DIFETTI = [['cordonature','Cordonature'],['spire','Spire disallineate / telescopio'],['strappi','Strappi o rotture'],['incisione','Incisione non conforme']];
 const LZ_DEV_THR = 0.30;   // oltre questo scostamento dal calcolo teorico compare un avviso (la ricetta salvata non cambia)
 const LZ_DIFF_TOL = 0.03;  // nel confronto delle rilevazioni: oltre il 3% dalla ricetta salvata il valore è evidenziato
@@ -606,6 +607,10 @@ const DEFAULT_MODEL = {'115':'LAEM TR 415/1400','116':'LAEM TR 415/1400','118':'
 // Pannello di ogni impianto: 'laem' = LAEM TR 415, 'tb306' = Euromac TB 3.06 (manuale impianto 100),
 // 'generic' = pannello non ancora ricavato dal manuale (campi come LAEM).
 const PANEL = {'115':'laem','116':'laem','118':'laem','100':'tb306','119':'tb610'};
+// LAEM che sul pannello hanno, per ogni albero, "tiro iniziale" e "tiro finale" al posto di Set + Taper,
+// e la rullatura senza Vel% e Diam% (la 115). Il taper resta nel calcolo: tiro finale = tiro iniziale × (1 − taper).
+const TIRO_IF = {'115':true};
+const isTIF = (m = CUR) => !!TIRO_IF[m];
 // Dati di targa dal manuale Euromac TB 3.06: velocità max 450 m/min, Ø max avvolgimento 600 mm.
 const MACH_DEFAULTS = {'100':{vmax:450, dmax:600, rampUp:200, rampDn:80}, '119':{vmax:600, dmax:1000, wmax:1500}};
 const newMach = id => ({model:DEFAULT_MODEL[id], cfg:Object.assign(clone(DEFAULT_CFG), MACH_DEFAULTS[id]||{}), log:[]});
@@ -829,7 +834,11 @@ function compute(){
   const rewSetB = has('rewB') ? OV.rewB : rewSetCalc;
   const rewA = rewSetA*wA/10, rewB = rewSetB*wB/10;     // Calc [N]
   const taperCalc = taperFor(R, ctx);
-  const taper = has('taper') ? OV.taper : taperCalc;
+  let taper = has('taper') ? OV.taper : taperCalc;
+  // tiro finale per albero (pannello 115): segue il tiro iniziale; se scritto a mano, il taper diventa quello che ne risulta
+  const finACalc = rewSetA*(1-taper/100), finBCalc = rewSetB*(1-taper/100);
+  const finA = has('finA') ? OV.finA : finACalc, finB = has('finB') ? OV.finB : finBCalc;
+  if(isTIF() && has('finA') && rewSetA>0) taper = Math.max(0, Math.min(90, (1-finA/rewSetA)*100));
   const q = contactLoad(ctx, v);                        // N/m
   const rollACalc = Math.round(q*wA/1000), rollBCalc = Math.round(q*wB/1000);
   const rollA = has('rollA') ? OV.rollA : rollACalc;
@@ -843,7 +852,8 @@ function compute(){
   const knifeCalc = knifeFor(ctx);
   const knife = OV.knife ? {type:OV.knife, why:`Scelta manuale. Il programma consiglia: ${knifeCalc.type}. ${knifeCalc.why}`} : knifeCalc;
   const calc = {unw:unwToPanel(unwCalc,Wm), rewA:rewSetCalc, rewB:rewSetCalc, taper:taperCalc, rollA:rollACalc, rollB:rollBCalc,
-                rollVel:CFG.rollVel, rollDiam:CFG.rollDiam, rollChar:CFG.rollChar, v:vCalc, rup:rupCalc, rdn:rdnCalc, knife:knifeCalc.type};
+                rollVel:CFG.rollVel, rollDiam:CFG.rollDiam, rollChar:CFG.rollChar, v:vCalc, rup:rupCalc, rdn:rdnCalc, knife:knifeCalc.type,
+                finA:rewSetCalc*(1-taperCalc/100), finB:rewSetCalc*(1-taperCalc/100), finALive:finACalc, finBLive:finBCalc};
 
   const weight = G*(w/1000)*L/1000;
   let Lmother = mlIn>0 ? mlIn : (mdIn>0 ? Math.PI*(mdIn*mdIn-CFG.motherCoreOD*CFG.motherCoreOD)/(4*tEff)/1000 : NaN);
@@ -856,7 +866,7 @@ function compute(){
   const kgh = n*weight/(setMin/60);
   const mlh = L/(setMin/60);
 
-  Object.assign(res,{T,G,ctx,nPerMm,Wm,motherKnown,trim,used,L,D,Dco,R,v,unw,kR,rewPerMm,nA,nB,wA,wB,rewSetA,rewSetB,rewA,rewB,taper,q,rollA,rollB,rollVel,rollDiam,rollChar,rup,rdn,weight,Lmother,sets,rest,runMin,setMin,kgh,mlh,knife,calc});
+  Object.assign(res,{T,G,ctx,nPerMm,Wm,motherKnown,trim,used,L,D,Dco,R,v,unw,kR,rewPerMm,nA,nB,wA,wB,rewSetA,rewSetB,rewA,rewB,taper,finA,finB,q,rollA,rollB,rollVel,rollDiam,rollChar,rup,rdn,weight,Lmother,sets,rest,runMin,setMin,kgh,mlh,knife,calc});
 
   const A = res.alerts;
   if(used > CFG.wmax) A.push(['crit',`Larghezza utile ${nf(used)} mm oltre il massimo macchina di ${nf(CFG.wmax)} mm.`]);
@@ -960,7 +970,7 @@ function render(){
     return `<span class="ovf${man?' man':''}"><input type="number" class="ov" id="ov_${key}" data-ov="${key}" step="${dec?(1/Math.pow(10,dec)):1}" value="${cur}" aria-label="${label}"><span class="u">${unit}</span>${man?`<button type="button" class="rst" data-rst="${key}" title="Torna al valore calcolato" aria-label="Torna al valore calcolato">↺</button>`:''}</span>${man?`<span class="sub man-note">${lzOvWord(key)} · calcolato ${nf(calcVal,dec)}</span>`:''}`;
   };
   const nMan = Object.keys(OV).length;
-  const endA = r.rewA*(1-r.taper/100), endB = r.rewB*(1-r.taper/100);
+  const endA = isTIF() ? r.finA*r.wA/10 : r.rewA*(1-r.taper/100), endB = isTIF() ? r.finB*r.wB/10 : r.rewB*(1-r.taper/100);
 
   // Euromac TB 3.06: stessi valori calcolati, espressi con i campi e le unità del suo pannello
   const ov2 = (key, val, calcVal, dec, unit, label, isMan, rstKey) => `<span class="ovf${isMan?' man':''}"><input type="number" class="ov" id="ov_${key}" data-ov2="${key}" step="${dec?(1/Math.pow(10,dec)):1}" value="${+(+val).toFixed(dec)}" aria-label="${label}"><span class="u">${unit}</span>${isMan?`<button type="button" class="rst" data-rst="${rstKey}" title="Torna al valore calcolato" aria-label="Torna al valore calcolato">↺</button>`:''}</span>${isMan?`<span class="sub man-note">manuale · calcolato ${nf(calcVal,dec)}</span>`:''}`;
@@ -1115,21 +1125,26 @@ function render(){
     <div class="st">
       <div class="st-h"><h3>3 · Controllo della tensione</h3><span class="tag">riavvolgimento</span></div>
       <dl>
+        ${isTIF() ? `
+        <dt>Albero superiore · Tiro iniziale<span class="dsub">${r.nA} fasce · ${nf(r.wA)} mm · Ø ${nf(r.Dco)} mm</span></dt><dd>${ov('rewA', r.calc.rewA, 2, 'N/cm', 'Tiro iniziale albero superiore')}<span class="sub">${nf(r.rewA)} N</span></dd>
+        <dt>Albero superiore · Tiro finale<span class="dsub">a Ø ${nf(r.D)} mm</span></dt><dd>${ov('finA', r.calc.finALive, 2, 'N/cm', 'Tiro finale albero superiore')}<span class="sub">${nf(endA)} N · calo ${nf(r.rewSetA>0?(1-r.finA/r.rewSetA)*100:0)}%</span></dd>
+        <dt>Albero inferiore · Tiro iniziale<span class="dsub">${r.nB} fasce · ${nf(r.wB)} mm</span></dt><dd>${r.nB?`${ov('rewB', r.calc.rewB, 2, 'N/cm', 'Tiro iniziale albero inferiore')}<span class="sub">${nf(r.rewB)} N</span>`:'—'}</dd>
+        <dt>Albero inferiore · Tiro finale</dt><dd>${r.nB?`${ov('finB', r.calc.finBLive, 2, 'N/cm', 'Tiro finale albero inferiore')}<span class="sub">${nf(endB)} N · calo ${nf(r.rewSetB>0?(1-r.finB/r.rewSetB)*100:0)}%</span>`:'—'}</dd>` : `
         <dt>Albero superiore · Set<span class="dsub">${r.nA} fasce · ${nf(r.wA)} mm</span></dt><dd>${ov('rewA', r.calc.rewA, 2, 'N/cm', 'Set albero superiore')}<span class="sub">Calc ${nf(r.rewA)} N · a fine bobina ${nf(endA)} N</span></dd>
         <dt>Albero inferiore · Set<span class="dsub">${r.nB} fasce · ${nf(r.wB)} mm</span></dt><dd>${r.nB?`${ov('rewB', r.calc.rewB, 2, 'N/cm', 'Set albero inferiore')}<span class="sub">Calc ${nf(r.rewB)} N · a fine bobina ${nf(endB)} N</span>`:'—'}</dd>
-        <dt>Taper %<span class="dsub">uguale sui due alberi · Ø ${nf(r.Dco)} → ${nf(r.D)} mm</span></dt><dd>${ov('taper', r.calc.taper, 0, '%', 'Taper')}</dd>
+        <dt>Taper %<span class="dsub">uguale sui due alberi · Ø ${nf(r.Dco)} → ${nf(r.D)} mm</span></dt><dd>${ov('taper', r.calc.taper, 0, '%', 'Taper')}</dd>`}
       </dl>
-      <p class="why"><b>Controllo:</b> il Calc [N] sul pannello deve coincidere con quello qui sopra. Se è diverso, le larghezze impostate in macchina non corrispondono al lavoro.</p>
+      <p class="why">${isTIF() ? '<b>Tiro iniziale</b> sull\'anima, <b>tiro finale</b> a bobina finita: il pannello passa dall\'uno all\'altro man mano che il diametro cresce. Il tiro finale segue il tiro iniziale; se lo correggi a mano, il calo si ricalcola da solo.' : '<b>Controllo:</b> il Calc [N] sul pannello deve coincidere con quello qui sopra. Se è diverso, le larghezze impostate in macchina non corrispondono al lavoro.'}</p>
     </div>
     <div class="st">
       <div class="st-h"><h3>4 · Rullatura [N]</h3><span class="tag">${nf(r.q)} N/m di carico</span></div>
       <dl>
         <dt>Albero superiore · Set</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero superiore')}</dd>
         <dt>Albero inferiore · Set</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero inferiore'):'—'}</dd>
-        <dt>Vel%</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
-        <dt>Diam%</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>
+        ${isTIF() ? '' : `<dt>Vel%</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
+        <dt>Diam%</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>`}
       </dl>
-      <p class="why">Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.</p>
+      <p class="why">${isTIF() ? 'Su questo impianto la rullatura non ha compensazione di velocità e diametro: resta quella impostata per tutta la bobina.' : 'Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.'}</p>
     </div>
     <div class="st">
       <div class="st-h"><h3>5 · Velocità [m/min]</h3><span class="tag">Lim ${nf(CFG.vmax)}</span></div>
@@ -1257,6 +1272,19 @@ function recipeRows(r){
     res.push(['Pressioni','Contropressione iniziale',CFG.cpStart,'bar','',''], ['Pressioni','Caratteristica contropressione',CFG.cpChar,'%','','']);
     res.push(['Velocità','Velocità di produzione',r0(r.v),'m/min',mk('v'),''], ['Velocità','Rampa accelerazione',r0(r.rup),'s',mk('rup'),''], ['Velocità','Rampa decelerazione',r0(r.rdn),'s',mk('rdn'),'']);
     res.push(['Metri e tagli','Arresto a metratura',r.mode==='D'?'OFF':'ON','','',''], ['Metri e tagli','Set metri',r0(r.L),'m','',''], ['Metri e tagli','Larghezza bobina madre',r0(r.Wm),'mm','',''], ['Metri e tagli','Larghezza stazioni usate',Math.round(r.w*10)/10,'mm','',''], ['Metri e tagli','Tipo taglio',r.knife.type.startsWith('Lame circolari')?'COLTELLI':'LAMETTE','','','']);
+    return res;
+  }
+  if(isTIF()){
+    const res = [], r2 = x => Math.round(x*100)/100, mk = k => OV[k]!=null ? lzOvWord(k) : 'calcolato';
+    for(const row of out){
+      const key = row[0]+'|'+row[1];
+      if(key==='Controllo tensione|Taper' || key==='Rullatura|Vel%' || key==='Rullatura|Diam%') continue;
+      if(key==='Controllo tensione|Albero superiore · Set'){ res.push(['Controllo tensione','Albero superiore · Tiro iniziale',row[2],row[3],row[4],row[5]]); continue; }
+      if(key==='Controllo tensione|Albero inferiore · Set'){ res.push(['Controllo tensione','Albero inferiore · Tiro iniziale',row[2],row[3],row[4],row[5]]); continue; }
+      if(key==='Controllo tensione|Albero superiore · a fine bobina'){ res.push(['Controllo tensione','Albero superiore · Tiro finale',r2(r.finA),'N/cm',mk('finA'),OV.finA!=null?r2(r.calc.finALive):'']); continue; }
+      if(key==='Controllo tensione|Albero inferiore · a fine bobina'){ res.push(['Controllo tensione','Albero inferiore · Tiro finale',r2(r.finB),'N/cm',mk('finB'),OV.finB!=null?r2(r.calc.finBLive):'']); continue; }
+      res.push(row);
+    }
     return res;
   }
   if(PANEL[CUR]==='tb306'){
@@ -1431,17 +1459,21 @@ function recipeText(r){
   if(PANEL[CUR]==='tb610') return recipeTextT6(r);
   if(PANEL[CUR]==='tb306') return recipeTextTB(r);
   const U = CFG.unit, m = k => OV[k]!=null ? ` (${lzOvWord(k)})` : '', lzab = lzCurAb();
-  const endA = r.rewA*(1-r.taper/100), endB = r.rewB*(1-r.taper/100);
+  const endA = isTIF() ? r.finA*r.wA/10 : r.rewA*(1-r.taper/100), endB = isTIF() ? r.finB*r.wB/10 : r.rewB*(1-r.taper/100);
   const lines = [
     `RICETTA IMPIANTO ${CUR} · ${MACH[CUR].model} · ${$('jobCode').value}`,
     `Struttura: ${$('struct').value}  (${nf(r.T,1)} µm, ${nf(r.G,1)} g/m²)`,
     `Taglio: ${r.n} × ${nf(r.w,1)} mm su madre ${nf(r.Wm)} mm, rifilo ${nf(Math.max(0,r.trim),1)} mm/lato · ${r.knife.type}${m('knife')}`,
     lzab && LASER_UNITS[CUR] ? `LASER       ${LASER_UNITS[CUR]} · ${LZ_TIPI[lzab.tipo]||''} · programma n° ${lzab.prog||'—'}${lzab.posizione?` · ${lzab.posizione}`:''} · ricetta ${LZ_STATI[lzab.stato]||'in prova'} v${lzab.versione||1}` : '',
     `SVOLGITORE  Tensione Set ${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${U}${m('unw')}`,
+    ...(isTIF() ? [
+    `TENSIONE    Albero superiore · Tiro iniziale ${nf(r.rewSetA,2)} N/cm${m('rewA')} · Tiro finale ${nf(r.finA,2)} N/cm${m('finA')}`,
+    r.nB ? `            Albero inferiore · Tiro iniziale ${nf(r.rewSetB,2)} N/cm${m('rewB')} · Tiro finale ${nf(r.finB,2)} N/cm${m('finB')}` : '',
+    `RULLATURA   Albero superiore ${nf(r.rollA)} N${m('rollA')}${r.nB?` · Albero inferiore ${nf(r.rollB)} N${m('rollB')}`:''}`] : [
     `TENSIONE    Albero superiore Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
     r.nB ? `            Albero inferiore Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
     `            Taper ${nf(r.taper)}%${m('taper')}`,
-    `RULLATURA   A ${nf(r.rollA)} N${m('rollA')}${r.nB?` · B ${nf(r.rollB)} N${m('rollB')}`:''} · Vel% ${nf(r.rollVel)}${m('rollVel')} · Diam% ${nf(r.rollDiam)}${m('rollDiam')}`,
+    `RULLATURA   A ${nf(r.rollA)} N${m('rollA')}${r.nB?` · B ${nf(r.rollB)} N${m('rollB')}`:''} · Vel% ${nf(r.rollVel)}${m('rollVel')} · Diam% ${nf(r.rollDiam)}${m('rollDiam')}`]),
     `VELOCITÀ    Set ${nf(r.v)} m/min${m('v')} · Ramp+ ${nf(r.rup)} s${m('rup')} · Ramp− ${nf(r.rdn)} s${m('rdn')}`,
     `CONTAMETRI  Set ${nf(r.L)} m · Diametro Set ${r.mode==='D'?nf(r.D):0} mm · Assi ${assiLabel(r.coreID)}`,
     `Bobina: Ø ${nf(r.D)} mm · ${nf(r.weight,1)} kg`,
@@ -1624,14 +1656,20 @@ function diagChanges(d, r){
       rows.push({label:'Tiro superiore', unit:'N', cur:r.rewA, next:r.rewA*(1+c.rew/100), dec:0, delta:sgn(c.rew)}); ov.rewA = +(r.rewSetA*(1+c.rew/100)).toFixed(4);
       if(r.nB){ rows.push({label:'Tiro inferiore', unit:'N', cur:r.rewB, next:r.rewB*(1+c.rew/100), dec:0, delta:sgn(c.rew)}); ov.rewB = +(r.rewSetB*(1+c.rew/100)).toFixed(4); }
     } else {
-      add('rewA','Albero superiore · Set','N/cm',r.rewSetA,+(r.rewSetA*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
-      if(r.nB) add('rewB','Albero inferiore · Set','N/cm',r.rewSetB,+(r.rewSetB*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
+      const sl = isTIF() ? 'Tiro iniziale' : 'Set';
+      add('rewA',`Albero superiore · ${sl}`,'N/cm',r.rewSetA,+(r.rewSetA*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
+      if(r.nB) add('rewB',`Albero inferiore · ${sl}`,'N/cm',r.rewSetB,+(r.rewSetB*(1+c.rew/100)).toFixed(2),2,sgn(c.rew));
+      if(isTIF() && OV.finA!=null){ add('finA','Albero superiore · Tiro finale','N/cm',r.finA,+(r.finA*(1+c.rew/100)).toFixed(2),2,sgn(c.rew)); if(r.nB && OV.finB!=null) add('finB','Albero inferiore · Tiro finale','N/cm',r.finB,+(r.finB*(1+c.rew/100)).toFixed(2),2,sgn(c.rew)); }
     }
   }
   if(c.taper){
     const next = Math.max(0, Math.min(60, Math.round(r.taper + c.taper)));
     if(TB || T6){ const a = carFromTaper(r.taper, r.Dco, r.D), b = carFromTaper(next, r.Dco, r.D);
       rows.push({label:'Caratteristica', unit:'%', cur:a, next:b, dec:0, delta:`${c.taper>0?'più':'meno'} calo di tiro`}); ov.taper = next; }
+    else if(isTIF()){
+      add('finA','Albero superiore · Tiro finale','N/cm',r.finA,+(r.rewSetA*(1-next/100)).toFixed(2),2,`${c.taper>0?'più':'meno'} calo di tiro`);
+      if(r.nB) add('finB','Albero inferiore · Tiro finale','N/cm',r.finB,+(r.rewSetB*(1-next/100)).toFixed(2),2,`${c.taper>0?'più':'meno'} calo di tiro`);
+    }
     else add('taper','Taper','%',r.taper,next,0,`${c.taper>0?'+':''}${c.taper} punti`);
   }
   if(c.roll && T6){
@@ -1845,12 +1883,14 @@ function buildPdf(r, into){
     ...(lzab ? [[`0 · LASER IN LINEA · ${LASER_UNITS[CUR]}`, [['Programma da richiamare', `n° ${lzab.prog||'—'}`], ['Incisione', LZ_TIPI[lzab.tipo]||'—', lzab.posizione ? String(lzab.posizione).slice(0,60) : '']]]] : []),
     ['1 · SVOLGITORE', [['Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
     ['2 · TAGLIO', [['Sistema', cutKind], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
+    isTIF() ? ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Tiro iniziale', `${nf(r.rewSetA,2)} N/cm`], ['Albero superiore · Tiro finale', `${nf(r.finA,2)} N/cm`],
+      ...(r.nB?[['Albero inferiore · Tiro iniziale', `${nf(r.rewSetB,2)} N/cm`], ['Albero inferiore · Tiro finale', `${nf(r.finB,2)} N/cm`]]:[])]] :
     ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
       ...(r.nB?[['Albero inferiore · Set', `${nf(r.rewSetB,2)} N/cm${man('rewB')}`, `Calc ${nf(r.rewB)} N · fine bobina ${nf(r.rewB*(1-r.taper/100))} N`]]:[]),
       ['Taper', `${nf(r.taper)} %${man('taper')}`]]]
   ];
   R = [
-    ['4 · RULLATURA', [['Albero superiore · Set', `${nf(r.rollA)} N${man('rollA')}`], ...(r.nB?[['Albero inferiore · Set', `${nf(r.rollB)} N${man('rollB')}`]]:[]), ['Vel%', `${nf(r.rollVel)} %${man('rollVel')}`], ['Diam%', `${nf(r.rollDiam)} %${man('rollDiam')}`]]],
+    ['4 · RULLATURA', [['Albero superiore · Set', `${nf(r.rollA)} N${man('rollA')}`], ...(r.nB?[['Albero inferiore · Set', `${nf(r.rollB)} N${man('rollB')}`]]:[]), ...(isTIF() ? [] : [['Vel%', `${nf(r.rollVel)} %${man('rollVel')}`], ['Diam%', `${nf(r.rollDiam)} %${man('rollDiam')}`]])]],
     ['5 · VELOCITÀ', [['Set', `${nf(r.v)} m/min${man('v')}`], ['Ramp+', `${nf(r.rup)} s${man('rup')}`], ['Ramp-', `${nf(r.rdn)} s${man('rdn')}`]]],
     ['6 · CONTAMETRI', [['Contametri Set', `${nf(r.L)} m`], ['Diametro Set', r.mode==='D' ? `${nf(r.D)} mm` : '0 mm (fermata a metri)'], ['Scelta assi', assiLabel(r.coreID)]]]
   ];
@@ -2013,30 +2053,41 @@ $('archList').addEventListener('click', async e => {
 let LZ = null, LZ_ERR = false, LZ_LOADED = null, LZ_OPEN = null, LZ_ARM = null, LZ_BUSY = false;
 let RIL = null, RIL_ERR = false, RIL_DB = null, CAN_RIL = false, CAN_RIL_VIEW = false, ME = '';
 const LZ_RIL_OPEN = new Set();
-const LZ_SHORT = {unw:'Svolg.', rewA:'Alb. A', rewB:'Alb. B', taper:'Taper', rollA:'Rull. A', rollB:'Rull. B', rollVel:'Vel%', rollDiam:'Diam%', v:'Vel.', rup:'Ramp+', rdn:'Ramp−'};
+const LZ_SHORT = {unw:'Svolg.', rewA:'Alb. sup.', rewB:'Alb. inf.', finA:'Fin. sup.', finB:'Fin. inf.', taper:'Taper', rollA:'Rull. sup.', rollB:'Rull. inf.', rollVel:'Vel%', rollDiam:'Diam%', v:'Vel.', rup:'Ramp+', rdn:'Ramp−'};
 const lzArt = id => (LZ||[]).find(a=>a.id===id) || null;
 const lzAbOf = (art, mach) => (art && art.abil && art.abil[mach]) || null;
 const lzCurAb = () => LZ_LOADED ? lzAbOf(lzArt(LZ_LOADED.id), CUR) : null;
 const lzMachUnit = mach => ((MACH[mach]||{}).cfg||{}).unit || 'N';
 const lzKeyDef = k => LZ_KEYS.find(x=>x[0]===k) || [k,k,'',0];
+// parametri del pannello di quell'impianto, con i nomi del pannello (115: tiro iniziale / finale, niente taper, Vel%, Diam%)
+const LZ_TIF_OUT = ['taper','rollVel','rollDiam'], LZ_STD_OUT = ['finA','finB'];
+function lzKeysFor(mach){
+  const t = !!TIRO_IF[mach], out = t ? LZ_TIF_OUT : LZ_STD_OUT;
+  return LZ_KEYS.filter(([k])=>!out.includes(k)).map(([k,l,u,d]) => [k, t && k==='rewA' ? 'Albero superiore · Tiro iniziale' : t && k==='rewB' ? 'Albero inferiore · Tiro iniziale' : l, u, d]);
+}
+const lzLabelOf = (k, mach) => (lzKeysFor(mach).find(x=>x[0]===k) || lzKeyDef(k))[1];
 const lzUnitOf = (k, mach) => k==='unw' ? lzMachUnit(mach) : lzKeyDef(k)[2];
 function lzDecOf(k, mach){ if(k!=='unw') return lzKeyDef(k)[3]; const u = lzMachUnit(mach); return u==='N/cm' ? 2 : u==='N' ? 0 : 1; }
 function lzFmt(k, v, mach){ const x = lzNum(v); return Number.isFinite(x) ? `${nf(x, lzDecOf(k, mach))} ${lzUnitOf(k, mach)}`.trim() : '—'; }
-const lzValsText = (av, mach) => LZ_KEYS.filter(([k])=>Number.isFinite(lzNum((av||{})[k]))).map(([k,l])=>`${l} ${lzFmt(k, av[k], mach)}`).join(' · ');
+const lzValsText = (av, mach) => lzKeysFor(mach).filter(([k])=>Number.isFinite(lzNum((av||{})[k]))).map(([k,l])=>`${l} ${lzFmt(k, av[k], mach)}`).join(' · ');
 const fmtDT = iso => { const d = new Date(iso); return isNaN(d) ? '—' : d.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); };
 function lzToast(el, m){ if(!el) return; el.textContent = m; clearTimeout(el._h); el._h = setTimeout(()=>{ el.textContent = ''; }, 3500); }
 // valori della ricetta sullo schermo, nelle unità del pannello LAEM (quelli che si salvano nella ricetta laser)
 function lzValuesOf(r){
   if(!r || r.invalid) return null;
-  return {unw:+unwToPanel(r.unw, r.Wm).toFixed(unwDec()), rewA:+r.rewSetA.toFixed(2), rewB: r.nB ? +r.rewSetB.toFixed(2) : null,
+  const o = {unw:+unwToPanel(r.unw, r.Wm).toFixed(unwDec()), rewA:+r.rewSetA.toFixed(2), rewB: r.nB ? +r.rewSetB.toFixed(2) : null,
     taper:+(+r.taper).toFixed(1), rollA:Math.round(r.rollA), rollB: r.nB ? Math.round(r.rollB) : null, rollVel:+r.rollVel, rollDiam:+r.rollDiam,
     v:Math.round(r.v), rup:Math.round(r.rup), rdn:Math.round(r.rdn)};
+  if(isTIF()){ o.finA = +r.finA.toFixed(2); o.finB = r.nB ? +r.finB.toFixed(2) : null; delete o.taper; delete o.rollVel; delete o.rollDiam; }
+  return o;
 }
 // gli stessi parametri come li calcola il programma dal materiale
 function lzCalcOf(r){
   const c = r.calc;
-  return {unw:c.unw, rewA:c.rewA, rewB: r.nB ? c.rewB : null, taper:c.taper, rollA:c.rollA, rollB: r.nB ? c.rollB : null,
+  const o = {unw:c.unw, rewA:c.rewA, rewB: r.nB ? c.rewB : null, taper:c.taper, rollA:c.rollA, rollB: r.nB ? c.rollB : null,
     rollVel:c.rollVel, rollDiam:c.rollDiam, v:c.v, rup:c.rup, rdn:c.rdn};
+  if(isTIF()){ o.finA = c.finA; o.finB = r.nB ? c.finB : null; delete o.taper; delete o.rollVel; delete o.rollDiam; }
+  return o;
 }
 // da dove viene un valore scritto sopra al calcolato: dalla ricetta laser, da una rilevazione o da una modifica a mano
 function lzOvWord(k){
@@ -2064,7 +2115,7 @@ function lzAlerts(r, A){
   if(LZ_LOADED.src==='rilevazione') A.push(['info', `Valori presi dalla rilevazione ${LZ_LOADED.srcLabel}, non dalla ricetta salvata (v${ab.versione||1}). Per tenerli aggiorna la ricetta laser con il motivo.`]);
   else {
     const diff = lzDiffKeys(lzValuesOf(r), ab.av||{}, 0.005);
-    if(diff.length) A.push(['info', `Valori diversi dalla ricetta laser salvata: ${diff.map(k=>lzKeyDef(k)[1]).join(', ')}.${CAN_EDIT ? ' Se la modifica va tenuta, aggiorna la ricetta laser con il motivo; altrimenti chiudi e riapri l\'articolo.' : ''}`]);
+    if(diff.length) A.push(['info', `Valori diversi dalla ricetta laser salvata: ${diff.map(k=>lzLabelOf(k, CUR)).join(', ')}.${CAN_EDIT ? ' Se la modifica va tenuta, aggiorna la ricetta laser con il motivo; altrimenti chiudi e riapri l\'articolo.' : ''}`]);
   }
   const dev = lzDeviations(ab.av||{}, lzCalcOf(r), LZ_DEV_THR);
   if(dev.length) A.push(['info', `Controllo con il calcolo teorico: ${dev.map(d=>`${lzKeyDef(d.k)[1]} salvato ${lzFmt(d.k, d.val, CUR)}, calcolato ${lzFmt(d.k, d.calc, CUR)} (${d.pct>0?'+':''}${nf(d.pct*100)}%)`).join(' · ')}. La ricetta salvata non cambia: se è provata vale lei. L'avviso serve a notare un errore di battitura.`]);
@@ -2217,7 +2268,7 @@ function renderRilPanel(){
       <div class="field"><label for="rilSq">Squadra</label><select id="rilSq"><option value="">—</option><option>A</option><option>B</option><option>C</option></select></div>
       <div class="field"><label for="rilLotto">Lotto / ODL</label><input type="text" id="rilLotto"></div>
     </div>
-    <div class="rilgrid">${LZ_KEYS.filter(([k])=>(k!=='rewB' && k!=='rollB') || LAST.nB).map(([k,l])=>`<div class="field"><label for="ril_${k}">${esc(l)} · ${esc(lzUnitOf(k, CUR))}</label><input type="number" step="any" id="ril_${k}" data-ril="${k}"></div>`).join('')}</div>
+    <div class="rilgrid">${lzKeysFor(CUR).filter(([k])=>(k!=='rewB' && k!=='rollB' && k!=='finB') || LAST.nB).map(([k,l])=>`<div class="field"><label for="ril_${k}">${esc(l)} · ${esc(lzUnitOf(k, CUR))}</label><input type="number" step="any" id="ril_${k}" data-ril="${k}"></div>`).join('')}</div>
     <div class="actions"><button type="button" class="ghost sm" id="rilReset">Riprendi i valori della ricetta</button></div>
     <div class="field"><span class="lbl">Com'è venuta la bobina</span><div class="checks">${LZ_DIFETTI.map(([k,l])=>`<label class="check"><input type="checkbox" id="rilD_${k}"> ${esc(l)}</label>`).join('')}</div><span class="hint">Nessuna casella spuntata = bobina buona.</span></div>
     <div class="field"><label for="rilNote">Note</label><input type="text" id="rilNote" placeholder="Es. cordonatura leggera dopo metà bobina"></div>
@@ -2258,7 +2309,7 @@ function lzRilTable(a, m, b){
   const rils = lzRilsOf(a.id, m);
   if(!rils.length) return `<p class="hint">Nessuna rilevazione dei lotti. Si registrano aprendo l'articolo nel calcolatore: sotto la ricetta compare "Rilevazione lotto".</p>`;
   const av = b.av || {};
-  const keys = LZ_KEYS.map(x=>x[0]).filter(k => Number.isFinite(lzNum(av[k])) || rils.some(r=>Number.isFinite(lzNum((r.valori||{})[k]))));
+  const keys = lzKeysFor(m).map(x=>x[0]).filter(k => Number.isFinite(lzNum(av[k])) || rils.some(r=>Number.isFinite(lzNum((r.valori||{})[k]))));
   const cell = (k, v) => { const x = lzNum(v); return Number.isFinite(x) ? nf(x, lzDecOf(k, m)) : '—'; };
   const rg = lzRanges(rils), nDif = rils.filter(r=>lzEsito(r.difetti)!=='ok').length;
   const sq = [...new Set(rils.map(r=>r.squadra).filter(Boolean))].sort();
@@ -2273,14 +2324,14 @@ function lzRilTable(a, m, b){
   }).join('');
   const k_ = `${a.id}|${m}`;
   return `<details class="sub" data-rilopen="${esc(k_)}"${LZ_RIL_OPEN.has(k_) ? ' open' : ''}><summary>Rilevazioni dei lotti (${rils.length}${nDif ? ` · ${nDif} con difetti` : ''})</summary>
-    <div class="tbl-wrap" style="margin-top:8px"><table class="ril"><thead><tr><th>Data</th><th>Sq.</th><th>Lotto</th>${keys.map(k=>`<th title="${esc(lzKeyDef(k)[1])} (${esc(lzUnitOf(k, m))})">${LZ_SHORT[k]}</th>`).join('')}<th>Bobina</th><th></th></tr></thead>
+    <div class="tbl-wrap" style="margin-top:8px"><table class="ril"><thead><tr><th>Data</th><th>Sq.</th><th>Lotto</th>${keys.map(k=>`<th title="${esc(lzLabelOf(k, m))} (${esc(lzUnitOf(k, m))})">${LZ_SHORT[k]}</th>`).join('')}<th>Bobina</th><th></th></tr></thead>
     <tbody><tr class="ref"><td colspan="3">Ricetta v${b.versione||1}</td>${keys.map(k=>`<td class="n">${cell(k, av[k])}</td>`).join('')}<td></td><td></td></tr>${rows}</tbody></table></div>
     <p class="hint">${rils.length} lotti · ${nDif} con difetti · squadre: ${esc(sq.join(', ') || '—')}. Evidenziati i valori oltre il ${nf(LZ_DIFF_TOL*100)}% dalla ricetta salvata. ${rg.n ? (var_.length ? `Sui ${rg.n} lotti buoni i valori variano: ${esc(var_.join(' · '))}.` : `Sui ${rg.n} lotti buoni i valori sono gli stessi.`) : 'Nessun lotto buono finora.'}</p>
   </details>`;
 }
 function lzCard(a, m){
   const b = a.abil[m], av = b.av || {}, job = b.job || {}, kk = `${a.id}|${m}`;
-  const vals = LZ_KEYS.filter(([k])=>Number.isFinite(lzNum(av[k]))).map(([k,l])=>`<span>${esc(l)} <b>${esc(lzFmt(k, av[k], m))}</b></span>`).join('');
+  const vals = lzKeysFor(m).filter(([k])=>Number.isFinite(lzNum(av[k]))).map(([k,l])=>`<span>${esc(l)} <b>${esc(lzFmt(k, av[k], m))}</b></span>`).join('');
   const meta = [`programma n° ${esc(b.prog||'—')}`, esc(LZ_TIPI[b.tipo]||''), b.posizione ? `riferimento: ${esc(b.posizione)}` : '', b.controllo ? `controllo: ${esc(b.controllo)}` : '', b.note ? esc(b.note) : ''].filter(Boolean).join(' · ');
   const who = b.stato==='validata' && b.validataIl ? `validata il ${fmtD(b.validataIl)}${b.validataDa ? ' da '+esc(b.validataDa) : ''}` : `salvata il ${fmtD(b.salvataIl)}${b.salvataDa ? ' da '+esc(b.salvataDa) : ''}`;
   const edit = CAN_EDIT ? `${b.stato!=='validata'
