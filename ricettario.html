@@ -607,8 +607,8 @@ const DEFAULT_MODEL = {'115':'LAEM TR 415/1400','116':'LAEM TR 415/1400','118':'
 // Pannello di ogni impianto: 'laem' = LAEM TR 415, 'tb306' = Euromac TB 3.06 (manuale impianto 100),
 // 'generic' = pannello non ancora ricavato dal manuale (campi come LAEM).
 const PANEL = {'115':'laem','116':'laem','118':'laem','100':'tb306','119':'tb610'};
-// LAEM che sul pannello hanno, per ogni albero, "tiro iniziale" e "tiro finale" al posto di Set + Taper,
-// e la rullatura senza Vel% e Diam% (la 115). Il taper resta nel calcolo: tiro finale = tiro iniziale × (1 − taper).
+// LAEM che sul pannello hanno, per ogni albero, "tiro iniziale" e "tiro finale" al posto di Set + Taper (la 115).
+// Press.% Vel. e Press.% Diam. ci sono, ma sulla pagina AVVOLGITORI. Svolgitore in N, tiro finale riferito alla bobina prodotta. Il taper resta nel calcolo: tiro finale = tiro iniziale × (1 − taper).
 const TIRO_IF = {'115':true};
 const isTIF = (m = CUR) => !!TIRO_IF[m];
 // Dati di targa dal manuale Euromac TB 3.06: velocità max 450 m/min, Ø max avvolgimento 600 mm.
@@ -1142,10 +1142,10 @@ function render(){
       <dl>
         <dt>Albero superiore · ${isTIF()?'Pressione':'Set'}</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero superiore')}</dd>
         <dt>Albero inferiore · ${isTIF()?'Pressione':'Set'}</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero inferiore'):'—'}</dd>
-        ${isTIF() ? '' : `<dt>Vel%</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
-        <dt>Diam%</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>`}
+        <dt>${isTIF()?'Press.% Vel.<span class="dsub">pagina Avvolgitori</span>':'Vel%'}</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
+        <dt>${isTIF()?'Press.% Diam.<span class="dsub">pagina Avvolgitori</span>':'Diam%'}</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>
       </dl>
-      <p class="why">${isTIF() ? 'Campo Pressione [N] della pagina Parametri produzione. La lettura in bar compare sulla pagina Avvolgitori.' : 'Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.'}</p>
+      <p class="why">${isTIF() ? 'Pressione [N] sulla pagina Parametri produzione. Press.% Vel. e Press.% Diam. si impostano sulla pagina Avvolgitori, nel riquadro di ciascun avvolgitore (stesso valore su superiore e inferiore): aumentano la pressione di quella percentuale alla velocità massima (600 m/min) e al diametro massimo.' : 'Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.'}</p>
     </div>
     <div class="st">
       <div class="st-h"><h3>5 · Velocità [m/min]</h3><span class="tag">Lim ${nf(CFG.vmax)}</span></div>
@@ -1282,8 +1282,8 @@ function recipeRows(r){
     const res = [], r2 = x => Math.round(x*100)/100, mk = k => OV[k]!=null ? lzOvWord(k) : 'calcolato';
     for(const row of out){
       const key = row[0]+'|'+row[1];
-      if(key==='Controllo tensione|Taper' || key==='Rullatura|Vel%' || key==='Rullatura|Diam%' || key==='Contametri|Scelta assi') continue;
-      const ren = {'Svolgitore|Tensione Set':['Svolgitore','Tiro Materiale'], 'Rullatura|Albero superiore · Set':['Pressione rullatura','Albero superiore · Pressione'], 'Rullatura|Albero inferiore · Set':['Pressione rullatura','Albero inferiore · Pressione'],
+      if(key==='Controllo tensione|Taper' || key==='Contametri|Scelta assi') continue;
+      const ren = {'Svolgitore|Tensione Set':['Svolgitore','Tiro Materiale'], 'Rullatura|Albero superiore · Set':['Pressione rullatura','Albero superiore · Pressione'], 'Rullatura|Albero inferiore · Set':['Pressione rullatura','Albero inferiore · Pressione'], 'Rullatura|Vel%':['Pressione rullatura','Press.% Vel. (pagina Avvolgitori)'], 'Rullatura|Diam%':['Pressione rullatura','Press.% Diam. (pagina Avvolgitori)'],
         'Velocità|Set':['Velocità','Velocità'], 'Velocità|Ramp+':['Velocità','Rampa Accelera'], 'Velocità|Ramp−':['Velocità','Rampa Decelera']};
       if(key==='Contametri|Contametri Set'){ res.push(['Stop','Metri Stop',r.mode==='D'?0:row[2],'m','','']); continue; }
       if(key==='Contametri|Diametro Set'){ res.push(['Stop','Diametro Stop',row[2],'mm','','']); continue; }
@@ -1478,7 +1478,7 @@ function recipeText(r){
     ...(isTIF() ? [
     `TENSIONE    Albero superiore · Tiro iniziale ${nf(r.rewSetA,2)} N/cm${m('rewA')} · Tiro finale ${nf(r.finA,2)} N/cm${m('finA')}`,
     r.nB ? `            Albero inferiore · Tiro iniziale ${nf(r.rewSetB,2)} N/cm${m('rewB')} · Tiro finale ${nf(r.finB,2)} N/cm${m('finB')}` : '',
-    `PRESSIONE   Albero superiore ${nf(r.rollA)} N${m('rollA')}${r.nB?` · Albero inferiore ${nf(r.rollB)} N${m('rollB')}`:''}`] : [
+    `PRESSIONE   Albero superiore ${nf(r.rollA)} N${m('rollA')}${r.nB?` · Albero inferiore ${nf(r.rollB)} N${m('rollB')}`:''} · Press.% Vel. ${nf(r.rollVel)}${m('rollVel')} · Press.% Diam. ${nf(r.rollDiam)}${m('rollDiam')} (pagina Avvolgitori)`] : [
     `TENSIONE    Albero superiore Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
     r.nB ? `            Albero inferiore Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
     `            Taper ${nf(r.taper)}%${m('taper')}`,
@@ -1901,7 +1901,7 @@ function buildPdf(r, into){
       ['Taper', `${nf(r.taper)} %${man('taper')}`]]]
   ];
   R = isTIF() ? [
-    ['4 · PRESSIONE RULLATURA', [['Albero superiore · Pressione', `${nf(r.rollA)} N`], ...(r.nB?[['Albero inferiore · Pressione', `${nf(r.rollB)} N`]]:[])]],
+    ['4 · PRESSIONE RULLATURA', [['Albero superiore · Pressione', `${nf(r.rollA)} N`], ...(r.nB?[['Albero inferiore · Pressione', `${nf(r.rollB)} N`]]:[]), ['Press.% Vel. (pag. Avvolgitori)', `${nf(r.rollVel)} %`], ['Press.% Diam. (pag. Avvolgitori)', `${nf(r.rollDiam)} %`]]],
     ['5 · VELOCITÀ', [['Velocità', `${nf(r.v)} m/min`], ['Rampa Accelera', `${nf(r.rup)} s`], ['Rampa Decelera', `${nf(r.rdn)} s`]]],
     ['6 · STOP', [['Metri Stop', r.mode==='D' ? '0 m (fermata a diametro)' : `${nf(r.L)} m`], ['Diametro Stop', r.mode==='D' ? `${nf(r.D)} mm` : '0 mm (fermata a metri)']]]
   ] : [
@@ -2074,11 +2074,12 @@ const lzAbOf = (art, mach) => (art && art.abil && art.abil[mach]) || null;
 const lzCurAb = () => LZ_LOADED ? lzAbOf(lzArt(LZ_LOADED.id), CUR) : null;
 const lzMachUnit = mach => ((MACH[mach]||{}).cfg||{}).unit || 'N';
 const lzKeyDef = k => LZ_KEYS.find(x=>x[0]===k) || [k,k,'',0];
-// parametri del pannello di quell'impianto, con i nomi del pannello (115: tiro iniziale / finale, niente taper, Vel%, Diam%)
-const LZ_TIF_OUT = ['taper','rollVel','rollDiam'], LZ_STD_OUT = ['finA','finB'];
+// parametri del pannello di quell'impianto, con i nomi del pannello (115: tiro iniziale / finale al posto del taper)
+const LZ_TIF_OUT = ['taper'], LZ_STD_OUT = ['finA','finB'];
 function lzKeysFor(mach){
   const t = !!TIRO_IF[mach], out = t ? LZ_TIF_OUT : LZ_STD_OUT;
-  return LZ_KEYS.filter(([k])=>!out.includes(k)).map(([k,l,u,d]) => [k, t && k==='rewA' ? 'Albero superiore · Tiro iniziale' : t && k==='rewB' ? 'Albero inferiore · Tiro iniziale' : l, u, d]);
+  const tl = {rewA:'Albero superiore · Tiro iniziale', rewB:'Albero inferiore · Tiro iniziale', rollVel:'Press.% Vel.', rollDiam:'Press.% Diam.'};
+  return LZ_KEYS.filter(([k])=>!out.includes(k)).map(([k,l,u,d]) => [k, t && tl[k] ? tl[k] : l, u, d]);
 }
 const lzLabelOf = (k, mach) => (lzKeysFor(mach).find(x=>x[0]===k) || lzKeyDef(k))[1];
 const lzUnitOf = (k, mach) => k==='unw' ? lzMachUnit(mach) : lzKeyDef(k)[2];
@@ -2093,7 +2094,7 @@ function lzValuesOf(r){
   const o = {unw:+unwToPanel(r.unw, r.Wm).toFixed(unwDec()), rewA:+r.rewSetA.toFixed(2), rewB: r.nB ? +r.rewSetB.toFixed(2) : null,
     taper:+(+r.taper).toFixed(1), rollA:Math.round(r.rollA), rollB: r.nB ? Math.round(r.rollB) : null, rollVel:+r.rollVel, rollDiam:+r.rollDiam,
     v:Math.round(r.v), rup:Math.round(r.rup), rdn:Math.round(r.rdn)};
-  if(isTIF()){ o.finA = +r.finA.toFixed(2); o.finB = r.nB ? +r.finB.toFixed(2) : null; delete o.taper; delete o.rollVel; delete o.rollDiam; }
+  if(isTIF()){ o.finA = +r.finA.toFixed(2); o.finB = r.nB ? +r.finB.toFixed(2) : null; delete o.taper; }
   return o;
 }
 // gli stessi parametri come li calcola il programma dal materiale
@@ -2101,7 +2102,7 @@ function lzCalcOf(r){
   const c = r.calc;
   const o = {unw:c.unw, rewA:c.rewA, rewB: r.nB ? c.rewB : null, taper:c.taper, rollA:c.rollA, rollB: r.nB ? c.rollB : null,
     rollVel:c.rollVel, rollDiam:c.rollDiam, v:c.v, rup:c.rup, rdn:c.rdn};
-  if(isTIF()){ o.finA = c.finA; o.finB = r.nB ? c.finB : null; delete o.taper; delete o.rollVel; delete o.rollDiam; }
+  if(isTIF()){ o.finA = c.finA; o.finB = r.nB ? c.finB : null; delete o.taper; }
   return o;
 }
 // da dove viene un valore scritto sopra al calcolato: dalla ricetta laser, da una rilevazione o da una modifica a mano
