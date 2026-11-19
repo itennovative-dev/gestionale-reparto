@@ -887,6 +887,7 @@ function compute(){
   }
   if(aluOuter && LIM[CUR] && LIM[CUR].aluEst===true) A.push(['info','Alluminio esterno: impianto abilitato. Controlla bave e polvere sul lato alluminio.']);
   if(!hasLimits(CUR)) A.push(['info', `Limiti dell'impianto ${CUR} non inseriti: compilali in Taratura per controllare fascia, anime, diametro e peso.`]);
+  if(isTIF() && (rup<60 || rdn<60)) A.push(['warn','Sul pannello di questo impianto Rampa Accelera e Rampa Decelera non scendono sotto 60 s.']);
   if(PANEL[CUR]==='generic') A.push(['info', 'Per questo impianto il pannello non è ancora ricavato dal manuale: nomi e unità dei campi seguono le LAEM. La prima volta confronta con il pannello della macchina e correggi la taratura (unità tensione, velocità max, rampe).']);
   if(PANEL[CUR]==='tb610'){
     if(w > 650 && w <= 1200) A.push(['warn', `Fascia di ${nf(w)} mm: oltre 650 mm serve una stazione composta da due bracci motorizzati (fino a 1.200 mm e 1.000 kg). Togli i bracci non motorizzati prima di montare.`]);
@@ -1113,7 +1114,7 @@ function render(){
     <div class="st">
       <div class="st-h"><h3>1 · Svolgitore</h3><span class="tag">nastro intero ${nf(r.Wm)} mm</span></div>
       <dl>
-        <dt>Tensione Set</dt><dd>${ov('unw', r.calc.unw, ud, U, 'Tensione svolgitore')}<span class="sub">${nf(r.unw)} N totali${U!=='N/cm'?` · ${nf(r.nPerMm*10,2)} N/cm`:''}</span></dd>
+        <dt>${isTIF()?'Tiro Materiale':'Tensione Set'}</dt><dd>${ov('unw', r.calc.unw, ud, U, 'Tensione svolgitore')}<span class="sub">${nf(r.unw)} N totali${U!=='N/cm'?` · ${nf(r.nPerMm*10,2)} N/cm`:''}</span></dd>
       </dl>
       <p class="why">Svolgitore in N totali, come sul pannello. Si cambia in Taratura.</p>
     </div>
@@ -1123,7 +1124,7 @@ function render(){
       <p class="why"><b>Perché:</b> ${r.knife.why}</p>
     </div>
     <div class="st">
-      <div class="st-h"><h3>3 · Controllo della tensione</h3><span class="tag">riavvolgimento</span></div>
+      <div class="st-h"><h3>3 · ${isTIF()?'Avvolgitore':'Controllo della tensione'}</h3><span class="tag">riavvolgimento</span></div>
       <dl>
         ${isTIF() ? `
         <dt>Albero superiore · Tiro iniziale<span class="dsub">${r.nA} fasce · ${nf(r.wA)} mm · Ø ${nf(r.Dco)} mm</span></dt><dd>${ov('rewA', r.calc.rewA, 2, 'N/cm', 'Tiro iniziale albero superiore')}<span class="sub">${nf(r.rewA)} N</span></dd>
@@ -1137,30 +1138,33 @@ function render(){
       <p class="why">${isTIF() ? '<b>Tiro iniziale</b> sull\'anima, <b>tiro finale</b> a bobina finita: il pannello passa dall\'uno all\'altro man mano che il diametro cresce. Il tiro finale segue il tiro iniziale; se lo correggi a mano, il calo si ricalcola da solo.' : '<b>Controllo:</b> il Calc [N] sul pannello deve coincidere con quello qui sopra. Se è diverso, le larghezze impostate in macchina non corrispondono al lavoro.'}</p>
     </div>
     <div class="st">
-      <div class="st-h"><h3>4 · Rullatura [N]</h3><span class="tag">${nf(r.q)} N/m di carico</span></div>
+      <div class="st-h"><h3>4 · ${isTIF()?'Pressione rullatura [N]':'Rullatura [N]'}</h3><span class="tag">${nf(r.q)} N/m di carico</span></div>
       <dl>
-        <dt>Albero superiore · Set</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero superiore')}</dd>
-        <dt>Albero inferiore · Set</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero inferiore'):'—'}</dd>
+        <dt>Albero superiore · ${isTIF()?'Pressione':'Set'}</dt><dd>${ov('rollA', r.calc.rollA, 0, 'N', 'Rullatura albero superiore')}</dd>
+        <dt>Albero inferiore · ${isTIF()?'Pressione':'Set'}</dt><dd>${r.nB?ov('rollB', r.calc.rollB, 0, 'N', 'Rullatura albero inferiore'):'—'}</dd>
         ${isTIF() ? '' : `<dt>Vel%</dt><dd>${ov('rollVel', r.calc.rollVel, 0, '%', 'Rullatura Vel%')}</dd>
         <dt>Diam%</dt><dd>${ov('rollDiam', r.calc.rollDiam, 0, '%', 'Rullatura Diam%')}</dd>`}
       </dl>
-      <p class="why">${isTIF() ? 'Su questo impianto la rullatura non ha compensazione di velocità e diametro: resta quella impostata per tutta la bobina.' : 'Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.'}</p>
+      <p class="why">${isTIF() ? 'Campo Pressione [N] della pagina Parametri produzione. La lettura in bar compare sulla pagina Avvolgitori.' : 'Vel% e Diam% compensano la rullatura con velocità e diametro. Il valore iniziale è quello in uso oggi: verifica sul manuale LAEM come agiscono prima di cambiarli.'}</p>
     </div>
     <div class="st">
       <div class="st-h"><h3>5 · Velocità [m/min]</h3><span class="tag">Lim ${nf(CFG.vmax)}</span></div>
       <dl>
-        <dt>Set</dt><dd>${ov('v', r.calc.v, 0, 'm/min', 'Velocità set')}</dd>
-        <dt>Ramp+</dt><dd>${ov('rup', r.calc.rup, 0, 's', 'Rampa di salita')}</dd>
-        <dt>Ramp−</dt><dd>${ov('rdn', r.calc.rdn, 0, 's', 'Rampa di discesa')}</dd>
+        <dt>${isTIF()?'Velocità':'Set'}</dt><dd>${ov('v', r.calc.v, 0, 'm/min', 'Velocità set')}</dd>
+        <dt>${isTIF()?'Rampa Accelera':'Ramp+'}</dt><dd>${ov('rup', r.calc.rup, 0, 's', 'Rampa di salita')}</dd>
+        <dt>${isTIF()?'Rampa Decelera':'Ramp−'}</dt><dd>${ov('rdn', r.calc.rdn, 0, 's', 'Rampa di discesa')}</dd>
       </dl>
       <p class="why"><b>Come è calcolata:</b> ${r.ctx.vWhy.join(' → ')} → <b>${nf(r.calc.v)} m/min</b>. Le rampe sono riferite al Lim di ${nf(CFG.vmax)} m/min: con Ramp+ ${nf(r.rup)} s arriva a ${nf(r.v)} m/min in ${nf(r.tUp)} s.</p>
     </div>
     <div class="st">
       <div class="st-h"><h3>6 · Contametri e produzione</h3><span class="tag">${Number.isFinite(r.sets)?'dalla madre':'per tiratura'}</span></div>
       <dl>
+        ${isTIF() ? `
+        <dt>Metri Stop</dt><dd>${r.mode==='D'?'0<span class="u">m</span><span class="sub">fermata a diametro</span>':nf(r.L)+'<span class="u">m</span>'}</dd>
+        <dt>Diametro Stop</dt><dd>${r.mode==='D'?nf(r.D)+'<span class="u">mm</span>':'0<span class="u">mm</span><span class="sub">fermata a metri</span>'}</dd>` : `
         <dt>Contametri Set</dt><dd>${nf(r.L)}<span class="u">m</span></dd>
         <dt>Diametro Set</dt><dd>${r.mode==='D'?nf(r.D)+'<span class="u">mm</span>':'0<span class="u">mm</span><span class="sub">fermata a metri</span>'}</dd>
-        <dt>Scelta assi</dt><dd>${assiLabel(r.coreID)}</dd>
+        <dt>Scelta assi</dt><dd>${assiLabel(r.coreID)}</dd>`}
         <dt>Tiratura (marcia + cambio)</dt><dd>${nf(r.setMin,0)}<span class="u">min</span><span class="sub">${nf(r.runMin,1)} marcia + ${CFG.change} cambio</span></dd>
         ${Number.isFinite(r.sets)?`<dt>Tirature dalla madre</dt><dd>${r.sets}<span class="u">× ${r.n} bobine</span><span class="sub">avanzo ${nf(r.rest)} m</span></dd>`:''}
         <dt>Resa oraria in metri lineari<span class="dsub">metri di bobina madre lavorati, cambi inclusi</span></dt><dd>${nf(r.mlh)}<span class="u">m/h</span></dd>
@@ -1278,7 +1282,12 @@ function recipeRows(r){
     const res = [], r2 = x => Math.round(x*100)/100, mk = k => OV[k]!=null ? lzOvWord(k) : 'calcolato';
     for(const row of out){
       const key = row[0]+'|'+row[1];
-      if(key==='Controllo tensione|Taper' || key==='Rullatura|Vel%' || key==='Rullatura|Diam%') continue;
+      if(key==='Controllo tensione|Taper' || key==='Rullatura|Vel%' || key==='Rullatura|Diam%' || key==='Contametri|Scelta assi') continue;
+      const ren = {'Svolgitore|Tensione Set':['Svolgitore','Tiro Materiale'], 'Rullatura|Albero superiore · Set':['Pressione rullatura','Albero superiore · Pressione'], 'Rullatura|Albero inferiore · Set':['Pressione rullatura','Albero inferiore · Pressione'],
+        'Velocità|Set':['Velocità','Velocità'], 'Velocità|Ramp+':['Velocità','Rampa Accelera'], 'Velocità|Ramp−':['Velocità','Rampa Decelera']};
+      if(key==='Contametri|Contametri Set'){ res.push(['Stop','Metri Stop',r.mode==='D'?0:row[2],'m','','']); continue; }
+      if(key==='Contametri|Diametro Set'){ res.push(['Stop','Diametro Stop',row[2],'mm','','']); continue; }
+      if(ren[key]){ res.push([ren[key][0], ren[key][1], row[2], row[3], row[4], row[5]]); continue; }
       if(key==='Controllo tensione|Albero superiore · Set'){ res.push(['Controllo tensione','Albero superiore · Tiro iniziale',row[2],row[3],row[4],row[5]]); continue; }
       if(key==='Controllo tensione|Albero inferiore · Set'){ res.push(['Controllo tensione','Albero inferiore · Tiro iniziale',row[2],row[3],row[4],row[5]]); continue; }
       if(key==='Controllo tensione|Albero superiore · a fine bobina'){ res.push(['Controllo tensione','Albero superiore · Tiro finale',r2(r.finA),'N/cm',mk('finA'),OV.finA!=null?r2(r.calc.finALive):'']); continue; }
@@ -1465,17 +1474,19 @@ function recipeText(r){
     `Struttura: ${$('struct').value}  (${nf(r.T,1)} µm, ${nf(r.G,1)} g/m²)`,
     `Taglio: ${r.n} × ${nf(r.w,1)} mm su madre ${nf(r.Wm)} mm, rifilo ${nf(Math.max(0,r.trim),1)} mm/lato · ${r.knife.type}${m('knife')}`,
     lzab && LASER_UNITS[CUR] ? `LASER       ${LASER_UNITS[CUR]} · ${LZ_TIPI[lzab.tipo]||''} · programma n° ${lzab.prog||'—'}${lzab.posizione?` · ${lzab.posizione}`:''} · ricetta ${LZ_STATI[lzab.stato]||'in prova'} v${lzab.versione||1}` : '',
-    `SVOLGITORE  Tensione Set ${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${U}${m('unw')}`,
+    `SVOLGITORE  ${isTIF()?'Tiro Materiale':'Tensione Set'} ${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${U}${m('unw')}`,
     ...(isTIF() ? [
     `TENSIONE    Albero superiore · Tiro iniziale ${nf(r.rewSetA,2)} N/cm${m('rewA')} · Tiro finale ${nf(r.finA,2)} N/cm${m('finA')}`,
     r.nB ? `            Albero inferiore · Tiro iniziale ${nf(r.rewSetB,2)} N/cm${m('rewB')} · Tiro finale ${nf(r.finB,2)} N/cm${m('finB')}` : '',
-    `RULLATURA   Albero superiore ${nf(r.rollA)} N${m('rollA')}${r.nB?` · Albero inferiore ${nf(r.rollB)} N${m('rollB')}`:''}`] : [
+    `PRESSIONE   Albero superiore ${nf(r.rollA)} N${m('rollA')}${r.nB?` · Albero inferiore ${nf(r.rollB)} N${m('rollB')}`:''}`] : [
     `TENSIONE    Albero superiore Set ${nf(r.rewSetA,2)} N/cm${m('rewA')} (Calc ${nf(r.rewA)} N)`,
     r.nB ? `            Albero inferiore Set ${nf(r.rewSetB,2)} N/cm${m('rewB')} (Calc ${nf(r.rewB)} N)` : '',
     `            Taper ${nf(r.taper)}%${m('taper')}`,
     `RULLATURA   A ${nf(r.rollA)} N${m('rollA')}${r.nB?` · B ${nf(r.rollB)} N${m('rollB')}`:''} · Vel% ${nf(r.rollVel)}${m('rollVel')} · Diam% ${nf(r.rollDiam)}${m('rollDiam')}`]),
-    `VELOCITÀ    Set ${nf(r.v)} m/min${m('v')} · Ramp+ ${nf(r.rup)} s${m('rup')} · Ramp− ${nf(r.rdn)} s${m('rdn')}`,
-    `CONTAMETRI  Set ${nf(r.L)} m · Diametro Set ${r.mode==='D'?nf(r.D):0} mm · Assi ${assiLabel(r.coreID)}`,
+    isTIF() ? `VELOCITÀ    Velocità ${nf(r.v)} m/min${m('v')} · Rampa Accelera ${nf(r.rup)} s${m('rup')} · Rampa Decelera ${nf(r.rdn)} s${m('rdn')}`
+            : `VELOCITÀ    Set ${nf(r.v)} m/min${m('v')} · Ramp+ ${nf(r.rup)} s${m('rup')} · Ramp− ${nf(r.rdn)} s${m('rdn')}`,
+    isTIF() ? `STOP        Metri Stop ${r.mode==='D'?0:nf(r.L)} m · Diametro Stop ${r.mode==='D'?nf(r.D):0} mm`
+            : `CONTAMETRI  Set ${nf(r.L)} m · Diametro Set ${r.mode==='D'?nf(r.D):0} mm · Assi ${assiLabel(r.coreID)}`,
     `Bobina: Ø ${nf(r.D)} mm · ${nf(r.weight,1)} kg`,
     `Resa: ${nf(r.mlh)} m lineari/h · ${nf(r.kgh)} kg/h (cambi inclusi)`,
     ...r.alerts.filter(a=>a[0]!=='ok').map(a=>`! ${a[1]}`)
@@ -1881,15 +1892,19 @@ function buildPdf(r, into){
   } else {
   L = [
     ...(lzab ? [[`0 · LASER IN LINEA · ${LASER_UNITS[CUR]}`, [['Programma da richiamare', `n° ${lzab.prog||'—'}`], ['Incisione', LZ_TIPI[lzab.tipo]||'—', lzab.posizione ? String(lzab.posizione).slice(0,60) : '']]]] : []),
-    ['1 · SVOLGITORE', [['Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
+    ['1 · SVOLGITORE', [[isTIF()?'Tiro Materiale':'Tensione Set', `${nf(unwToPanel(r.unw,r.Wm),unwDec())} ${CFG.unit}${man('unw')}`, `${nf(r.unw)} N totali`]]],
     ['2 · TAGLIO', [['Sistema', cutKind], ['Lame', `${r.n+1}${trimW>0?' con rifili':''}`]]],
-    isTIF() ? ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Tiro iniziale', `${nf(r.rewSetA,2)} N/cm`], ['Albero superiore · Tiro finale', `${nf(r.finA,2)} N/cm`],
+    isTIF() ? ['3 · AVVOLGITORE', [['Albero superiore · Tiro iniziale', `${nf(r.rewSetA,2)} N/cm`], ['Albero superiore · Tiro finale', `${nf(r.finA,2)} N/cm`],
       ...(r.nB?[['Albero inferiore · Tiro iniziale', `${nf(r.rewSetB,2)} N/cm`], ['Albero inferiore · Tiro finale', `${nf(r.finB,2)} N/cm`]]:[])]] :
     ['3 · CONTROLLO DELLA TENSIONE', [['Albero superiore · Set', `${nf(r.rewSetA,2)} N/cm${man('rewA')}`, `Calc ${nf(r.rewA)} N · fine bobina ${nf(r.rewA*(1-r.taper/100))} N`],
       ...(r.nB?[['Albero inferiore · Set', `${nf(r.rewSetB,2)} N/cm${man('rewB')}`, `Calc ${nf(r.rewB)} N · fine bobina ${nf(r.rewB*(1-r.taper/100))} N`]]:[]),
       ['Taper', `${nf(r.taper)} %${man('taper')}`]]]
   ];
-  R = [
+  R = isTIF() ? [
+    ['4 · PRESSIONE RULLATURA', [['Albero superiore · Pressione', `${nf(r.rollA)} N`], ...(r.nB?[['Albero inferiore · Pressione', `${nf(r.rollB)} N`]]:[])]],
+    ['5 · VELOCITÀ', [['Velocità', `${nf(r.v)} m/min`], ['Rampa Accelera', `${nf(r.rup)} s`], ['Rampa Decelera', `${nf(r.rdn)} s`]]],
+    ['6 · STOP', [['Metri Stop', r.mode==='D' ? '0 m (fermata a diametro)' : `${nf(r.L)} m`], ['Diametro Stop', r.mode==='D' ? `${nf(r.D)} mm` : '0 mm (fermata a metri)']]]
+  ] : [
     ['4 · RULLATURA', [['Albero superiore · Set', `${nf(r.rollA)} N${man('rollA')}`], ...(r.nB?[['Albero inferiore · Set', `${nf(r.rollB)} N${man('rollB')}`]]:[]), ...(isTIF() ? [] : [['Vel%', `${nf(r.rollVel)} %${man('rollVel')}`], ['Diam%', `${nf(r.rollDiam)} %${man('rollDiam')}`]])]],
     ['5 · VELOCITÀ', [['Set', `${nf(r.v)} m/min${man('v')}`], ['Ramp+', `${nf(r.rup)} s${man('rup')}`], ['Ramp-', `${nf(r.rdn)} s${man('rdn')}`]]],
     ['6 · CONTAMETRI', [['Contametri Set', `${nf(r.L)} m`], ['Diametro Set', r.mode==='D' ? `${nf(r.D)} mm` : '0 mm (fermata a metri)'], ['Scelta assi', assiLabel(r.coreID)]]]
